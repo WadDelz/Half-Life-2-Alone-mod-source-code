@@ -14,11 +14,15 @@
 #include "EffectsPanelConvarPage.h"
 #include "EffectsPanelOverlayPage.h"
 #include "EffectsPanelLightingPage.h"
+#include "EffectsPanelSettingsPage.h"
 
 //commands
 #define COMMAND_LOAD_EFFECTS "LoadEffects"
 #define COMMAND_SAVE_EFFECTS "SaveEffects"
 #define COMMAND_RESET_EFFECTS "ResetEffects"
+#define COMMAND_CONFIRM_RESET "ConfirmReset"
+#define COMMAND_LIGHTING_DEBUG "LightingDebug"
+#define COMMAND_AUTOLOAD "AutoloadDebug"
 
 //effects panel
 class CEffectsPanel : public vgui::PropertyDialog, CAutoGameSystem
@@ -27,12 +31,19 @@ class CEffectsPanel : public vgui::PropertyDialog, CAutoGameSystem
 public:	
 	//constructor
 	CEffectsPanel(vgui::VPANEL parent);
+	~CEffectsPanel();
 
 	//keyboard/mouse funcs
 	void OnKeyCodePressed(vgui::KeyCode code);
 
-	//called on map load
+	//map funcs
 	void LevelInitPostEntity();
+	void LevelShutdownPreEntity();
+
+	//autoload funcs
+	void ResetEverything();
+	void LoadFile(const char* filepath);
+	void CallOnTick();
 
 	//other functions
 	void OnCommand(const char* pszCommand);
@@ -46,7 +57,27 @@ private:
 	//file dialog stuff for save/load
 	vgui::FileOpenDialog* m_FileDialog = nullptr;
 	vgui::FileOpenDialogType_t m_FileType;
+
+	//debug for lighting page
+	vgui::CheckButton* m_LightingDebugCheckButton;
+
+	//autoload check button
+	vgui::CheckButton* m_AutoloadCheckButton;
+
+	//settings page
+	CEffectsPanelSettingsPage* m_SettingsPage;
 };
+
+#define EFFECTS_PANEL_AUTOLOAD_LIST_FILENAME "cfg/effects_panel_autoload_list.cfg"
+
+//index for lighting page
+#define LIGHTING_PAGE_INDEX 3
+
+//lighting debug convar
+extern ConVar amod_lighting_debug;
+
+//autoload debug
+extern ConVar amod_effects_panel_autoload_files;
 
 //---------------------------------------------------------------------------------
 // Purpose: Constructor for the effects panel
@@ -70,6 +101,33 @@ CEffectsPanel::CEffectsPanel(vgui::VPANEL parent) : BaseClass(nullptr, "EffectsP
 	SetMoveable(true);
 	SetVisible(false);
 
+	//add all the pages needed
+	m_EffectsPages.AddToTail(new CEffectsPanelViewEffects(this, "View Effects"));
+	m_EffectsPages.AddToTail(new CEffectsPanelConvarPage(this, "Console Variables"));
+	m_EffectsPages.AddToTail(new CEffectsPanelOverlayPage(this, "Screen Overlays"));
+	m_EffectsPages.AddToTail(new CEffectsPanelLightingPage(this, "Lighting"));
+
+	//add each page
+	for (int i = 0; i < m_EffectsPages.Count(); i++)
+		AddPage(m_EffectsPages[i], m_EffectsPages[i]->GetName());
+
+	//add the settings page
+	m_SettingsPage = new CEffectsPanelSettingsPage(this, "SettingsPage");
+	AddPage(m_SettingsPage, "Autoload Files  ");
+
+	//load the settings
+	KeyValues* settings = new KeyValues("Settings");
+	settings->LoadFromFile(filesystem, EFFECTS_PANEL_AUTOLOAD_LIST_FILENAME, "MOD");
+
+	m_SettingsPage->ReadFromFile(settings);
+
+	settings->deleteThis();
+
+	//bounds and title
+	SetTitle("Effects Panel", false);
+	SetSize(EFFECTS_PANEL_WIDTH, EFFECTS_PANEL_HEIGHT);
+	MoveToCenterOfScreen();
+
 	//bottom buttons
 	SetOKButtonVisible(true);
 	SetOKButtonText("Reset");
@@ -89,22 +147,35 @@ CEffectsPanel::CEffectsPanel(vgui::VPANEL parent) : BaseClass(nullptr, "EffectsP
 	_applyButton->SetCommand(COMMAND_LOAD_EFFECTS);
 	_applyButton->SetReleasedSound("ui/buttonclickrelease.wav");
 
-	//add all the pages needed
-	m_EffectsPages.AddToTail(new CEffectsPanelViewEffects(this, "View Effects"));
-	m_EffectsPages.AddToTail(new CEffectsPanelConvarPage(this, "Console Variables"));
-	m_EffectsPages.AddToTail(new CEffectsPanelOverlayPage(this, "Screen Overlays"));
-	m_EffectsPages.AddToTail(new CEffectsPanelLightingPage(this, "Lighting"));
-
-	//add each page
-	for (int i = 0; i < m_EffectsPages.Count(); i++)
-		AddPage(m_EffectsPages[i], m_EffectsPages[i]->GetName());
-
-	//bounds and title
-	SetTitle("Effects Panel", false);
-	SetSize(EFFECTS_PANEL_WIDTH, EFFECTS_PANEL_HEIGHT);
-	MoveToCenterOfScreen();
+	//create the lighting debug button
+	m_LightingDebugCheckButton = new vgui::CheckButton(this, "LightingDebug", "Lighting Debug");
+	m_LightingDebugCheckButton->SetBounds(10, EFFECTS_PANEL_HEIGHT - 32, 150, 22);
+	m_LightingDebugCheckButton->AddActionSignalTarget(this);
+	m_LightingDebugCheckButton->SetSelected(false);
+	m_LightingDebugCheckButton->SetCommand(COMMAND_LIGHTING_DEBUG);
+	
+	//create the autoload check buttong
+	m_AutoloadCheckButton = new vgui::CheckButton(this, "AutoloadButton", "Should Autoload Files?");
+	m_AutoloadCheckButton->SetBounds(10, EFFECTS_PANEL_HEIGHT - 32, 165, 22);
+	m_AutoloadCheckButton->AddActionSignalTarget(this);
+	m_AutoloadCheckButton->SetSelected(amod_effects_panel_autoload_files.GetBool());
+	m_AutoloadCheckButton->SetCommand(COMMAND_AUTOLOAD);
 
 	vgui::ivgui()->AddTickSignal(GetVPanel(), 30);
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: Destructor
+//---------------------------------------------------------------------------------
+CEffectsPanel::~CEffectsPanel()
+{
+	//save the settings
+	KeyValues* settings = new KeyValues("Settings");
+
+	m_SettingsPage->WriteToFile(settings);
+
+	settings->SaveToFile(filesystem, EFFECTS_PANEL_AUTOLOAD_LIST_FILENAME, "MOD");
+	settings->deleteThis();
 }
 
 //---------------------------------------------------------------------------------
@@ -137,7 +208,64 @@ void CEffectsPanel::LevelInitPostEntity()
 	for (int i = 0; i < m_EffectsPages.Count(); i++)
 		m_EffectsPages[i]->OnMapLoad();
 
+	//call for settings
+	m_SettingsPage->OnMapLoad();
+
 	CAutoGameSystem::LevelInitPostEntity();
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: Called on map load
+//---------------------------------------------------------------------------------
+void CEffectsPanel::LevelShutdownPreEntity()
+{
+	//call all page functions
+	for (int i = 0; i < m_EffectsPages.Count(); i++)
+		m_EffectsPages[i]->OnMapShutdown();
+
+	//call for settings
+	m_SettingsPage->OnMapShutdown();
+
+	CAutoGameSystem::LevelInitPostEntity();
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: Resets everything. This is for the autoload functionality
+//---------------------------------------------------------------------------------
+void CEffectsPanel::ResetEverything()
+{
+	//load for all effect pages
+	for (int i = 0; i < m_EffectsPages.Count(); i++)
+		m_EffectsPages[i]->ResetEffects();
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: Loads a file. This is for the autoload functionality
+//---------------------------------------------------------------------------------
+void CEffectsPanel::LoadFile(const char* filepath)
+{
+	//load the keyvalues
+	KeyValues* file = new KeyValues("");
+	if (file->LoadFromFile(g_pFullFileSystem, filepath))
+	{
+		//load for all effect pages
+		for (int i = 0; i < m_EffectsPages.Count(); i++)
+		{
+			m_EffectsPages[i]->ReadFromFile(file);
+		}
+	}
+
+	//delete the keyvalues
+	file->deleteThis();
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: Calls the ontick funciton for every page
+//---------------------------------------------------------------------------------
+void CEffectsPanel::CallOnTick()
+{
+	for (int i = 0; i < m_EffectsPages.Count(); i++)
+		m_EffectsPages[i]->OnTick();
 }
 
 //---------------------------------------------------------------------------------
@@ -147,6 +275,18 @@ void CEffectsPanel::OnCommand(const char* pszCommand)
 {
 	//check for reset
 	if (!Q_strcmp(pszCommand, COMMAND_RESET_EFFECTS))
+	{
+		//prompt the user
+		vgui::QueryBox* prompt = new vgui::QueryBox("Save?", "Are you sure you want to reset without saving?");
+		prompt->SetOKButtonText("Ok");
+		prompt->SetOKCommand(new KeyValues("Command", "command", COMMAND_CONFIRM_RESET));
+		prompt->SetCancelButtonVisible(false);
+		prompt->AddActionSignalTarget(this);
+		prompt->DoModal(this);
+	}
+
+	//confirm reset
+	if (!Q_strcmp(pszCommand, COMMAND_CONFIRM_RESET))
 	{
 		//reset every page
 		for (int i = 0; i < m_EffectsPages.Count(); i++)
@@ -212,6 +352,18 @@ void CEffectsPanel::OnCommand(const char* pszCommand)
 		//set the file type
 		m_FileType = vgui::FileOpenDialogType_t::FOD_OPEN;
 	}
+	
+	//check for lighting debug
+	else if (!Q_strcmp(pszCommand, COMMAND_LIGHTING_DEBUG))
+	{
+		amod_lighting_debug.SetValue(m_LightingDebugCheckButton->IsSelected());
+	}
+	
+	//check for lighting debug
+	else if (!Q_strcmp(pszCommand, COMMAND_AUTOLOAD))
+	{
+		amod_effects_panel_autoload_files.SetValue(m_AutoloadCheckButton->IsSelected());
+	}
 
 	//call base function
 	else
@@ -227,9 +379,27 @@ void CEffectsPanel::OnTick()
 {
 	BaseClass::OnTick();
 
+	vgui::Panel* activepage = GetActivePage();
+
+	//see if settings page
+	m_AutoloadCheckButton->SetVisible(activepage == m_SettingsPage);
+	_cancelButton->SetVisible(activepage != m_SettingsPage);
+	_okButton->SetVisible(activepage != m_SettingsPage);
+	_applyButton->SetVisible(activepage != m_SettingsPage);
+
+	//see if it is the lighting page
+	bool IsLightingPage = activepage == m_EffectsPages[LIGHTING_PAGE_INDEX];
+	m_LightingDebugCheckButton->SetVisible(IsLightingPage);
+
 	//if this isnt visible then dont bother with the next code
 	if (!IsVisible())
+	{
+		//check for lighting page and lighting debug
+		if (IsLightingPage)
+			m_EffectsPages[LIGHTING_PAGE_INDEX]->OnTick();
+
 		return;
+	}
 
 	//call each page's on tick function
 	for (int i = 0; i < m_EffectsPages.Count(); i++)
@@ -270,7 +440,7 @@ void CEffectsPanel::OnFileSelected(const char* pszFileName)
 
 		//read each page
 		for (int i = 0; i < m_EffectsPages.Count(); i++)
-			m_EffectsPages[i]->ReadFromFile(file);
+			m_EffectsPages[i]->ReadFromFile(file, true);
 	}
 	else
 	{
@@ -306,6 +476,10 @@ public:
 	virtual void Destroy();
 	virtual void ToggleVisibility();
 
+	//autoload stuff
+	virtual void ResetEverything();
+	virtual void LoadFile(const char* filepath);
+	virtual void CallOnTick();
 private:
 	//effects panel instance
 	CEffectsPanel* m_EffectsPanelInstance = nullptr;
@@ -354,6 +528,42 @@ void CEffectsPanelInterface::ToggleVisibility()
 		m_EffectsPanelInstance->MoveToFront();
 		m_EffectsPanelInstance->vgui::Panel::RequestFocus();
 	}
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: Resets everything
+//---------------------------------------------------------------------------------
+void CEffectsPanelInterface::ResetEverything()
+{
+	//check for effects panel
+	if (!m_EffectsPanelInstance)
+		return;
+
+	m_EffectsPanelInstance->ResetEverything();
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: Loads a file
+//---------------------------------------------------------------------------------
+void CEffectsPanelInterface::LoadFile(const char* filepath)
+{
+	//check for effects panel
+	if (!m_EffectsPanelInstance)
+		return;
+
+	m_EffectsPanelInstance->LoadFile(filepath);
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: Calls on tick for every page
+//---------------------------------------------------------------------------------
+void CEffectsPanelInterface::CallOnTick()
+{
+	//check for effects panel
+	if (!m_EffectsPanelInstance)
+		return;
+
+	m_EffectsPanelInstance->CallOnTick();
 }
 
 //effects panel singleton

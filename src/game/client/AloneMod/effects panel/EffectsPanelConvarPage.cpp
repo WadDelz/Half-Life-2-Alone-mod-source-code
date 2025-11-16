@@ -31,7 +31,7 @@ void CFilteredTextEntry::OnKeyTyped(wchar_t unichar)
 		if (unichar == m_FilterOut[i])
 			return;
 	}
-
+	
 	//passed filter check
 	BaseClass::OnKeyTyped(unichar);
 }
@@ -218,6 +218,9 @@ bool CConvarPageConvarList::AddConvar(const char* ConvarName, const char* Convar
 
 	//add the button to the list of buttons
 	m_ButtonList.AddToTail(button);
+
+	//select button
+	OnCommand(CFmtStr(CONVAR_LIST_PANEL_BUTTON_COMMAND_PREFIX  "%d", m_ButtonList.Count() - 1));
 
 	//check the list size
 	if (m_ButtonList.Count() > CONVAR_LIST_PANEL_MAX_ITEMS_BEFORE_SCROLL)
@@ -797,7 +800,7 @@ CEffectsPanelConvarPage::CEffectsPanelConvarPage(vgui::Panel* parent, const char
 
 	//bottom buttons
 	m_AddButton = new vgui::Button(this, "AddConvarButton", "Add Convar", this, CONVAR_PAGE_ADD_COMMAND);
-	m_ChangeButton = new vgui::Button(this, "ChangeConvarButton", "Change Selected Vars Value", this, CONVAR_PAGE_CHANGE_COMMAND);
+	m_ChangeButton = new vgui::Button(this, "ChangeConvarButton", "Update Selected Vars Value", this, CONVAR_PAGE_CHANGE_COMMAND);
 	m_RemoveButton = new vgui::Button(this, "RemoveConvarButton", "Remove Selected Convar", this, CONVAR_PAGE_REMOVE_COMMAND);
 
 	//reset the things to the defaults
@@ -823,10 +826,11 @@ void CEffectsPanelConvarPage::ResetEffects()
 //---------------------------------------------------------------------------------
 // Purpose: Reads from the file
 //---------------------------------------------------------------------------------
-void CEffectsPanelConvarPage::ReadFromFile(KeyValues* keyvalues)
+void CEffectsPanelConvarPage::ReadFromFile(KeyValues* keyvalues, bool reset)
 {
 	//reset everything
-	ResetEffects();
+	if (reset)
+		ResetEffects();
 
 	//find the view KeyValues
 	KeyValues* convars = keyvalues->FindKey("ConVars");
@@ -1020,4 +1024,6 @@ void CEffectsPanelConvarPage::PerformLayout()
 	m_AddButton->SetBounds(5, 362, 171, 22);
 	m_ChangeButton->SetBounds(180, 362, 171, 22);
 	m_RemoveButton->SetBounds(355, 362, 171, 22);
+
+	BaseClass::PerformLayout();
 }

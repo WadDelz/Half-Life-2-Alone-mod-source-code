@@ -858,6 +858,8 @@ public:
 	void							SetSize( const Vector &vecMin, const Vector &vecMax ); // UTIL_SetSize( pev, mins, maxs );
 	char const						*GetClassname( void );
 	char const						*GetDebugName( void );
+	const char						*GetEntityName(void) { return m_EntityName; };
+	const char						*GetRealClassname(void) { return m_RealClassname; };
 	static int						PrecacheModel( const char *name ); 
 	static bool						PrecacheSound( const char *name );
 	static void						PrefetchSound( const char *name );
@@ -1565,6 +1567,8 @@ private:
 	CHandle<C_BaseEntity>			m_hOldMoveParent;
 
 	string_t						m_ModelName;
+	char							m_EntityName[128];
+	char							m_RealClassname[128];
 
 	CNetworkVarEmbedded( CCollisionProperty, m_Collision );
 	CNetworkVarEmbedded( CParticleProperty, m_Particles );

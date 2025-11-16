@@ -161,6 +161,8 @@ BEGIN_SEND_TABLE_NOBASE( CBaseEntity, DT_AnimTimeMustBeFirst )
 	//  if it is sent after the new values, then it will only have the new origin and studio model, etc.
 	//  interpolation will be busted
 	SendPropInt	(SENDINFO(m_flAnimTime), 8, SPROP_UNSIGNED|SPROP_CHANGES_OFTEN|SPROP_ENCODED_AGAINST_TICKCOUNT, SendProxy_AnimTime),
+	SendPropString(SENDINFO(m_EntityName)),
+	SendPropString(SENDINFO(m_RealClassname)),
 END_SEND_TABLE()
 
 #if !defined( NO_ENTITY_PREDICTION )
@@ -613,6 +615,7 @@ CBaseEntity *CBaseEntity::GetFollowedEntity()
 void CBaseEntity::SetClassname( const char *className )
 {
 	m_iClassname = AllocPooledString( className );
+	Q_strncpy(m_RealClassname.GetForModify(), className, sizeof(m_RealClassname));
 }
 
 void CBaseEntity::SetModelIndex( int index )

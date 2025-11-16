@@ -589,7 +589,7 @@ CEffectsPanelOverlayPage::CEffectsPanelOverlayPage(vgui::Panel* parent, const ch
 
 	//make buttons
 	m_AddButton = new vgui::Button(this, "AddButton", "Add Overlay", this, ADD_OVERLAY_BUTTON_COMMAWND);
-	m_ChangeOverlay = new vgui::Button(this, "ChangeButton", "Change Selected Overlay", this, CHANGE_OVERLAY_BUTTON_COMMAWND);
+	m_ChangeOverlay = new vgui::Button(this, "ChangeButton", "Update Selected Overlay", this, CHANGE_OVERLAY_BUTTON_COMMAWND);
 	m_RemoveOverlay = new vgui::Button(this, "RemoveOverlay", "Remove Selected Overlay", this, REMOVE_OVERLAY_BUTTON_COMMAWND);
 
 	//reset the things to the defaults
@@ -702,10 +702,11 @@ void CEffectsPanelOverlayPage::ResetEffects()
 //---------------------------------------------------------------------------------
 // Purpose: Reads from the file
 //---------------------------------------------------------------------------------
-void CEffectsPanelOverlayPage::ReadFromFile(KeyValues* keyvalues)
+void CEffectsPanelOverlayPage::ReadFromFile(KeyValues* keyvalues, bool reset)
 {
 	//clear everything
-	ResetEffects();
+	if (reset)
+		ResetEffects();
 
 	//find the view KeyValues
 	KeyValues* overlays = keyvalues->FindKey("Overlays");
@@ -943,4 +944,6 @@ void CEffectsPanelOverlayPage::PerformLayout()
 	m_AddButton->SetBounds(5, 360, 170, 22);
 	m_ChangeOverlay->SetBounds(182, 360, 170, 22);
 	m_RemoveOverlay->SetBounds(359, 360, 170, 22);
+
+	BaseClass::PerformLayout();
 }

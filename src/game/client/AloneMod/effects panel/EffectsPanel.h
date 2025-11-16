@@ -18,17 +18,18 @@ public:
 
 	//save/load functions
 	virtual void ResetEffects() = 0;
-	virtual void ReadFromFile(KeyValues* keyvalues) = 0;
+	virtual void ReadFromFile(KeyValues* keyvalues, bool reset = false) = 0;
 	virtual void WriteToFile(KeyValues* keyvalues) = 0;
 
-	//called on map load
+	//map funcs
 	virtual void OnMapLoad() {};
+	virtual void OnMapShutdown() {};
 };
 
 #define EFFECTS_PANEL_WIDTH 550
 #define EFFECTS_PANEL_HEIGHT 490
-#define EFFECTS_PAGE_WIDTH EFFECTS_PANEL_WIDTH - 25
-#define EFFECTS_PAGE_HEIGHT EFFECTS_PANEL_HEIGHT - 25
+#define EFFECTS_PAGE_WIDTH (EFFECTS_PANEL_WIDTH - 25)
+#define EFFECTS_PAGE_HEIGHT (EFFECTS_PANEL_HEIGHT - 25)
 
 //effects panel interface
 class IEffectsPanel
@@ -37,6 +38,11 @@ public:
 	virtual void		Create(vgui::VPANEL parent) = 0;
 	virtual void		Destroy() = 0;
 	virtual void		ToggleVisibility() = 0;
+
+	//autoload
+	virtual void		ResetEverything() = 0;
+	virtual void		LoadFile(const char* filepath) = 0;
+	virtual void		CallOnTick() = 0;
 };
 
 //global effects panel interface

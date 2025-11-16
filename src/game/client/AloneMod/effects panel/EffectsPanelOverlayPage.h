@@ -192,7 +192,7 @@ public:
 
 	//save/load functions
 	void ResetEffects();
-	void ReadFromFile(KeyValues* keyvalues);
+	void ReadFromFile(KeyValues* keyvalues, bool reset = false);
 	void WriteToFile(KeyValues* keyvalues);
 
 	//sets overlay text entry text

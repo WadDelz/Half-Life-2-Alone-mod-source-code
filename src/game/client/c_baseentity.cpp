@@ -418,6 +418,8 @@ void RecvProxy_EffectFlags( const CRecvProxyData *pData, void *pStruct, void *pO
 
 BEGIN_RECV_TABLE_NOBASE( C_BaseEntity, DT_AnimTimeMustBeFirst )
 	RecvPropInt( RECVINFO(m_flAnimTime), 0, RecvProxy_AnimTime ),
+	RecvPropString( RECVINFO(m_EntityName) ),
+	RecvPropString( RECVINFO(m_RealClassname) ),
 END_RECV_TABLE()
 
 

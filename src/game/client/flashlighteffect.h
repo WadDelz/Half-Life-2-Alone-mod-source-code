@@ -42,9 +42,13 @@ protected:
 	void LightOffOld();
 	void LightOffNew();
 
+public:
 	void UpdateLightNew(const Vector &vecPos, const Vector &vecDir, const Vector &vecRight, const Vector &vecUp);
 	void UpdateLightOld(const Vector &vecPos, const Vector &vecDir, int nDistance);
+	void UpdateLightEffectsPanel(const Vector &vecPos, const Vector &vecDir, const Vector &vecRight, const Vector &vecUp, Color color, int far, int fov);
 
+	Vector m_pos, m_forward, m_right, m_up;
+protected:
 	bool m_bIsOn;
 	int m_nEntIndex;
 	ClientShadowHandle_t m_FlashlightHandle;

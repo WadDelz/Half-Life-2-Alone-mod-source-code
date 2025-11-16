@@ -441,6 +441,7 @@ bool CBaseEntity::KeyValue( const char *szKeyName, const char *szValue )
 	if ( FStrEq( szKeyName, "targetname" ) )
 	{
 		m_iName = AllocPooledString( szValue );
+		Q_strncpy(m_EntityName.GetForModify(), m_iName.ToCStr(), sizeof(m_EntityName));
 		return true;
 	}
 

@@ -236,10 +236,11 @@ void CEffectsPanelViewEffects::ResetEffects()
 //---------------------------------------------------------------------------------
 // Purpose: Reads from the file
 //---------------------------------------------------------------------------------
-void CEffectsPanelViewEffects::ReadFromFile(KeyValues* keyvalues)
+void CEffectsPanelViewEffects::ReadFromFile(KeyValues* keyvalues, bool reset)
 {
 	//reset everything
-	ResetEffects();
+	if (reset)
+		ResetEffects();
 
 	//find the view KeyValues
 	KeyValues* view = keyvalues->FindKey("View");
@@ -574,4 +575,6 @@ void CEffectsPanelViewEffects::PerformLayout()
 
 	SET_CONTROL_BOUNDS(m_MaximumPitchText, 395, CheckButtonY, 125, CheckButtonTall, CheckButtonTall);
 	SET_CONTROL_BOUNDS(m_MaximumPitchSlider, 395, CheckButtonY, 125, CheckButtonTall, CheckButtonTall);
+
+	BaseClass::PerformLayout();
 }
