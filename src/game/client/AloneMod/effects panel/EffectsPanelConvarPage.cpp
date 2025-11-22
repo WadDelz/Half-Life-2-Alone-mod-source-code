@@ -134,7 +134,7 @@ CConvarPageConvarList::CConvarPageConvarList(vgui::Panel* parent, const char* na
 	
 	//make the scroll bar
 	m_ScrollBar = new vgui::ScrollBar(this, "_ScrollBar", true);
-	m_ScrollBar->SetBounds(EFFECTS_PAGE_WIDTH - 20, 0, 20, 298);
+	m_ScrollBar->SetBounds(EFFECTS_PAGE_WIDTH - 20, 0, 20, 278);
 	m_ScrollBar->SetRangeWindow(1);
 	m_ScrollBar->AddActionSignalTarget(this);
 
@@ -179,7 +179,7 @@ void CConvarPageConvarList::OnScrollBarSliderMoved()
 //---------------------------------------------------------------------------------
 // Purpose: Adds a convar button
 //---------------------------------------------------------------------------------
-bool CConvarPageConvarList::AddConvar(const char* ConvarName, const char* ConvarValue)
+bool CConvarPageConvarList::AddConvar(const char* ConvarName, const char* ConvarValue, ConvarActiveType_e type)
 {
 	//see if we have a button with the same name
 	if (HasConvar(ConvarName))
@@ -206,9 +206,11 @@ bool CConvarPageConvarList::AddConvar(const char* ConvarName, const char* Convar
 	Q_strncpy(button->m_ConvarData.value, ConvarValue, sizeof(button->m_ConvarData.value));
 	Q_strncpy(button->m_ConvarData.default, var->GetString(), sizeof(button->m_ConvarData.default));
 	button->m_ConvarData.convar = var;
+	button->m_ConvarData.type = type;
 
-	//set the convar's value
-	var->SetValue(ConvarValue);
+	//set the convar's value if we can
+	if (ShouldConvarBeActive(dynamic_cast<C_BaseHLPlayer*>(CBasePlayer::GetLocalPlayer()), type))
+		var->SetValue(ConvarValue);
 
 	//select the button and de-select every other button
 	button->SetButtonSelected(true);
@@ -260,7 +262,7 @@ bool CConvarPageConvarList::HasConvar(const char* ConvarName)
 //---------------------------------------------------------------------------------
 // Purpose: Changes a convar's value
 //---------------------------------------------------------------------------------
-void CConvarPageConvarList::ChangeConvarValue(const char* ConvarName, const char* newvalue)
+void CConvarPageConvarList::ChangeConvarValue(const char* ConvarName, const char* newvalue, ConvarActiveType_e type)
 {
 	//check each button
 	for (int i = 0; i < m_ButtonList.Count(); i++)
@@ -276,7 +278,11 @@ void CConvarPageConvarList::ChangeConvarValue(const char* ConvarName, const char
 			Q_strncpy(button->m_ConvarData.value, newvalue, sizeof(button->m_ConvarData.value));
 
 			//set the convar's value
-			button->m_ConvarData.convar->SetValue(newvalue);
+			button->m_ConvarData.type = type;
+
+			//should we activate the convar?
+			if (ShouldConvarBeActive(dynamic_cast<C_BaseHLPlayer*>(CBasePlayer::GetLocalPlayer()), button->m_ConvarData.type))
+				button->m_ConvarData.convar->SetValue(newvalue);
 
 			//set the button's text
 			button->SetText(CFmtStr("%s = %s", ConvarName, newvalue));
@@ -301,7 +307,7 @@ void CConvarPageConvarList::ChangeConvarValue(const char* ConvarName, const char
 //---------------------------------------------------------------------------------
 // Purpose: Returns if this list has a convar
 //---------------------------------------------------------------------------------
-bool CConvarPageConvarList::ChangeSelectedConvar(const char* newvalue)
+bool CConvarPageConvarList::ChangeSelectedConvar(const char* newvalue, ConvarActiveType_e type)
 {
 	//check each button
 	for (int i = 0; i < m_ButtonList.Count(); i++)
@@ -316,7 +322,7 @@ bool CConvarPageConvarList::ChangeSelectedConvar(const char* newvalue)
 			continue;
 
 		//change the value
-		ChangeConvarValue(button->m_ConvarData.name, newvalue);
+		ChangeConvarValue(button->m_ConvarData.name, newvalue, type);
 		return true;
 	}
 
@@ -441,7 +447,8 @@ void CConvarPageConvarList::ApplyConvarValues()
 		if (!button)
 			continue;
 
-		button->m_ConvarData.convar->SetValue(button->m_ConvarData.value);
+		if (ShouldConvarBeActive(dynamic_cast<C_BaseHLPlayer*>(CBasePlayer::GetLocalPlayer()), button->m_ConvarData.type))
+			button->m_ConvarData.convar->SetValue(button->m_ConvarData.value);
 	}
 }
 
@@ -472,8 +479,10 @@ void CConvarPageConvarList::OnCommand(const char* pszCommand)
 				m_ConvarPage->SetConvarText(button->m_ConvarData.name, button->m_ConvarData.value);
 
 				//also set the convar value
-				if (Q_strcmp(button->m_ConvarData.convar->GetString(), button->m_ConvarData.value))
+				if (Q_strcmp(button->m_ConvarData.convar->GetString(), button->m_ConvarData.value) && ShouldConvarBeActive(dynamic_cast<C_BaseHLPlayer*>(CBasePlayer::GetLocalPlayer()), button->m_ConvarData.type))
+				{
 					button->m_ConvarData.convar->SetValue(button->m_ConvarData.value);
+				}
 			}
 		}
 
@@ -483,6 +492,95 @@ void CConvarPageConvarList::OnCommand(const char* pszCommand)
 	BaseClass::OnCommand(pszCommand);
 }
 
+//---------------------------------------------------------------------------------
+// Purpose: Returns if the convar should be active
+//---------------------------------------------------------------------------------
+bool CConvarPageConvarList::ShouldConvarBeActive(CHL2_Player* pPlayer, ConvarActiveType_e type)
+{
+	//check for player
+	if (!pPlayer)
+		return false;
+
+	//check for always draw
+	if (((int)type & (int)ConvarActiveType_e::Active_Always) && !pPlayer->IsEffectActive(EF_DIMLIGHT))
+		return true;
+
+	//check for flashlight on
+	if (((int)type & (int)ConvarActiveType_e::Active_WhenPlayerFlashlightOn) && pPlayer->IsEffectActive(EF_DIMLIGHT))
+		return true;
+
+	//check for flashlight off
+	if (((int)type & (int)ConvarActiveType_e::Active_WhenPlayerFlashlightOff) && !pPlayer->IsEffectActive(EF_DIMLIGHT))
+		return true;
+
+	//moving?
+	bool moving = pPlayer->GetAbsVelocity().Length() >= 25;
+
+	//check for walking
+	if (((int)type & (int)ConvarActiveType_e::Active_WhenWalking) && moving && !pPlayer->IsSprinting())
+		return true;
+
+	//check for sprinting
+	if (((int)type & (int)ConvarActiveType_e::Active_WhenSprinting) && moving && pPlayer->IsSprinting())
+		return true;
+
+	//check for health
+	if (((int)type & (int)ConvarActiveType_e::Active_WhenHealthLow) && pPlayer->GetHealth() <= 20)
+		return true;
+
+	//check for under water
+	if (((int)type & (int)ConvarActiveType_e::Active_WhenUnderWater) && pPlayer->GetWaterLevel() < WL_Eyes)
+		return true;
+
+	//check for crouching
+	if (((int)type & (int)ConvarActiveType_e::Active_WhenCrouching) && (pPlayer->GetFlags() & FL_DUCKING))
+		return true;
+
+	//check for on ground
+	if (((int)type & (int)ConvarActiveType_e::Active_WhenOnGround) && (pPlayer->GetFlags() & FL_ONGROUND))
+		return true;
+
+	//check for holding object
+	if (((int)type & (int)ConvarActiveType_e::Active_WhenHoldingObject) && pPlayer->GetUseEntity())
+		return true;
+
+	//check for zooming
+	if (((int)type & (int)ConvarActiveType_e::Active_WhenUsingSuitZoom) && pPlayer->IsZoomed())
+		return true;
+
+	//check for in air
+	if (((int)type & (int)ConvarActiveType_e::Active_WhenInAir) && !(pPlayer->GetFlags() & FL_ONGROUND))
+		return true;
+
+	return false;
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: Called on think
+//---------------------------------------------------------------------------------
+void CConvarPageConvarList::OnTick()
+{
+	//get the player
+	C_BaseHLPlayer* pPlayer = dynamic_cast<C_BaseHLPlayer*>(CBasePlayer::GetLocalPlayer());
+
+	//paint all the overlays
+	for (int i = 0; i < m_ButtonList.Count(); i++)
+	{
+		//get the data
+		ConvarButtonData_t& data = m_ButtonList[i]->m_ConvarData;
+
+		bool ConvarValueIsSet = !Q_strcmp(data.convar->GetString(), data.value);
+		bool ShouldBeActive = ShouldConvarBeActive(pPlayer, data.type);
+
+		//see if the overlay should draw
+		if (ShouldBeActive && !ConvarValueIsSet)
+			data.convar->SetValue(data.value);
+		
+		//see if the overlay shouldnt draw
+		else if (!ShouldBeActive && ConvarValueIsSet)
+			data.convar->SetValue(data.default);
+	}
+}
 
 //convar list panel
 
@@ -785,6 +883,21 @@ CEffectsPanelConvarPage::CEffectsPanelConvarPage(vgui::Panel* parent, const char
 	//create the convar list panel
 	m_ConvarListPanel = new CConvarPageConvarList(this, "ConvarList", "Convar List:");
 
+	//make types combo box
+	m_TypeComboBox = new vgui::ComboBox(this, "TypesComboBox", 14, false);
+	m_TypeComboBox->SetMaximumCharCount(254);
+
+	//add types
+	for (int i = 0; i < SIZE_OF_ARRAY(g_ConvarActiveType); i++)
+	{
+		m_TypeComboBox->GetMenu()->AddCheckableMenuItem(g_ConvarActiveType[i], new KeyValues("SetText", "text", g_ConvarActiveType[i]), this, nullptr);
+		m_TypeComboBox->GetMenu()->GetMenuItem(i)->SetCommand(CFmtStr(CONVAR_PAGE_OVERLAY_TYPE_PREFIX "%d", i));
+		m_TypeComboBox->GetMenu()->GetMenuItem(i)->AddActionSignalTarget(this);
+	}
+
+	//active the items
+	m_TypeComboBox->ActivateItem(0);
+
 	//create the name stuff
 	m_ConvarNameText = new vgui::Label(this, "ConvarNameText", "Convar Name");
 	m_ConvarNameTextEntry = new CFilteredTextEntry(this, "ConvarNameTextEntry", CONVAR_PAGE_NAME_FILTER);
@@ -803,6 +916,16 @@ CEffectsPanelConvarPage::CEffectsPanelConvarPage(vgui::Panel* parent, const char
 	m_ChangeButton = new vgui::Button(this, "ChangeConvarButton", "Update Selected Vars Value", this, CONVAR_PAGE_CHANGE_COMMAND);
 	m_RemoveButton = new vgui::Button(this, "RemoveConvarButton", "Remove Selected Convar", this, CONVAR_PAGE_REMOVE_COMMAND);
 
+	//add the tool tips
+	ADD_TOOLTIP(m_ConvarListPanel, 100, "This list shows all of the convars that are currently being modified. Select the convar to change its value/active type or remove it using the buttons below.", true);
+	ADD_TOOLTIP(m_TypeComboBox, 100, "When you add a convar to the list panel/change it, These are the conditions that must be met for the convar to show. Note that only 1 condition needs to be met for the convars value to be set", true);
+	ADD_TOOLTIP(m_ConvarNameTextEntry, 100, "The name of the convar that's value you want to change.", true);
+	ADD_TOOLTIP(m_FindConvarButton, 100, "Press this to find a list of convar's that you can insert into the name text entry", true);
+	ADD_TOOLTIP(m_ConvarNameTextEntry, 100, "The value that will get set for the convar.", true);
+	ADD_TOOLTIP(m_AddButton, 100, "Press this button to add the convar (and its data) into the list of convars.", true);
+	ADD_TOOLTIP(m_ChangeButton, 100, "Press this button to update the button that is currently selected in the convar list", true);
+	ADD_TOOLTIP(m_RemoveButton, 100, "Press this button to remove the button that is currently selected in the convar list", true);
+
 	//reset the things to the defaults
 	ResetEffects();
 
@@ -817,6 +940,13 @@ void CEffectsPanelConvarPage::ResetEffects()
 {
 	//clear the convars
 	m_ConvarListPanel->ClearConvars();
+
+	//reset mode
+	m_TypeComboBox->ActivateItem(0);
+
+	//only select menu item 1 (Always active)
+	for (int i = 0; i < m_TypeComboBox->GetItemCount(); i++)
+		m_TypeComboBox->GetMenu()->SetMenuItemChecked(i, i == 0);
 
 	//reset the text entries
 	m_ConvarValueTextEntry->SetText("");
@@ -838,8 +968,10 @@ void CEffectsPanelConvarPage::ReadFromFile(KeyValues* keyvalues, bool reset)
 		return;
 
 	//add each convar
-	FOR_EACH_VALUE(convars, value)
-		m_ConvarListPanel->AddConvar(value->GetName(), value->GetString());
+	FOR_EACH_TRUE_SUBKEY(convars, subkey)
+	{
+		m_ConvarListPanel->AddConvar(subkey->GetString("Convar"), subkey->GetString("Value"), (ConvarActiveType_e)subkey->GetInt("Type"));
+	}
 }
 
 //---------------------------------------------------------------------------------
@@ -857,7 +989,15 @@ void CEffectsPanelConvarPage::WriteToFile(KeyValues* keyvalues)
 	//add the keys
 	for (int i = 0; i < data.Count(); i++)
 	{
-		convars->SetString(data[i]->name, data[i]->value);
+		//create a new subkey
+		KeyValues* subkey = new KeyValues("Convar");
+
+		subkey->SetString("Convar", data[i]->name);
+		subkey->SetString("Value", data[i]->value);
+		subkey->SetInt("Type", (int)data[i]->type);
+
+		//add subkey
+		convars->AddSubKey(subkey);
 	}
 
 	//add the convars settings
@@ -912,8 +1052,16 @@ void CEffectsPanelConvarPage::OnCommand(const char* pszCommand)
 			return;
 		}
 
+		//get the type
+		int drawtype = NULL;
+		for (int i = 0; i < m_TypeComboBox->GetItemCount(); i++)
+		{
+			if (m_TypeComboBox->GetMenu()->IsChecked(i))
+				drawtype |= (1 << i);
+		}
+
 		//add the convar
-		if (!m_ConvarListPanel->AddConvar(name, value))
+		if (!m_ConvarListPanel->AddConvar(name, value, (ConvarActiveType_e)drawtype))
 		{
 			//play an error sound
 			vgui::surface()->PlaySound("resource/warning.wav");
@@ -951,8 +1099,16 @@ void CEffectsPanelConvarPage::OnCommand(const char* pszCommand)
 		char value[202];
 		m_ConvarValueTextEntry->GetText(value, sizeof(value));
 
+		//get the draw type
+		int drawtype = NULL;
+		for (int i = 0; i < m_TypeComboBox->GetItemCount(); i++)
+		{
+			if (m_TypeComboBox->GetMenu()->IsChecked(i))
+				drawtype |= (1 << i);
+		}
+
 		//remove the selected convar
-		if (!m_ConvarListPanel->ChangeSelectedConvar(value))
+		if (!m_ConvarListPanel->ChangeSelectedConvar(value, (ConvarActiveType_e)drawtype))
 		{
 			vgui::surface()->PlaySound("resource/warning.wav");
 
@@ -975,8 +1131,26 @@ void CEffectsPanelConvarPage::OnCommand(const char* pszCommand)
 		m_ConvarNameTextEntry->GetText(name, sizeof(name));
 		m_ConvarValueTextEntry->GetText(value, sizeof(value));
 
+		//get the draw type
+		int drawtype = NULL;
+		for (int i = 0; i < m_TypeComboBox->GetItemCount(); i++)
+		{
+			if (m_TypeComboBox->GetMenu()->IsChecked(i))
+				drawtype |= (1 << i);
+		}
+
 		//change the value
-		m_ConvarListPanel->ChangeConvarValue(name, value);
+		m_ConvarListPanel->ChangeConvarValue(name, value, (ConvarActiveType_e)drawtype);
+	}
+
+	//check for OVERLAY_PAGE_OVERLAY_TYPE_PREFIX
+	else if (StringHasPrefix(pszCommand, CONVAR_PAGE_OVERLAY_TYPE_PREFIX))
+	{
+		//get index
+		int index = Q_atoi(pszCommand + Q_strlen(CONVAR_PAGE_OVERLAY_TYPE_PREFIX));
+
+		//set selected state of menu item
+		m_TypeComboBox->GetMenu()->SetMenuItemChecked(index, m_TypeComboBox->GetMenu()->IsChecked(index));
 	}
 
 	//check for find convar button
@@ -1004,12 +1178,24 @@ void CEffectsPanelConvarPage::OnCommand(const char* pszCommand)
 }
 
 //---------------------------------------------------------------------------------
+// Purpose: Called every 30ms
+//---------------------------------------------------------------------------------
+void CEffectsPanelConvarPage::OnTick()
+{
+	//call m_ConvarListPanel on tick
+	m_ConvarListPanel->OnTick();
+}
+
+//---------------------------------------------------------------------------------
 // Purpose: Sets the bounds for each item
 //---------------------------------------------------------------------------------
 void CEffectsPanelConvarPage::PerformLayout()
 {
 	//set the convar list
-	m_ConvarListPanel->SetBounds(5, 10, EFFECTS_PAGE_WIDTH, 300);
+	m_ConvarListPanel->SetBounds(5, 10, EFFECTS_PAGE_WIDTH, 280);
+
+	//set type combo box
+	m_TypeComboBox->SetBounds(5, 294, EFFECTS_PAGE_WIDTH, 22);
 
 	//name stuff
 	m_ConvarNameText->SetBounds(8, 315, 256, 20);

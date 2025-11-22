@@ -26,7 +26,7 @@ CAutoLoadPageList::CAutoLoadPageList(vgui::Panel* parent, const char* name, cons
 
 	//make the scroll bar
 	m_ScrollBar = new vgui::ScrollBar(this, "_ScrollBar", true);
-	m_ScrollBar->SetBounds(EFFECTS_PAGE_WIDTH - 20, 0, 20, 298);
+	m_ScrollBar->SetBounds(EFFECTS_PAGE_WIDTH - 20, 0, 20, 273);
 	m_ScrollBar->SetRangeWindow(1);
 	m_ScrollBar->AddActionSignalTarget(this);
 
@@ -124,6 +124,15 @@ void CAutoLoadPageList::GetAutoloadFiles(CUtlVector<char*>& data)
 		//button->GetText(temp, sizeof(temp));
 		//data.AddToTail(strdup(temp));
 	}
+}
+
+
+//---------------------------------------------------------------------------------
+// Purpose: Returns the numbner of buttons
+//---------------------------------------------------------------------------------
+int CAutoLoadPageList::GetFileCount()
+{
+	return m_ButtonList.Count();
 }
 
 //---------------------------------------------------------------------------------
@@ -255,6 +264,9 @@ CEffectsPanelSettingsPage::CEffectsPanelSettingsPage(vgui::Panel* parent, const 
 	//create add/remove buttons
 	m_AddToListButton = new vgui::Button(this, "AddButton", "Add to list", this, COMMAND_ADD);
 	m_RemoveButton = new vgui::Button(this, "RemoveButton", "Remove selected from list", this, COMMAND_REMOVE);
+
+	//add tooltips
+	ADD_TOOLTIP(m_FileList, 100, "This contains a list of every single file and folder that will get loaded into the effects panel when a new map starts. To add a file/folder use the 'select file' or 'select folder' button to get the file/folder(s) name then add the folder with the add button.\n\nIf you make a file or have a folder with the name of a map in the maps directory then it will only load that folder/file if the current map name is the name of the folder/file.\n\nThe file and files in the folder and folders sub folders must be of the .amf extention (or else it wont load),\n\nAll the effects in the effects panel will get cleared when a level is shutdown unless the 'Should Autoload Files?' button isnt checked.", true);
 
 	//set the bounds for each item
 	PerformLayout();
@@ -549,6 +561,10 @@ void CEffectsPanelSettingsPage::OnMapLoad()
 //---------------------------------------------------------------------------------
 void CEffectsPanelSettingsPage::OnMapShutdown()
 {
+	//dont reset if empty
+	if (m_FileList->GetFileCount() <= 0)
+		return;
+
 	//tell the effects panel to reset everything
 	g_EffectsPanelInterface->ResetEverything();
 }

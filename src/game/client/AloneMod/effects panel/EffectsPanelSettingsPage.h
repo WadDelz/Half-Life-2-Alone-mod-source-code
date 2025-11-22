@@ -52,6 +52,7 @@ public:
 	void AddFile(const char* File);
 	bool RemoveSelectedFile();
 	void GetAutoloadFiles(CUtlVector<char*>& data);
+	int GetFileCount();
 
 	//panel functions
 	void OnCommand(const char* pszCommand);

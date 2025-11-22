@@ -160,6 +160,32 @@ CEffectsPanelViewEffects::CEffectsPanelViewEffects(vgui::Panel* parent, const ch
 
 	m_iPrevFovValue = fov_desired.GetInt();
 
+	//add all the tooltips
+	ADD_TOOLTIP(m_DontDrawViewmodel, 100, "If selected then the player's weapon model wont show, Else it will.", true);
+	ADD_TOOLTIP(m_EnableBlackAndWhiteView, 100, "Enables a noir black and white filter.", false);
+	ADD_TOOLTIP(m_EnableLenseDirtOnScreen, 100, "Adds lense dirt onto the players screen.", false);
+	ADD_TOOLTIP(m_EnableTvStyledView, 100, "Adds a bodycan styled old tv overlay onto the screen.", true);
+	ADD_TOOLTIP(m_EnableColoredTvStyledView, 100, "Adds a blue colored bodycan styled old tv overlay onto the screen.", true);
+	ADD_TOOLTIP(m_EnableBlurredView, 100, "Adds a blur effect onto the screen", false);
+	ADD_TOOLTIP(m_EnableBlackBoxes, 100, "Adds cinematic black edge boxes onto the screen.\nChange the size with the black box sliders below", true);
+	ADD_TOOLTIP(m_EnableClaustraphobia, 100, "Enables a claustraphobic styled view effect that can be modified with the claustraphobia sliders below.", true);
+	ADD_TOOLTIP(m_OverrideViewmodelFov, 100, "Overrides the players viewmodel fov using the sliders value below.", true);
+
+	ADD_TOOLTIP(m_EnableCameraEditor, 100, "Enables all the camera features below", false);
+	ADD_TOOLTIP(m_EnableCameraEditorViewmodelFix, 100, "When the angle smooth amount or origin smooth amount slider is set to something other then 0, and the player moves/looks around, The viewmodel can move faster then the camera. Select this to fix this", true);
+	ADD_TOOLTIP(m_SmoothAngleAmountSlider, 100, "Changes how smooth the players view moves when looking around", true);
+	ADD_TOOLTIP(m_SmoothOriginAmountSlider, 100, "Changes how smooth the players view moves moving around", true);
+	ADD_TOOLTIP(m_OriginOverrideTextEntry, 100, "Determines the players position offset using the (forward/back left/right up/down) format", true);
+	ADD_TOOLTIP(m_AngleOverrideTextEntry, 100, "Determines the players angle offset using the (pitch yaw roll) format", true);
+	ADD_TOOLTIP(m_MinimumPitchSlider, 100, "Changes how far the player can look down", false);
+	ADD_TOOLTIP(m_MaximumPitchSlider, 100, "Changes how far the player can look up", false);
+
+	ADD_TOOLTIP(m_BlackBoxWidthSlider, 100, "Sets how much room (width) the black boxes should take up on either side of the screen if the 'Enable cinematic black boxes' check button is selected", true);
+	ADD_TOOLTIP(m_BlackBoxHeightSlider, 100, "Sets how much room (height) the black boxes should take up on either side of the screen if the 'Enable cinematic black boxes' check button is selected", true);
+	ADD_TOOLTIP(m_ClaustrapphobiaAmountSlider, 100, "Sets how claustraphobic the players view should be if the 'Enable claustraphobia' check button is selected", true);
+	ADD_TOOLTIP(m_ClaustrapphobiaFovSlider, 100, "Overrides the players fov tho this amount if the 'Enable claustraphobia' check button is selected", true);
+	ADD_TOOLTIP(m_ViewmodelFovOverrideSlider, 100, "Overrides the players viewmodel fov to this amount if the 'Override viewmodel fov' check button is selected", true);
+
 	//reset these to the defaults
 	ResetEffects();
 	

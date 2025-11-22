@@ -207,6 +207,25 @@ $Project
 				$File "vgui_soundscape_maker.cpp"
 				$File "vgui_soundscape_maker.h"
 			}
+			$Folder "Geo-Guesser"
+			{
+				$File "AloneMod\geo guesser\GG_FinishedPage.cpp"
+				$File "AloneMod\geo guesser\GG_FinishedPage.h"
+				$File "AloneMod\geo guesser\GG_GamePage.cpp"
+				$File "AloneMod\geo guesser\GG_GamePage.h"
+				$File "AloneMod\geo guesser\GG_MainMenuPage.cpp"
+				$File "AloneMod\geo guesser\GG_MainMenuPage.h"
+				$File "AloneMod\geo guesser\GG_MainPanel.cpp"
+				$File "AloneMod\geo guesser\GG_MainPanel.h"
+				$File "AloneMod\geo guesser\GG_MapList.cpp"
+				$File "AloneMod\geo guesser\GG_MapList.h"
+				$File "AloneMod\geo guesser\GG_MiniMap.cpp"
+				$File "AloneMod\geo guesser\GG_MiniMap.h"
+				$File "AloneMod\geo guesser\GG_OptionsPage.cpp"
+				$File "AloneMod\geo guesser\GG_OptionsPage.h"
+				$File "AloneMod\geo guesser\GG_Page.cpp"
+				$File "AloneMod\geo guesser\GG_Page.h"
+			}
 			$Folder "UI"
 			{
 				$Folder "Effects Panel"

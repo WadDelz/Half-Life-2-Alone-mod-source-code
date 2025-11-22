@@ -713,6 +713,8 @@ protected:
 	void Init();
 
 private:
+	friend class COptionsPanelInterface;
+
 	//keyvalues for file
 	KeyValues* kvMain;
 
@@ -1636,6 +1638,13 @@ public:
 		if (m_OptionsPanel)
 			m_OptionsPanel->Activate();
 	}
+	
+	//sets the epic filter button state
+	void SetFilterButtonValue(bool state)
+	{
+		if (m_OptionsPanel && m_OptionsPanel->m_EpicFilterCheckButton)
+			m_OptionsPanel->m_EpicFilterCheckButton->SetSelected(state);
+	}
 
 	//options panel
 	COptionsPanel* m_OptionsPanel = nullptr;
@@ -1779,4 +1788,22 @@ CON_COMMAND_F(ToggleWeatherPanel, "Toggles The Alone Mod Options Panel", FCVAR_H
 	//open the weather panel
 	weatherpanel->Close();
 	weatherpanel->Open();
+};
+
+//command to toggle the epic filter panel
+CON_COMMAND_F(ToggleEpicFilter, "Toggles The Alone Mod Epic Filter", FCVAR_HIDDEN)
+{
+	//look for epic filter convar
+	ConVar* amod_epic_filter = cvar->FindVar("amod_epic_filter");
+	if (!amod_epic_filter)
+		return;
+
+	//set the value
+	amod_epic_filter->SetValue(!amod_epic_filter->GetBool());
+
+	//tell the options panel to set the button value
+	g_OptionsPanel.SetFilterButtonValue(amod_epic_filter->GetBool());
+
+	//write config
+	Amod_WriteConfig();
 };

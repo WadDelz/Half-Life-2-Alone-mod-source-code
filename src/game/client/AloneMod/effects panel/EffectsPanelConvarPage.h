@@ -9,12 +9,49 @@
 #include "vgui_controls/ComboBox.h"
 #include "vgui_controls/Frame.h"
 #include "vgui_controls/ScrollBar.h"
+#include "vgui_controls/ComboBox.h"
+#include "vgui_controls/MenuItem.h"
+#include "hl2_player_shared.h"
 
 #ifdef _WIN32
 #pragma once
 #endif
 
 
+
+//convar active type
+enum class ConvarActiveType_e
+{
+	Active_Always = (1 << 0),
+	Active_WhenPlayerFlashlightOn = (1 << 1),
+	Active_WhenPlayerFlashlightOff = (1 << 2),
+	Active_WhenWalking = (1 << 3),
+	Active_WhenSprinting = (1 << 4),
+	Active_WhenCrouching = (1 << 5),
+	Active_WhenOnGround = (1 << 6),
+	Active_WhenInAir = (1 << 7),
+	Active_WhenUnderWater = (1 << 8),
+	Active_WhenHealthLow = (1 << 9),
+	Active_WhenHoldingObject = (1 << 10),
+	Active_WhenUsingSuitZoom = (1 << 11),
+};
+
+//convar active type string's for combo box
+static const char* g_ConvarActiveType[] =
+{
+	"Always Active",
+	"When flashlight on",
+	"When flashlight off",
+	"When walking",
+	"When sprinting",
+	"When crouching",
+	"When on ground",
+	"When in air",
+	"When under water",
+	"When health low",
+	"When holding object",
+	"When using suit zoom"
+};
 
 
 
@@ -78,6 +115,7 @@ struct ConvarButtonData_t
 	char value[202];
 	char default[200];
 	ConVar* convar = nullptr;
+	ConvarActiveType_e type = ConvarActiveType_e::Active_Always;
 };
 
 class CConvarPageConvarButton : public CConvarPageConvarButtonBase
@@ -110,7 +148,8 @@ private:
 #define CONVAR_LIST_PANEL_BUTTON_X_OFFSET 5
 #define CONVAR_LIST_PANEL_BUTTON_HEIGHT 22
 #define CONVAR_LIST_PANEL_BUTTON_COMMAND_PREFIX "ConvarButton:"
-#define CONVAR_LIST_PANEL_MAX_ITEMS_BEFORE_SCROLL 11
+#define CONVAR_LIST_PANEL_MAX_ITEMS_BEFORE_SCROLL 10
+#define CONVAR_PAGE_OVERLAY_TYPE_PREFIX "ConvarType:"
 
 class CConvarPageConvarList : public vgui::Divider
 {
@@ -124,9 +163,9 @@ public:
 	MESSAGE_FUNC(OnScrollBarSliderMoved, "ScrollBarSliderMoved");
 
 	//adds a convar
-	bool AddConvar(const char* ConvarName, const char* ConvarValue);
-	void ChangeConvarValue(const char* ConvarName, const char* newvalue);
-	bool ChangeSelectedConvar(const char* newvalue);
+	bool AddConvar(const char* ConvarName, const char* ConvarValue, ConvarActiveType_e type);
+	void ChangeConvarValue(const char* ConvarName, const char* newvalue, ConvarActiveType_e type);
+	bool ChangeSelectedConvar(const char* newvalue, ConvarActiveType_e type);
 	bool HasConvar(const char* ConvarName);
 	void GetConvarData(CUtlVector<ConvarButtonData_t*>& data);
 	void ClearConvars();
@@ -135,6 +174,9 @@ public:
 
 	//panel functions
 	void OnCommand(const char* pszCommand);
+
+	bool ShouldConvarBeActive(CHL2_Player* pPlayer, ConvarActiveType_e type);
+	void OnTick();
 
 private:
 	//array of buttons (convars)
@@ -219,6 +261,7 @@ public:
 	//other panel functions
 	void OnMapLoad();
 	void OnCommand(const char* pszCommand);
+	void OnTick();
 
 	//sets all the bounds for each item
 	void PerformLayout();
@@ -226,6 +269,9 @@ public:
 private:
 	//list of convars
 	CConvarPageConvarList* m_ConvarListPanel;
+
+	//type combo box
+	vgui::ComboBox* m_TypeComboBox;
 
 	//name stuff
 	vgui::Label* m_ConvarNameText;

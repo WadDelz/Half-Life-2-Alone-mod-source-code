@@ -70,6 +70,9 @@ private:
 
 #define EFFECTS_PANEL_AUTOLOAD_LIST_FILENAME "cfg/effects_panel_autoload_list.cfg"
 
+//index for overlay page
+#define CONVAR_PAGE_INDEX 1
+
 //index for lighting page
 #define LIGHTING_PAGE_INDEX 3
 
@@ -103,9 +106,9 @@ CEffectsPanel::CEffectsPanel(vgui::VPANEL parent) : BaseClass(nullptr, "EffectsP
 
 	//add all the pages needed
 	m_EffectsPages.AddToTail(new CEffectsPanelViewEffects(this, "View Effects"));
-	m_EffectsPages.AddToTail(new CEffectsPanelConvarPage(this, "Console Variables"));
+	m_EffectsPages.AddToTail(new CEffectsPanelConvarPage(this, "Console Variables"));	//if you change this then change CONVAR_PAGE_INDEX
 	m_EffectsPages.AddToTail(new CEffectsPanelOverlayPage(this, "Screen Overlays"));
-	m_EffectsPages.AddToTail(new CEffectsPanelLightingPage(this, "Lighting"));
+	m_EffectsPages.AddToTail(new CEffectsPanelLightingPage(this, "Lighting"));			//if you change this then change LIGHTING_PAGE_INDEX
 
 	//add each page
 	for (int i = 0; i < m_EffectsPages.Count(); i++)
@@ -113,7 +116,7 @@ CEffectsPanel::CEffectsPanel(vgui::VPANEL parent) : BaseClass(nullptr, "EffectsP
 
 	//add the settings page
 	m_SettingsPage = new CEffectsPanelSettingsPage(this, "SettingsPage");
-	AddPage(m_SettingsPage, "Autoload Files  ");
+	AddPage(m_SettingsPage, "Autoload Files");
 
 	//load the settings
 	KeyValues* settings = new KeyValues("Settings");
@@ -160,6 +163,10 @@ CEffectsPanel::CEffectsPanel(vgui::VPANEL parent) : BaseClass(nullptr, "EffectsP
 	m_AutoloadCheckButton->AddActionSignalTarget(this);
 	m_AutoloadCheckButton->SetSelected(amod_effects_panel_autoload_files.GetBool());
 	m_AutoloadCheckButton->SetCommand(COMMAND_AUTOLOAD);
+
+	//add tooltips
+	ADD_TOOLTIP(m_LightingDebugCheckButton, 100, "If selected then it will show debug lines/boxes/texts for all of the active (newly added) lights in the scene/map.", true)
+	ADD_TOOLTIP(m_AutoloadCheckButton, 100, "If selected then when a map loads it will go through each folder/file and add those effect save files into each page of the effect panel.", true)
 
 	vgui::ivgui()->AddTickSignal(GetVPanel(), 30);
 }
@@ -388,15 +395,14 @@ void CEffectsPanel::OnTick()
 	_applyButton->SetVisible(activepage != m_SettingsPage);
 
 	//see if it is the lighting page
-	bool IsLightingPage = activepage == m_EffectsPages[LIGHTING_PAGE_INDEX];
-	m_LightingDebugCheckButton->SetVisible(IsLightingPage);
+	m_LightingDebugCheckButton->SetVisible(activepage == m_EffectsPages[LIGHTING_PAGE_INDEX]);
 
 	//if this isnt visible then dont bother with the next code
 	if (!IsVisible())
 	{
-		//check for lighting page and lighting debug
-		if (IsLightingPage)
-			m_EffectsPages[LIGHTING_PAGE_INDEX]->OnTick();
+		//call on tick for the lighting and convar page
+		m_EffectsPages[LIGHTING_PAGE_INDEX]->OnTick();
+		m_EffectsPages[CONVAR_PAGE_INDEX]->OnTick();
 
 		return;
 	}

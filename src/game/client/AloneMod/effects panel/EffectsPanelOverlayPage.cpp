@@ -37,7 +37,7 @@ COverlayPageList::COverlayPageList(vgui::Panel* parent, const char* name, const 
 
 	//make the scroll bar
 	m_ScrollBar = new vgui::ScrollBar(this, "_ScrollBar", true);
-	m_ScrollBar->SetBounds(EFFECTS_PAGE_WIDTH - 20, 0, 20, 298);
+	m_ScrollBar->SetBounds(EFFECTS_PAGE_WIDTH - 20, 0, 20, 273);
 	m_ScrollBar->SetRangeWindow(1);
 	m_ScrollBar->AddActionSignalTarget(this);
 
@@ -543,10 +543,6 @@ CEffectsPanelOverlayPage::CEffectsPanelOverlayPage(vgui::Panel* parent, const ch
 
 	//make the overlay list
 	m_OverlayList = new COverlayPageList(this, "OverlayList", "Overlays:");
-	m_OverlayList->GetTooltip()->SetEnabled(true);
-	m_OverlayList->GetTooltip()->SetTooltipFormatToMultiLine();
-	m_OverlayList->GetTooltip()->SetTooltipDelay(100);
-	m_OverlayList->GetTooltip()->SetText("Hold shift and press the up/down arrow keys when an overlay is selected to change the render order of the overlays!");
 
 	//make overlay text entry
 	m_OverlayTextEntry = new vgui::ComboBox(this, "OverlayTextEntry", 20, true);
@@ -591,6 +587,18 @@ CEffectsPanelOverlayPage::CEffectsPanelOverlayPage(vgui::Panel* parent, const ch
 	m_AddButton = new vgui::Button(this, "AddButton", "Add Overlay", this, ADD_OVERLAY_BUTTON_COMMAWND);
 	m_ChangeOverlay = new vgui::Button(this, "ChangeButton", "Update Selected Overlay", this, CHANGE_OVERLAY_BUTTON_COMMAWND);
 	m_RemoveOverlay = new vgui::Button(this, "RemoveOverlay", "Remove Selected Overlay", this, REMOVE_OVERLAY_BUTTON_COMMAWND);
+
+	//add the tool tips
+	ADD_TOOLTIP(m_OverlayList, 100, "This contains all of the overlays that will show. Hold shift and press the up/down arrow keys when an overlay is selected to change the render order of the overlays!", true);
+	ADD_TOOLTIP(m_OverlayTextEntry, 100, "Select an overlay from the combo box or input your own material path that will get added when you press the 'add' button.\nNote that some overlays can be buggy/visually glitchy.", true);
+	ADD_TOOLTIP(m_TypeComboBox, 100, "The conditions that must be met for the overlay to draw. Note that only 1 condition needs to be met for the overlay to draw", true);
+	ADD_TOOLTIP(m_RedSlider, 100, "The red amount of the overlay. Note that with some overlays it might not work!", true);
+	ADD_TOOLTIP(m_GreenSlider, 100, "The green amount of the overlay. Note that with some overlays it might not work!", true);
+	ADD_TOOLTIP(m_BlueSlider, 100, "The blue amount of the overlay. Note that with some overlays it might not work!", true);
+	ADD_TOOLTIP(m_AlphaSlider, 100, "The transparency amount of the overlay. Note that with some overlays it might not work!", true);
+	ADD_TOOLTIP(m_AddButton, 100, "Press this to add the overlay (with the rgba and draw type data) to the overlay list.", true);
+	ADD_TOOLTIP(m_ChangeOverlay, 100, "Press this to change the selected overlay from the overlay list to the new overlay data in the sliders and combo boxs.", true);
+	ADD_TOOLTIP(m_RemoveOverlay, 100, "Press this to remove the selected overlay from the overlay list.", true);
 
 	//reset the things to the defaults
 	ResetEffects();

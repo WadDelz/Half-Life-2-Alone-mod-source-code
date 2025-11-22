@@ -182,7 +182,7 @@ public:
 	void GetPos(int &x,int &y);		// gets local position of panel
 	void SetSize(int wide,int tall);	// sets size of panel
 	void GetSize(int &wide, int &tall);	// gets size of panel
-	void SetBounds(int x, int y, int wide, int tall);		// combination of SetPos/SetSize
+	virtual void SetBounds(int x, int y, int wide, int tall);		// combination of SetPos/SetSize
 	void GetBounds(int &x, int &y, int &wide, int &tall);	// combination of GetPos/GetSize
 	int  GetWide();	// returns width of panel
 	void SetWide(int wide);	// sets width of panel

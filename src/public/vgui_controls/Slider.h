@@ -83,10 +83,12 @@ protected:
 	virtual void RecomputeNobPosFromValue();
 	virtual void RecomputeValueFromNobPos();
 	
+public:
 	virtual void SendSliderMovedMessage();
 	virtual void SendSliderDragStartMessage();
 	virtual void SendSliderDragEndMessage();
 
+private:
 	void ClampRange();
 
 	bool _dragging;

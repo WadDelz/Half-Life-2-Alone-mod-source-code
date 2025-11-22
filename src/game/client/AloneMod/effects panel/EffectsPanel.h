@@ -3,10 +3,21 @@
 
 #include "vgui/VGUI.h"
 #include "vgui_controls/PropertyPage.h"
+#include "vgui_controls/Tooltip.h"
 
 #ifdef _WIN32
 #pragma once
 #endif
+
+//macro for adding tool tips
+#define ADD_TOOLTIP(element, delay, text, multiline) \
+element->GetTooltip()->SetText(text); \
+element->GetTooltip()->SetEnabled(true); \
+element->GetTooltip()->SetTooltipDelay(delay); \
+if (multiline) \
+	element->GetTooltip()->SetTooltipFormatToMultiLine(); \
+else \
+	element->GetTooltip()->SetTooltipFormatToSingleLine(); \
 
 //base page for each effects panel
 class IEffectsPanelPage : public vgui::PropertyPage
