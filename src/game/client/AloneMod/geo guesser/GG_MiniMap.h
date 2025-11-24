@@ -117,6 +117,10 @@ private:
 
 	//can we mark?
 	bool m_bCanMark = true;
+
+	//position multiplyer
+	float m_PosMultiplyerX;
+	float m_PosMultiplyerY;
 };
 
 #endif //_GG_MINIMAP_H

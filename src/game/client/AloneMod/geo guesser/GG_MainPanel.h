@@ -29,10 +29,6 @@ public:
 	void WriteToConfig();
 	void ReadFromConfig();
 
-	//map funcs
-	void LoadAllMapData();
-	void InitalizeMapData(KeyValues* file);
-
 	//error message
 	void ShowError(const char* title, const char* message, bool playsound = true);
 
@@ -77,12 +73,21 @@ private:
 		struct MapLocation_t
 		{
 			Vector2D positions[MapType_e::Count];
+			UtlSymId_t actuall_map[MapType_e::Count];
 			UtlSymId_t image;
+
+			//is this enabled.
+			bool enabled = true;
 		};
 		CUtlVector<MapLocation_t> MapLocations;
 
 		//easy/medium/hard map images
-		UtlSymId_t MapImages[MapType_e::Count];
+		struct MapImages_t
+		{
+			UtlSymId_t MapName;
+			UtlSymId_t MapImage;
+		};
+		CUtlVector<MapImages_t> MapImages[MapType_e::Count];
 	};
 
 	//string table for map names/images
@@ -105,6 +110,11 @@ public:
 
 	//symbol stuff
 	inline const char* GetStringForSymbol(UtlSymId_t id) { return m_SymbolTable.String(id); }
+
+	//map funcs
+	void LoadAllMapData();
+	void LoadDifficultyImages(KeyValues* file, KeyValues* macros, MapData_t::MapType_e type, MapData_t* item);
+	void InitalizeMapData(KeyValues* file, KeyValues* macros);
 };
 
 #endif //__GG_MAINPANEL_H

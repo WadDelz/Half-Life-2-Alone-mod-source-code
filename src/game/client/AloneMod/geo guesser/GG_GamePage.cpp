@@ -38,9 +38,7 @@ CGG_Game_Page::CGG_Game_Page(CGG_MainPanel* parent)
 	AddChild((m_SubmitAnswerButton = new vgui::Button(parent, "SubmitAnswer", "Submit Answer", parent, SUBMIT_COMMAND)));
 	AddChild((m_SkipButtonm = new vgui::Button(parent, "SkipLevel", "Skip Level", parent, SKIP_COMMAND)));
 	AddChild((m_FinishButton = new vgui::Button(parent, "FinishButton", "Finish Now", parent, FINISH_COMMAND)));
-
-	//TEMP
-	m_CurrentFindFromImage->SetImage("sky_borealis01");
+	AddChild((m_MapList = new vgui::ComboBox(parent, "MapListComboBox", 10, false)));
 
 	//load GAME_RES_FILENAME on navigate to
 	SetSettingsFile(GAME_RES_FILENAME);
@@ -67,21 +65,72 @@ void CGG_Game_Page::SetFinishedState(bool state)
 		m_SkipButtonm->SetEnabled(false);
 		m_FinishButton->SetEnabled(false);
 
-		//get the position
+		//get difficulty and map locations
 		CGG_MainPanel::MapData_t::MapType_e difficulty = (CGG_MainPanel::MapData_t::MapType_e)GetPanel()->GetGGInfo().difficulty;
-		Vector2D position = GetPanel()->m_Info.mapdata[CurrentSelectedMap]->MapLocations[CurrentSelectedPosition].positions[difficulty];
+		CGG_MainPanel::MapData_t::MapLocation_t* location = &m_MapData[CurrentSelectedMap]->MapLocations[CurrentSelectedPosition];
 
-		//get the points value
-		int points = m_MiniMap->GetPointsValue(position);
+		//get the position
+		Vector2D position = location->positions[difficulty];
+
+		//get the map list text
+		char text[512];
+		m_MapList->GetText(text, sizeof(text));
+
+		//get the actuall map name
+		const char* ActuallMap = GetPanel()->GetStringForSymbol(location->actuall_map[difficulty]);
+
+		//see if we are not on the correct map AND we are using the combo box
+		if (m_MapList->IsEnabled() && Q_strcmp(ActuallMap, text))
+		{
+			//set the points label
+			m_CurrentScoreLabel->SetText("You Scored 0");
+
+			//get the correct map
+			for (int i = 0; i < m_MapList->GetItemCount(); i++)
+			{
+				//get the item text
+				char itemtext[512];
+				m_MapList->GetItemText(i, itemtext, sizeof(itemtext));
+
+				//compare with the actuall map name
+				if (!Q_strcmp(itemtext, ActuallMap))
+				{
+					m_MapList->ActivateItem(i);
+					break;
+				}
+			}
+
+			//set the minimap image
+			KeyValues* data = m_MapList->GetActiveItemUserData();
+			if (data)
+			{
+				//set the minimap image
+				const char* image = data->GetString("Image");
+				char minimapimage[512];
+				Q_snprintf(minimapimage, sizeof(minimapimage), "geo_guesser/full_maps/%s", image);
+				m_MiniMap->SetImage(minimapimage);
+			}
+
+			//disable the combo box for now
+			m_MapList->SetEnabled(false);
+		}
+		else
+		{
+			//get the points value
+			int points = m_MiniMap->GetPointsValue(position);
+
+			//set the points label
+			m_CurrentScoreLabel->SetText(CFmtStr("You Scored %d", points));
+
+			//add points to the current score
+			GetPanel()->GetGGInfo().current_score += points;
+		}
 
 		//show the actuall pos pin marker
 		m_MiniMap->SetActuallPosMarker(position);
 
 		//reset the minimap image bounds
 		m_MiniMap->ResetImageBounds();
-
-		//set the points label
-		m_CurrentScoreLabel->SetText(CFmtStr("You Scored = %d", points));
 	}
 	else
 	{
@@ -105,13 +154,7 @@ void CGG_Game_Page::OnMapFinished()
 
 	//get the position
 	CGG_MainPanel::MapData_t::MapType_e difficulty = (CGG_MainPanel::MapData_t::MapType_e)GetPanel()->GetGGInfo().difficulty;
-	Vector2D position = GetPanel()->m_Info.mapdata[CurrentSelectedMap]->MapLocations[CurrentSelectedPosition].positions[difficulty];
-
-	//get the points earnt
-	int points = m_MiniMap->GetPointsValue(position);
-
-	//get the current score
-	info.current_score += points;
+	Vector2D position = m_MapData[CurrentSelectedMap]->MapLocations[CurrentSelectedPosition].positions[difficulty];
 
 	//get the score text
 	m_CurrentScoreLabel->SetText(CFmtStr("Current Score: %d", info.current_score));
@@ -188,6 +231,28 @@ void CGG_Game_Page::OnCommand(const char* command)
 }
 
 //---------------------------------------------------------------------------------
+// Purpose: Called when text in the combo box is changed
+//---------------------------------------------------------------------------------
+void CGG_Game_Page::OnTextChanged()
+{
+	//see if the combo box is enabled or not
+	if (!m_MapList->IsEnabled())
+		return;
+
+	//get the data
+	KeyValues* data = m_MapList->GetActiveItemUserData();
+	if (!data)
+		return;
+
+	//set the minimap image
+	const char* image = data->GetString("Image");
+	char minimapimage[512];
+	Q_snprintf(minimapimage, sizeof(minimapimage), "geo_guesser/full_maps/%s", image);
+
+	m_MiniMap->SetImage(minimapimage);
+}
+
+//---------------------------------------------------------------------------------
 // Purpose: Called when this page gets navigated to
 //---------------------------------------------------------------------------------
 void CGG_Game_Page::NavigateTo()
@@ -196,8 +261,9 @@ void CGG_Game_Page::NavigateTo()
 	GetPanel()->GetGGInfo().rounds_played = 0;
 	GetPanel()->GetGGInfo().current_score = 0;
 
-	//clear the map data
+	//clear the map data and queue
 	m_MapData.RemoveAll();
+	m_MapQueue.RemoveAll();
 
 	//call base function
 	I_GG_Page::NavigateTo();
@@ -215,8 +281,12 @@ void CGG_Game_Page::PostNavigateTo()
 	CurrentSelectedMap = 0;
 	CurrentSelectedPosition = 0;
 
+	//disable the map list combo box and remove everything
+	m_MapList->RemoveAll();
+	m_MapList->SetEnabled(false);
+
 	//see if we have any maps?
-	if (!m_MapData.Count() == 0)
+	if (m_MapData.Count() == 0)
 	{
 		//Store the map data
 		CUtlVector<CGG_MainPanel::MapData_t*>& data = GetPanel()->GetGGInfo().mapdata;
@@ -229,12 +299,53 @@ void CGG_Game_Page::PostNavigateTo()
 		}
 	}
 
-	//choose a random map
-	CurrentSelectedMap = random->RandomInt(0, m_MapData.Count() - 1);
+	//remove queue[0]
+	if (m_MapQueue.Count() > 0)
+		m_MapQueue.Remove(0);
 
-	//get the position
+	//check the queue size
+	if (m_MapQueue.Count() <= 0)
+	{
+		//rebuild the queue
+		for (int i = 0; i < m_MapData.Count(); i++)
+		{
+			for (int j = 0; j < m_MapData[i]->MapLocations.Count(); j++)
+			{
+				//add the index into the queue
+				if (m_MapData[i]->MapLocations[j].enabled)
+					m_MapQueue.AddToTail(MapQueueItem_t{ i, j });
+			}
+		}
+
+		//shuffle the queue twice
+		for (int _ = 0; _ < 2; _++)
+		{
+			for (int i = 0; i < m_MapQueue.Count(); i++)
+			{
+				int index = random->RandomInt(0, m_MapQueue.Count() - 1);
+
+				MapQueueItem_t temp = m_MapQueue[i];
+				m_MapQueue[i] = m_MapQueue[index];
+				m_MapQueue[index] = temp;
+			}
+		}
+	}
+
+	//see if we failed to add any items
+	if (m_MapQueue.Count() < 0)
+	{
+		//error
+		GetPanel()->ShowError("Error", "Error: Got 0 selected maps. Failed to create map queue!");
+		GetPanel()->NavigateToPage(MAINMENU_PAGE_NAME);
+		return;
+	}
+
+	//get the next position in the queue
+	CurrentSelectedMap = m_MapQueue[0].map;
+	CurrentSelectedPosition = m_MapQueue[0].position;
+	
+	//get locations
 	CUtlVector<CGG_MainPanel::MapData_t::MapLocation_t>& locations = m_MapData[CurrentSelectedMap]->MapLocations;
-	CurrentSelectedPosition = random->RandomInt(0, locations.Count() - 1);
 
 	//get the reference image
 	char reference[512];
@@ -243,12 +354,29 @@ void CGG_Game_Page::PostNavigateTo()
 	//set the find image
 	m_CurrentFindFromImage->SetImage(reference);
 
-	//get the minimap image
-	char minimapimage[512];
-	Q_snprintf(minimapimage, sizeof(minimapimage), "geo_guesser/full_maps/%s", GetPanel()->GetStringForSymbol(m_MapData[CurrentSelectedMap]->MapImages[(CGG_MainPanel::MapData_t::MapType_e)GetPanel()->GetGGInfo().difficulty]));
+	//get the minimap image(s)
+	CUtlVector<CGG_MainPanel::MapData_t::MapImages_t>& MapImages = m_MapData[CurrentSelectedMap]->MapImages[(CGG_MainPanel::MapData_t::MapType_e)GetPanel()->GetGGInfo().difficulty];
+	
+	//if only 1 image then set the mini map image and do nothing else
+	if (MapImages.Count() <= 1)
+	{
+		char minimapimage[512];
+		Q_snprintf(minimapimage, sizeof(minimapimage), "geo_guesser/full_maps/%s", GetPanel()->GetStringForSymbol(MapImages[0].MapImage));
 
-	//set the minimap image to the image at difficulty
-	m_MiniMap->SetImage(minimapimage);
+		//set the minimap image to the image
+		m_MiniMap->SetImage(minimapimage);
+	}
+	else
+	{
+		//activate the combo box and add each item
+		m_MapList->SetEnabled(true);
+
+		for (int i = 0; i < MapImages.Count(); i++)
+			m_MapList->AddItem(GetPanel()->GetStringForSymbol(MapImages[i].MapName), new KeyValues("Data", "Image", GetPanel()->GetStringForSymbol(MapImages[i].MapImage)));
+
+		//activate item 0
+		m_MapList->ActivateItem(0);
+	}
 
 	//set the m_CurrentRoundLabel text
 	m_CurrentRoundLabel->SetText(CFmtStr("Current Round = %d/%d", GetPanel()->GetGGInfo().rounds_played + 1, GetPanel()->GetGGInfo().rounds));

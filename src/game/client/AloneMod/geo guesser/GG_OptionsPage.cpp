@@ -18,6 +18,8 @@
 
 #define OPTIONS_RES_FILENAME "resource/geo_guesser/options.res"
 
+#define DESELECT_ALL_CHILDREN_COMMAND "DeSelectAllChildren"
+#define SELECT_ALL_CHILDREN_COMMAND "SelectAllChildren"
 #define SELECT_ALL_COMMAND "SelectAll"
 #define DESELECT_ALL_COMMAND "DeselectAll"
 #define NAVIGATE_BACK_COMMAND "NavigateBack"
@@ -32,6 +34,8 @@ CGG_Options_Page::CGG_Options_Page(CGG_MainPanel* parent)
 	AddChild((m_MapList = new CGG_MapListPanel(parent, "MapList")));
 	AddChild((m_RoundsLabel = new vgui::Label(parent, "RoundsText", CFmtStr("Number Of Rounds: %d", parent->GetGGInfo().rounds))));
 	AddChild((m_RoundsSlider = new vgui::Slider(parent, "RoundsSlider")));
+	AddChild(new vgui::Button(parent, "DeSelectAllChildrenButton", "Select All Children", parent, DESELECT_ALL_CHILDREN_COMMAND));
+	AddChild(new vgui::Button(parent, "SelectAllChildrenButton", "Select All Children", parent, SELECT_ALL_CHILDREN_COMMAND));
 	AddChild(new vgui::Button(parent, "SelectAllButton", "Select All", parent, SELECT_ALL_COMMAND));
 	AddChild(new vgui::Button(parent, "DeselectAllButton", "Deselect All", parent, DESELECT_ALL_COMMAND));
 	AddChild(new vgui::Button(parent, "NavigateBackButton", "Navigate Back", parent, NAVIGATE_BACK_COMMAND));
@@ -56,7 +60,7 @@ void CGG_Options_Page::OnCommand(const char* command)
 		//see if we have any maps selected
 		if (!m_MapList->HasAnySelected())
 		{
-			GetPanel()->ShowError("Error", "Error: You must select atleast 1 map!");
+			GetPanel()->ShowError("Error", "Error: You must select atleast 1 map and position!");
 			return;
 		}
 
@@ -66,6 +70,14 @@ void CGG_Options_Page::OnCommand(const char* command)
 	//check for select all command
 	else if (!Q_strcmp(command, SELECT_ALL_COMMAND))
 		m_MapList->SelectAll(true);
+	
+	//check for de-select all children command
+	else if (!Q_strcmp(command, DESELECT_ALL_CHILDREN_COMMAND))
+		m_MapList->SelectAllChildren(false);
+	
+	//check for select all children command
+	else if (!Q_strcmp(command, SELECT_ALL_CHILDREN_COMMAND))
+		m_MapList->SelectAllChildren(true);
 	
 	//check for deselect all command
 	else if (!Q_strcmp(command, DESELECT_ALL_COMMAND))

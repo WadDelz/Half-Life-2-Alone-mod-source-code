@@ -185,7 +185,6 @@ void I_GG_Page::LoadSettings(const char* filename)
 
 		//get bounds, text, and other stuff
 		//panel->SetBounds(subkey->GetInt("X"), subkey->GetInt("Y"), subkey->GetInt("Width"), subkey->GetInt("Height"));
-
 		vgui::GetAnimationController()->RunAnimationCommand(panel, "xpos", subkey->GetInt("X"), 0.0f, PAGE_ANIMATE_TIME, PAGE_ANIMATE_MODE);
 		vgui::GetAnimationController()->RunAnimationCommand(panel, "ypos", subkey->GetInt("Y"), 0.0f, PAGE_ANIMATE_TIME, PAGE_ANIMATE_MODE);
 		vgui::GetAnimationController()->RunAnimationCommand(panel, "wide", subkey->GetInt("Width"), 0.0f, PAGE_ANIMATE_TIME, PAGE_ANIMATE_MODE);

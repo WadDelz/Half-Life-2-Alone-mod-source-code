@@ -234,8 +234,14 @@ $Project
 					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanel.h"
 					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelConvarPage.cpp"
 					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelConvarPage.h"
-					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelViewEffectsPage.cpp"
+					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelLightingPage.cpp"
+					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelLightingPage.h"
+					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelOverlayPage.cpp"
+					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelOverlayPage.h"
+					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelSettingsPage.h"
+					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelSettingsPage.cpp"
 					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelViewEffectsPage.h"
+					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelViewEffectsPage.cpp"
 				}
 				
 				$File 	"$SRCDIR\game\client\AloneMod\BackgroundPanel.cpp"

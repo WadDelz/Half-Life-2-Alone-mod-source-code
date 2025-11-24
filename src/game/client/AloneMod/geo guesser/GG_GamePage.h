@@ -17,6 +17,7 @@
 #include "GG_Page.h"
 #include "vgui_controls/Slider.h"
 #include "vgui_controls/Label.h"
+#include "vgui_controls/ComboBox.h"
 
 //name for the main menu page
 #define GAME_PAGE_NAME "Gamepage"
@@ -31,6 +32,9 @@ public:
 	//called on command (e.g when a button is pressed)
 	void OnCommand(const char* command) override;
 
+	//text changed
+	void OnTextChanged();
+
 	//called on navigated to
 	void OnMapFinished();
 	void NavigateTo() override;
@@ -42,6 +46,9 @@ private:
 	//search image
 	CStretchingImage* m_CurrentFindFromImage;
 	vgui::ImagePanel* m_CurrentFindFromImageBackground;
+
+	//map combo box
+	vgui::ComboBox* m_MapList;
 
 	//minimap
 	CGG_MiniMap* m_MiniMap;
@@ -57,6 +64,15 @@ private:
 
 	//map data list
 	CUtlVector<CGG_MainPanel::MapData_t*> m_MapData;
+
+	//map queue struct and array
+	struct MapQueueItem_t
+	{
+		//map and position index
+		int map;
+		int position;
+	};
+	CUtlVector<MapQueueItem_t> m_MapQueue;
 
 	//current selected map and position index
 	int CurrentSelectedMap = 0;

@@ -19,6 +19,24 @@
 #include "vgui_controls/CheckButton.h"
 #include "GG_MainPanel.h"
 
+//map list check button
+class CGG_MapListCheckButton : public vgui::CheckButton
+{
+	DECLARE_CLASS_SIMPLE(CGG_MapListCheckButton, vgui::CheckButton)
+public:
+	CGG_MapListCheckButton(Panel* parent, const char* panelName, const char* text) : BaseClass(parent, panelName, text) {}
+
+	//called in mouse release
+	void OnMouseReleased(vgui::MouseCode code) { if (code == vgui::MouseCode::MOUSE_RIGHT && IsSelected()) SetShowPositions(!ShouldShowPositions()); }
+
+	//positions functions
+	inline void SetShowPositions(bool show) { m_bShowPositions = show; PostActionSignal(new KeyValues("CheckButtonChecked")); };
+	const inline bool ShouldShowPositions() { return m_bShowPositions; }
+private:
+	//should we show the positions?
+	bool m_bShowPositions = false;
+};
+
 //map list panel
 class CGG_MapListPanel : public vgui::Divider
 {
@@ -36,6 +54,7 @@ public:
 
 	//select funcs
 	void SelectAll(bool select);
+	void SelectAllChildren(bool select);
 	bool HasAnySelected();
 
 	//pos/size
@@ -60,7 +79,13 @@ private:
 	vgui::ScrollBar* m_ScrollBar = nullptr;
 
 	//buttons
-	CUtlVector<vgui::CheckButton*> m_Buttons;
+	struct MapButton_t
+	{
+		CGG_MapListCheckButton* m_CheckButton;
+		CUtlVector<vgui::CheckButton*> m_ChildButtons;
+	};
+
+	CUtlVector<MapButton_t> m_CheckButtons;
 };
 
 #endif //_GG_MAPLIST_H

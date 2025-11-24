@@ -11,6 +11,11 @@
 #include "vgui/IInput.h"
 #include "fmtstr.h"
 
+//When the panel's size changes. So does the positions of the markers. This is the size i had the panel at
+//when i set the correct markers. Just divide the size of the panel with these and you get the marker offsets
+#define MINIMAP_WIDE 320.0f
+#define MINIMAP_TALL 275.0f
+
 //---------------------------------------------------------------------------------
 // Purpose: Constructor for options page mini map
 //---------------------------------------------------------------------------------
@@ -145,11 +150,11 @@ void CGG_MiniMap::OnMouseReleased(vgui::MouseCode code)
 		ScreenToLocal(mx, my);
 
 		//convert panel coords to image coords (consider zoom & offset)
-		m_Position.x = (float)(mx - m_iOffsetX) / m_fZoom;
-		m_Position.y = (float)(my - m_iOffsetY) / m_fZoom;
+		m_Position.x = ((float)(mx - m_iOffsetX) / m_fZoom);
+		m_Position.y = ((float)(my - m_iOffsetY) / m_fZoom);
 
 		//debug
-		ConDMsg("DEBUG MINIMAP: %d %d\n", (int)m_Position.x, (int)m_Position.y);
+		ConDMsg("DEBUG MINIMAP: %d %d\n", (int)(m_Position.x / m_PosMultiplyerX), (int)(m_Position.y / m_PosMultiplyerY));
 
 		//flag that we have a mark
 		m_bHasMark = true;
@@ -272,9 +277,14 @@ bool CGG_MiniMap::IsMarked()
 //---------------------------------------------------------------------------------
 void CGG_MiniMap::SetActuallPosMarker(const Vector2D& position)
 {
+	//get pos
+	Vector2D pos = position;
+	pos.x *= m_PosMultiplyerX;
+	pos.y *= m_PosMultiplyerY;
+
 	//set marker
 	m_bHasActuallMark = true;
-	m_ActuallPos = position;
+	m_ActuallPos = pos;
 
 	//set text
 	m_DistanceLabel->SetText(CFmtStr("Distance = %d", (int)m_Position.DistTo(m_ActuallPos)));
@@ -282,7 +292,7 @@ void CGG_MiniMap::SetActuallPosMarker(const Vector2D& position)
 
 ConVar gg_pin_maxpoints("gg_pin_maxpoints", "1000");
 ConVar gg_pin_maxpoints_falloff("gg_pin_maxpoints_falloff", "10");
-ConVar gg_pin_maxdistance_maxdistance("gg_pin_maxdistance_maxdistance", "175");
+ConVar gg_pin_maxdistance("gg_pin_maxdistance", "150");
 
 //---------------------------------------------------------------------------------
 // Purpose: Gets the points value of the current marker and the actuall goal
@@ -293,8 +303,13 @@ int CGG_MiniMap::GetPointsValue(const Vector2D& position)
 	if (!m_bHasMark)
 		return 0;
 
+	//get pos
+	Vector2D pos = position;
+	pos.x *= m_PosMultiplyerX;
+	pos.y *= m_PosMultiplyerY;
+
 	//get the distance of the 2 positions
-	int dist = position.DistTo(m_Position);
+	int dist = pos.DistTo(m_Position);
 
 	//subtract any falloff if needed (optional)
 	//dist -= gg_pin_maxdistance_falloff.GetInt();
@@ -305,13 +320,13 @@ int CGG_MiniMap::GetPointsValue(const Vector2D& position)
 		points = gg_pin_maxpoints.GetInt();
 
 	//if distance is too far, zero points
-	else if (dist > gg_pin_maxdistance_maxdistance.GetInt())
+	else if (dist > gg_pin_maxdistance.GetInt())
 		points = 0;
 
 	//otherwise, linear interpolation between max and zero
 	else
 	{
-		float t = (float)(dist - gg_pin_maxpoints_falloff.GetInt()) / (gg_pin_maxdistance_maxdistance.GetInt() - gg_pin_maxpoints_falloff.GetInt()); // scale 50..500 → 0..1
+		float t = (float)(dist - gg_pin_maxpoints_falloff.GetInt()) / (gg_pin_maxdistance.GetInt() - gg_pin_maxpoints_falloff.GetInt()); // scale 50..500 → 0..1
 		points = (int)(gg_pin_maxpoints.GetInt() * (1.0f - t));
 	}
 
@@ -398,4 +413,11 @@ void CGG_MiniMap::PerformLayout()
 		m_iOffsetY = ph - mh;
 
 	m_MapImage->SetBounds(m_iOffsetX, m_iOffsetY, mw, mh);
+
+	//get multipliers
+	m_PosMultiplyerX = (float)pw / MINIMAP_WIDE;
+	m_PosMultiplyerY = (float)ph / MINIMAP_TALL;
+
+	//debug multiplier
+	ConDMsg("x = %f, y = %f\n", m_PosMultiplyerX, m_PosMultiplyerY);
 }
