@@ -166,7 +166,7 @@ CEffectsPanel::CEffectsPanel(vgui::VPANEL parent) : BaseClass(nullptr, "EffectsP
 
 	//add tooltips
 	ADD_TOOLTIP(m_LightingDebugCheckButton, 100, "If selected then it will show debug lines/boxes/texts for all of the active (newly added) lights in the scene/map.", true)
-	ADD_TOOLTIP(m_AutoloadCheckButton, 100, "If selected then when a map loads it will go through each folder/file and add those effect save files into each page of the effect panel.", true)
+	ADD_TOOLTIP(m_AutoloadCheckButton, 100, "If selected then when a map loads it will go through each folder/file added to the 'Autoload List' and add those effect save files into each page of the effect panel.", true)
 
 	vgui::ivgui()->AddTickSignal(GetVPanel(), 30);
 }

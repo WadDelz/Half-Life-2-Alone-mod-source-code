@@ -283,6 +283,7 @@ void CGG_Game_Page::PostNavigateTo()
 
 	//disable the map list combo box and remove everything
 	m_MapList->RemoveAll();
+	m_MapList->SetText("");
 	m_MapList->SetEnabled(false);
 
 	//see if we have any maps?
@@ -306,6 +307,8 @@ void CGG_Game_Page::PostNavigateTo()
 	//check the queue size
 	if (m_MapQueue.Count() <= 0)
 	{
+		int x = 0;
+
 		//rebuild the queue
 		for (int i = 0; i < m_MapData.Count(); i++)
 		{
@@ -314,11 +317,17 @@ void CGG_Game_Page::PostNavigateTo()
 				//add the index into the queue
 				if (m_MapData[i]->MapLocations[j].enabled)
 					m_MapQueue.AddToTail(MapQueueItem_t{ i, j });
+
+				//inc x
+				x++;
 			}
+
+			//inc x
+			x++;
 		}
 
-		//shuffle the queue twice
-		for (int _ = 0; _ < 2; _++)
+		//shuffle the queue x times
+		for (int _ = 0; _ < x; _++)
 		{
 			for (int i = 0; i < m_MapQueue.Count(); i++)
 			{

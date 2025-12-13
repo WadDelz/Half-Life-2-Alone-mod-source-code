@@ -147,7 +147,7 @@ void CGG_MapListPanel::PopulateButtons()
 
 			//make child
 			vgui::CheckButton* child = new vgui::CheckButton(this, CFmtStr(MAP_LIST_CHECKBUTTON_COMMAND_PREFIX "%d:%d", i, j), text);
-			child->SetSelected(info.mapdata[i]->enabled && info.mapdata[i]->MapLocations[j].enabled);
+			child->SetSelected(info.mapdata[i]->MapLocations[j].enabled);
 			child->AddActionSignalTarget(this);
 
 			//add tooltip
@@ -177,10 +177,6 @@ void CGG_MapListPanel::SelectAll(bool select)
 	for (int i = 0; i < m_CheckButtons.Count(); i++)
 	{
 		m_CheckButtons[i].m_CheckButton->SetSelected(select);
-		
-		//go through all child buttons
-		for (int j = 0; j < m_CheckButtons[i].m_ChildButtons.Count(); j++)
-			m_CheckButtons[i].m_ChildButtons[j]->SetSelected(select);
 	}
 }
 
@@ -226,10 +222,14 @@ bool CGG_MapListPanel::HasAnySelected()
 //---------------------------------------------------------------------------------
 // Purpose: Override for the set bounds function
 //---------------------------------------------------------------------------------
-void CGG_MapListPanel::SetBounds(int x, int y, int w, int h)
+void CGG_MapListPanel::PerformLayout()
 {
 	//call base function
-	BaseClass::SetBounds(x, y, w, h);
+	BaseClass::PerformLayout();
+
+	//get size
+	int w, h;
+	GetSize(w, h);
 
 	//set the title stuff bounds
 	m_Title->SetBounds(0, 0, w - MAP_LIST_SCROLL_BAR_WIDTH, MAP_LIST_TITLE_HEIGHT);

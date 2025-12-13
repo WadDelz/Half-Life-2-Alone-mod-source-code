@@ -1,4 +1,4 @@
-#include "cbase.h"
+﻿#include "cbase.h"
 #include "cdll_int.h"
 #include "fmtstr.h"
 #include <filesystem.h>
@@ -86,6 +86,30 @@ void AmodRainWaitMaxChangeCallback(IConVar* cvar, const char*, float)
 	}
 }
 
+//alone mod clouds convar change callbacl
+void AmodCloudsChangeCallback(IConVar* var, const char*, float);
+
+//alone mod clouds convar
+ConVar amod_clouds("amod_clouds", "0", 0, "", AmodCloudsChangeCallback);
+
+void AmodCloudsChangeCallback(IConVar* var, const char*, float)
+{
+	//check to see if we are connected or not
+	if (!clientengine->IsConnected())
+		return;
+
+	//find the clouds brush
+	CBaseEntity* pEntity = gEntList.FindEntityByName(nullptr, "brush_clouds");
+	if (!pEntity)
+		return;
+
+	//enable or disable
+	if (amod_clouds.GetBool())
+		pEntity->AcceptInput("enable", nullptr, nullptr, variant_t{}, 0);
+	else
+		pEntity->AcceptInput("disable", nullptr, nullptr, variant_t{}, 0);
+}
+
 //play a random thunder sound
 void PlayRandomThunder()
 {
@@ -157,7 +181,10 @@ public:
 
 		if (gpGlobals->eLoadType == MapLoad_Background)
 			return;
+	}
 
+	void LevelInitPostEntity()
+	{
 		bool bRainEnabled = true;
 
 		if (!amod_rain_type.GetInt() || !amod_rain_enable.GetBool())
@@ -171,6 +198,17 @@ public:
 			else
 				bRainEnabled = pPlayer->m_bInRain;
 		}
+
+		//find the clouds brush
+		CBaseEntity* pEntity = gEntList.FindEntityByName(nullptr, "brush_clouds");
+		if (!pEntity)
+			return;
+
+		//enable or disable
+		if (amod_clouds.GetBool())
+			pEntity->AcceptInput("enable", nullptr, nullptr, variant_t{}, 0);
+		else
+			pEntity->AcceptInput("disable", nullptr, nullptr, variant_t{}, 0);
 	}
 };
 static CAutoAmodRainSystem g_RainSystem;

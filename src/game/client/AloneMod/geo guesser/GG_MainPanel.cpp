@@ -26,6 +26,9 @@ static CGG_MainPanel* gs_GeoGuesserMainPage = nullptr;
 #define GEO_GUESSER_MAPS_FOLDER "resource/geo_guesser/maps/"
 #define GEO_GUESSER_MAPS_MACROS_FILENAME "macros.res"
 
+//map positions text
+extern const char* gz_DifficultyTexts[];
+
 //---------------------------------------------------------------------------------
 // Purpose: Constructor for main geo-guesser panel.
 //---------------------------------------------------------------------------------
@@ -236,6 +239,9 @@ void CGG_MainPanel::LoadAllMapData()
 		char path[FILENAME_MAX];
 		Q_snprintf(path, sizeof(path), GEO_GUESSER_MAPS_FOLDER "%s", filename);
 
+		//debug
+		ConDMsg("Loading File: %s\n", path);
+
 		//load the file
 		KeyValues* keyvalues = new KeyValues("MapFile");
 		if (keyvalues->LoadFromFile(filesystem, path, "MOD"))
@@ -265,7 +271,11 @@ void CGG_MainPanel::LoadDifficultyImages(KeyValues* images, KeyValues* macros, M
 		//see if we find the image in the macros file
 		const char* macro_image = nullptr;
 		if ((macro_image = macros->GetString(images->GetString(), nullptr)) == nullptr)
-			macro_image = images->GetString();
+			macro_image = images->GetString(nullptr, nullptr);
+
+		//if no image then return
+		if (!macro_image || !macro_image[0])
+			return;
 
 		//just get the image
 		MapData_t::MapImages_t& image = item->MapImages[type][item->MapImages[type].AddToTail()];
@@ -360,21 +370,31 @@ void CGG_MainPanel::InitalizeMapData(KeyValues* file, KeyValues* macros)
 		if (images)
 		{
 			//load the difficulty images
-			LoadDifficultyImages(images->FindKey("EasyImages"), macros, MapData_t::MapType_e::Easy, item);
-			LoadDifficultyImages(images->FindKey("MediumImages"), macros, MapData_t::MapType_e::Medium, item);
-			LoadDifficultyImages(images->FindKey("HardImages"), macros, MapData_t::MapType_e::Hard, item);
+			for (int i = 0; i < MapData_t::MapType_e::Count; i++)
+				LoadDifficultyImages(images->FindKey(CFmtStr("%sImages", gz_DifficultyTexts[i])), macros, MapData_t::MapType_e(i), item);
 		}
 
-		//if no image data for the easy, medium or hard mode then delete the item
-		if (item->MapImages[MapData_t::MapType_e::Easy].Count() <= 0 || item->MapImages[MapData_t::MapType_e::Medium].Count() <= 0 || item->MapImages[MapData_t::MapType_e::Hard].Count() <= 0)
+		//if no image data for any of the difficulties, then delete the item
+		ShouldBreak = false;
+		for (int i = 0; i < MapData_t::MapType_e::Count; i++)
 		{
-			//warning
-			ConWarning("Error: Geo-Guesser Failed to load minimap images data for map: \"%s\". Deleting item!\n", map->GetName());
+			if (item->MapImages[i].Count() <= 0)
+			{
+				//warning
+				ConWarning("Error: Geo-Guesser Failed to load minimap images data for map: \"%s\". Deleting item!\n", map->GetName());
 
-			//delet the item
-			delete item;
-			continue;
+				//delet the item
+				delete item;
+
+				//break
+				ShouldBreak = true;
+				break;
+			}
 		}
+
+		//should we break?
+		if (ShouldBreak)
+			break;
 
 		//now get the positions
 		FOR_EACH_TRUE_SUBKEY(map, position)
@@ -393,31 +413,19 @@ void CGG_MainPanel::InitalizeMapData(KeyValues* file, KeyValues* macros)
 			//get the image
 			location.image = m_SymbolTable.AddString(position->GetName());
 
-			//get easy name
-			const char* name = macros->GetString(position->GetString("EasyName", nullptr));
-			if (!name)
-				name = position->GetString("EasyName");
+			//get difficulty names
+			for (int i = 0; i < MapData_t::Count; i++)
+			{
+				//get name
+				const char* name = macros->GetString(position->GetString(CFmtStr("%sName", gz_DifficultyTexts[i]), nullptr));
+				if (!name)
+					name = position->GetString(CFmtStr("%sName", gz_DifficultyTexts[i]));
 
-			location.actuall_map[MapData_t::MapType_e::Easy] = m_SymbolTable.AddString(name);
+				location.actuall_map[i] = m_SymbolTable.AddString(name);
 
-			//get medium name
-			name = macros->GetString(position->GetString("MediumName", nullptr));
-			if (!name)
-				name = position->GetString("MediumName");
-
-			location.actuall_map[MapData_t::MapType_e::Medium] = m_SymbolTable.AddString(name);
-				
-			//get hard name
-			name = macros->GetString(position->GetString("HardName", nullptr));
-			if (!name)
-				name = position->GetString("HardName");
-
-			location.actuall_map[MapData_t::MapType_e::Hard] = m_SymbolTable.AddString(name);
-
-			//get the positions
-			UTIL_StringToFloatArray(location.positions[MapData_t::MapType_e::Easy].Base(), 2, position->GetString("Easy", "0 0"));
-			UTIL_StringToFloatArray(location.positions[MapData_t::MapType_e::Medium].Base(), 2, position->GetString("Medium", "0 0"));
-			UTIL_StringToFloatArray(location.positions[MapData_t::MapType_e::Hard].Base(), 2, position->GetString("Hard", "0 0"));
+				//get the positions
+				UTIL_StringToFloatArray(location.positions[i].Base(), 2, position->GetString(gz_DifficultyTexts[i], "0 0"));
+			}
 		}
 
 		//if no position data then delete the data

@@ -47,7 +47,7 @@ protected:
 	CHudTexture		*m_pDefaultCrosshair;
 	Color			m_clrCrosshair;
 	QAngle			m_vecCrossHairOffsetAngle;
-
+	
 	CPanelAnimationVar( bool, m_bHideCrosshair, "never_draw", "false" );
 };
 

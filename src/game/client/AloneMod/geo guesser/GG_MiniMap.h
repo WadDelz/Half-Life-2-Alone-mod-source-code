@@ -28,7 +28,7 @@ public:
 	CStretchingImage(vgui::Panel* parent, const char* name) : BaseClass(parent, name) { m_X = m_Y = m_W = m_H = 0; }
 
 	//override set bounds func
-	virtual void SetBounds(int x, int y, int w, int h) { m_X = x; m_Y = y; m_W = w; m_H = h; return BaseClass::SetBounds(x, y, w, h); }
+	virtual void PerformLayout() { GetBounds(m_X, m_Y, m_W, m_H); return BaseClass::PerformLayout(); }
 
 	//paints the panel
 	virtual void Paint()

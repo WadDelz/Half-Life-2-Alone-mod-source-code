@@ -502,7 +502,7 @@ bool CConvarPageConvarList::ShouldConvarBeActive(CHL2_Player* pPlayer, ConvarAct
 		return false;
 
 	//check for always draw
-	if (((int)type & (int)ConvarActiveType_e::Active_Always) && !pPlayer->IsEffectActive(EF_DIMLIGHT))
+	if (((int)type & (int)ConvarActiveType_e::Active_Always))
 		return true;
 
 	//check for flashlight on

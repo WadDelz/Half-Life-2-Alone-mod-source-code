@@ -58,7 +58,7 @@ public:
 	bool HasAnySelected();
 
 	//pos/size
-	void SetBounds(int x, int y, int w, int h) override;
+	void PerformLayout() override;
 
 	//scroll stuff
 	virtual void OnMouseWheeled(int delta);

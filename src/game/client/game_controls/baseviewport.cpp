@@ -172,8 +172,8 @@ CBaseViewport::CBaseViewport() : vgui::EditablePanel( NULL, "CBaseViewport")
 	SetScheme(scheme);
 	SetProportional( true );
 
-	m_pAnimController = new vgui::AnimationController(this);
 	// create our animation controller
+	m_pAnimController = new vgui::AnimationController(this);
 	m_pAnimController->SetScheme(scheme);
 	m_pAnimController->SetProportional(true);
 	

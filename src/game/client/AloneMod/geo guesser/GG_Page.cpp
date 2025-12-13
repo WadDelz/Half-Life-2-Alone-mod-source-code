@@ -87,10 +87,10 @@ void I_GG_Page::NavigateTo()
 	PostNavigateTo();
 }
 
-ConVar gg_page_animate_time("gg_page_animate_time", "0.1");
+ConVar gg_page_animate_time("gg_page_animate_time", "0.15");
 
 #define PAGE_ANIMATE_TIME gg_page_animate_time.GetFloat()
-#define PAGE_ANIMATE_MODE vgui::AnimationController::Interpolators_e::INTERPOLATOR_SIMPLESPLINE
+#define PAGE_ANIMATE_MODE vgui::AnimationController::Interpolators_e::INTERPOLATOR_DEACCEL
 
 //---------------------------------------------------------------------------------
 // Purpose: Loads the settings for each child
@@ -190,6 +190,9 @@ void I_GG_Page::LoadSettings(const char* filename)
 		vgui::GetAnimationController()->RunAnimationCommand(panel, "wide", subkey->GetInt("Width"), 0.0f, PAGE_ANIMATE_TIME, PAGE_ANIMATE_MODE);
 		vgui::GetAnimationController()->RunAnimationCommand(panel, "tall", subkey->GetInt("Height"), 0.0f, PAGE_ANIMATE_TIME, PAGE_ANIMATE_MODE);
 
+		//set the bounds for now
+		//panel->SetBounds(0, 0, 0, 0);
+
 		//set zpos
 		if (subkey->FindKey("Z"))
 			panel->SetZPos(subkey->GetInt("Z"));
@@ -210,7 +213,27 @@ void I_GG_Page::LoadSettings(const char* filename)
 		//call the slider's callback if its a slider
 		vgui::Slider* slider = dynamic_cast<vgui::Slider*>(panel);
 		if (slider)
+		{
 			slider->SendSliderMovedMessage();
+
+			//get range
+			int min, max;
+			slider->GetRange(min, max);
+
+			//check for min value
+			if (subkey->FindKey("MinValue"))
+			{
+				min = subkey->GetInt("MinValue");
+				slider->SetRange(min, max);
+			}
+
+			//check for max value
+			if (subkey->FindKey("MaxValue"))
+			{
+				max = subkey->GetInt("MaxValue");
+				slider->SetRange(min, max);
+			}
+		}
 
 		//check to see if the panel can get its text set
 		vgui::Label* label = dynamic_cast<vgui::Label*>(panel);

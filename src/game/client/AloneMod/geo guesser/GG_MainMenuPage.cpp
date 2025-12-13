@@ -21,6 +21,15 @@
 #define MAINMENU_COMMAND_OPTIONS "NavigateToOptions"
 #define MAINMENU_COMMAND_STARTGAME "NavigateToGamePage"
 
+//difficulty strings
+const char* gz_DifficultyTexts[] =
+{
+	"Easy",
+	"Medium",
+	"Hard",
+	"Challenging",
+};
+
 //---------------------------------------------------------------------------------
 // Purpose: Constructor for main manu page
 //---------------------------------------------------------------------------------
@@ -38,16 +47,16 @@ CGG_MainMenu_Page::CGG_MainMenu_Page(CGG_MainPanel* parent)
 	
 	//difficulty stuff
 	AddChild(new vgui::Label(parent, "DifficultyLabel", "Difficulty:"));
-	AddChild((DifficultyComboBox = new vgui::ComboBox(parent, "DifficultyComboBox", 3, false)));
+	AddChild((DifficultyComboBox = new vgui::ComboBox(parent, "DifficultyComboBox", 20, false)));
 	
 	//score stuff
 	AddChild(new vgui::Divider(parent, "HighScoreDivider"));
 	AddChild((m_HighScoreText = new vgui::Label(parent, "HighScoreText", CFmtStr("High Score: %d", parent->GetGGInfo().high_score))));
 
-	//set the combo box data
-	DifficultyComboBox->AddItem("Easy", nullptr);		//The map display will only show the map that the photo was take from
-	DifficultyComboBox->AddItem("Medium", nullptr);		//The map display will show the chapter/section the photo was taken from
-	DifficultyComboBox->AddItem("Hard", nullptr);		//The map display will show the entire map (like the hl2 map, ep1 map, ep2 map etc...)
+	//add difficulty strings
+	for (int i = 0; i < SIZE_OF_ARRAY(gz_DifficultyTexts); i++)
+		DifficultyComboBox->AddItem(gz_DifficultyTexts[i], nullptr);
+
 	DifficultyComboBox->ActivateItem(parent->GetGGInfo().difficulty);
 
 	//load MAINMENU_RES_FILENAME on navigate to

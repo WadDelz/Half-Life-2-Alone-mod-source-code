@@ -208,14 +208,14 @@ CAModWeatherPanel::CAModWeatherPanel() : vgui::Frame(nullptr, "CAModWeatherPanel
 	ConVarRef amod_rain_splashes("amod_rain_splashes");
 	ConVarRef amod_rain_wait_min("amod_rain_wait_min");
 	ConVarRef amod_rain_wait_max("amod_rain_wait_max");
-	ConVarRef amod_weather_info("amod_weather_info");
+	ConVarRef amod_clouds("amod_clouds");
 	ConVarRef r_raindensity("r_raindensity");
 
 	//create the 'Show weather info' check button
-	m_cbWeatherInfo = new CheckButton(this, "ShowWeatherInfo", "Show Weather Info");
-	m_cbWeatherInfo->SetSelected(amod_weather_info.GetBool());
+	m_cbWeatherInfo = new CheckButton(this, "ShowClouds", "Show Moving Clouds");
+	m_cbWeatherInfo->SetSelected(amod_clouds.GetBool());
 	m_cbWeatherInfo->SetBounds(2, 21, 150, 25);
-	m_cbWeatherInfo->GetTooltip()->SetText("Every 60 or so seconds, a popup will display showing the current state of the weather");
+	m_cbWeatherInfo->GetTooltip()->SetText("Shows moving clouds on maps that allow for clouds in them!");
 	m_cbWeatherInfo->GetTooltip()->SetTooltipDelay(100);
 	m_cbWeatherInfo->GetTooltip()->SetTooltipFormatToMultiLine();
 
@@ -342,7 +342,7 @@ void CAModWeatherPanel::OnCommand(const char* command)
 		engine->ClientCmd_Unrestricted(CFmtStr("amod_do_breathing %d", m_cbBreaths->IsSelected()));
 
 		//enable/disable the weather info
-		engine->ClientCmd_Unrestricted(CFmtStr("amod_weather_info %d", m_cbWeatherInfo->IsSelected()));
+		engine->ClientCmd_Unrestricted(CFmtStr("amod_clouds %d", m_cbWeatherInfo->IsSelected()));
 
 		//get the convars
 		static ConVarRef amod_rain_enable("amod_rain_enable");
@@ -412,11 +412,11 @@ CON_COMMAND(amod_write_rain_config, "writes the rain info into the config")
 	ConVarRef amod_rain_wait_min("amod_rain_wait_min");
 	ConVarRef amod_rain_wait_max("amod_rain_wait_max");
 	ConVarRef amod_do_breathing("amod_do_breathing");
-	ConVarRef amod_weather_info("amod_weather_info");
+	ConVarRef amod_clouds("amod_clouds");
 	ConVarRef r_raindensity("r_raindensity");
 
 	file->SetBool("amod_do_breathing", amod_do_breathing.GetBool());
-	file->SetString("amod_weather_info", amod_weather_info.GetString());
+	file->SetString("amod_clouds", amod_clouds.GetString());
 	file->SetInt("amod_rain_type", amod_rain_type.GetInt());
 	file->SetBool("amod_rain_enable", amod_rain_enable.GetBool());
 	file->SetBool("amod_rain_thunder", amod_rain_thunder.GetBool());

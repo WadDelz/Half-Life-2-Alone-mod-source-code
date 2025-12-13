@@ -66,6 +66,7 @@ private:
 			Easy,
 			Medium,
 			Hard,
+			Challenging,
 			Count
 		};
 
@@ -97,7 +98,7 @@ public:
 	//geo-guesser info struct
 	struct GeoGuesserInfo_t
 	{
-		int difficulty = 0;
+		int difficulty = MapData_t::MapType_e::Easy;
 		int rounds = 5;
 		int rounds_played = 0;
 		int high_score = 0;

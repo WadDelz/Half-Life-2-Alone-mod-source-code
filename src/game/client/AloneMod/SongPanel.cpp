@@ -47,6 +47,26 @@ struct AloneModSong_t
 
 
 
+//function to stop every song from playing
+void StopAllSongs()
+{
+	//get sound list and loop through it
+	CUtlVector<SndInfo_t> soundinfo;
+	enginesound->GetActiveSounds(soundinfo);
+	for (int i = 0; i < soundinfo.Count(); i++)
+	{
+		//get filename
+		char buf[512];
+		filesystem->String(soundinfo[i].m_filenameHandle, buf, sizeof(buf));
+
+		//if the sound is a music file then stop it
+		if (Q_strstr(buf, "music") == buf)
+			enginesound->StopSoundByGuid(soundinfo[i].m_nGuid);
+	}
+}
+
+
+
 
 //playlist save panel
 #define PLAYLIST_SAVE_COMMAND "SavePlaylist"
@@ -1816,6 +1836,9 @@ void CSongPanel::OnLevelChange()
 	//get the volume for the song
 	float volume = ((float)m_VolumeSlider->GetValue() / 100);
 
+	//stop all currently playing songs
+	StopAllSongs();
+
 	//play the song
 	enginesound->EmitAmbientSound(m_CurrPlaying, volume, 100, SND_SHOULDPAUSE, m_TimeElapsed + m_SongStartTime);
 
@@ -1931,6 +1954,9 @@ void CSongPanel::StartPlaylist(bool bMessWithPitch)
 
 	if (!enginesound->IsSoundPrecached(m_CurrPlaying))
 		enginesound->PrecacheSound(m_CurrPlaying);
+
+	//stop currently playing songs
+	StopAllSongs();
 
 	//play the song
 	enginesound->EmitAmbientSound(m_CurrPlaying, volume, m_PitchSlider->GetValue(), SND_SHOULDPAUSE);
@@ -2419,6 +2445,9 @@ void CSongPanel::OnCommand(const char* pcCommand)
 
 			//get the volume
 			float volume = ((float)m_VolumeSlider->GetValue() / 100);
+
+			//stop currently playing songs
+			StopAllSongs();
 
 			//play the song
 			enginesound->EmitAmbientSound(songname, volume, m_PitchSlider->GetValue(), SND_SHOULDPAUSE);
