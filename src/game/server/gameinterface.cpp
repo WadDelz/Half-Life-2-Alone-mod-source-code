@@ -349,7 +349,6 @@ void			DrawMessageEntities();
 // For now just using one big AI network
 extern ConVar think_limit;
 
-
 #if 0
 //-----------------------------------------------------------------------------
 // Purpose: Draw output overlays for any measure sections

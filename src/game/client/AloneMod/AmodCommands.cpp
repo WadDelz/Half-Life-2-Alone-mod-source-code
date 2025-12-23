@@ -47,12 +47,16 @@ void Amod_WriteConfig()
 		"amod_filter_brightness_on",				//filter on value
 		"amod_filter_brightness_on_exp",			//filter on exponent value
 		"amod_filter_brightness_off",				//filter off value
+		"amod_sky",									//current sky name
 	};
 
 
 	//write all the stuff to a keyvalues* file
 	KeyValues* file = new KeyValues("AmodConfigFile");
 	
+	//load previous settings
+	file->LoadFromFile(filesystem, "cfg/AloneMod_Config.txt", "MOD");
+
 	//write every console var's value
 	for (int i = 0; i < ARRAYSIZE(s_CommandsToWrite); i++)
 	{

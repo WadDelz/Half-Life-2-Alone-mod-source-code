@@ -146,12 +146,12 @@ private:
 
 
 //quick mouse wheel slider
-class WheelSlider : public vgui::Slider
+class OverlaySlider : public WheelSlider
 {
-	DECLARE_CLASS_SIMPLE(WheelSlider, vgui::Slider);
+	DECLARE_CLASS_SIMPLE(OverlaySlider, WheelSlider);
 public:
 	//constructor
-	WheelSlider(vgui::Panel* parent, const char* name) : BaseClass(parent, name)
+	OverlaySlider(vgui::Panel* parent, const char* name) : BaseClass(parent, name)
 	{
 	}
 
@@ -162,13 +162,6 @@ public:
 			SetValue(255);
 		else
 			BaseClass::OnMousePressed(code);
-	}
-
-	//called on mouse wheeled
-	void OnMouseWheeled(int delta)
-	{
-		SetValue(GetValue() + delta);
-		BaseClass::OnMouseWheeled(delta);
 	}
 };
 
@@ -224,10 +217,10 @@ private:
 	vgui::Label* m_BlueText;
 	vgui::Label* m_AlphaText;
 
-	WheelSlider* m_RedSlider;
-	WheelSlider* m_GreenSlider;
-	WheelSlider* m_BlueSlider;
-	WheelSlider* m_AlphaSlider;
+	OverlaySlider* m_RedSlider;
+	OverlaySlider* m_GreenSlider;
+	OverlaySlider* m_BlueSlider;
+	OverlaySlider* m_AlphaSlider;
 
 	//buttons
 	vgui::Button* m_AddButton;

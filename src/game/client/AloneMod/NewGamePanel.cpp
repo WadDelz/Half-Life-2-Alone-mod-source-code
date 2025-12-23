@@ -1,66 +1,97 @@
-// aint no way i got this to work
-// i had to make the new "NewGamePanel" because only 32 chapters are alowed on the base hl2 new game panel at a time
 #include "cbase.h"
-#include "fmtstr.h"
-#include "filesystem.h"
 #include "INewGamePanel.h"
-#include <vgui/IVGui.h>
-#include <vgui_controls/Frame.h>
-#include <vgui_controls/Label.h>
-#include <vgui_controls/Button.h>
-#include <vgui_controls/ImagePanel.h>
-#include <vgui_controls/ComboBox.h>
-#include <vgui_controls/Divider.h>
-#include <vgui_controls/CheckButton.h>
-#include <ienginevgui.h>
-#include <vgui/ISurface.h>
+#include "filesystem.h"
 #include "fmtstr.h"
 #include "AloneMod/Amod_SharedDefs.h"
-
-using namespace vgui;
-
-ConVar cl_drawnewgamepanel("cl_drawnewgamepanel", "0", FCVAR_CLIENTDLL | FCVAR_HIDDEN, "Sets the state of the alone mod New Game panel");
-
-static bool bUsingHl1Panel = false;
+#include "vgui_controls/Frame.h"
+#include "vgui_controls/ImagePanel.h"
+#include "vgui_controls/Button.h"
+#include "vgui_controls/Label.h"
+#include "vgui_controls/ComboBox.h"
 
 #if !AMOD_DAYTIME_EDITION
 extern ConVar amod_day;
-
-#define IsDay(a) (!bUsingHl1Panel && amod_day.GetBool() && (ButtonExp + a > 48 && ButtonExp + a < 69))
-#else
-#define IsDay(a) false
 #endif
 
-class CNewGamePanel : public vgui::Frame
+//new game panel game list struct
+struct GameListInfo_t
 {
-	DECLARE_CLASS_SIMPLE(CNewGamePanel, vgui::Frame);
-
-	CNewGamePanel(vgui::VPANEL parent, bool hl1panel);
-	~CNewGamePanel() {};
-
-	void DoDayCheck();
-
-	void OnClose();
-protected:
-	//VGUI overrides:
-	virtual void OnTick();
-	virtual void OnCommand(const char* pcCommand);
-
-private:
-	int ButtonExp = 0;
-	Button* chapter1b, * chapter2b, * chapter3b, * next, * prev;
-	Label* chapter1l, * chapter2l, * chapter3l;
-	ImagePanel* ImageC1, * ImageC2, * ImageC3;
-
+	//prefix and name
+	char name[128];
+	char prefix[32];
 	CUtlVector<const char*> ChapterNames;
-	void Init(bool hl1panel);
+
+	//day info
+	struct DayInfo_t
+	{
+		ConVar* convar;
+		int min;
+		int max;
+	};
+	CUtlVector<DayInfo_t> m_DayInfo;
 };
 
-CNewGamePanel::CNewGamePanel(vgui::VPANEL parent, bool hl1panel)
-	: BaseClass(NULL, "NewGamePanel")
+#define COMMAND_CHAPTER_1 "LoadChapter1"
+#define COMMAND_CHAPTER_2 "LoadChapter2"
+#define COMMAND_CHAPTER_3 "LoadChapter3"
+#define COMMAND_PREV "PrevChapter"
+#define COMMAND_NEXT "NextChapter"
+
+#define MAX_CHAPTERS 999
+
+//new game panel
+class CNewGamePanel : public vgui::Frame
 {
+	DECLARE_CLASS_SIMPLE(CNewGamePanel, vgui::Frame)
+public:
+	CNewGamePanel(vgui::VPANEL parent);
+	~CNewGamePanel();
+
+	//initalizes the elements
+	void InitElements();
+
+	//map functions
+	void LoadNewGameInfo(const char* filename);
+	void ActivateGame(int gameindex = 0);
+	void SelectPage(int page);
+
+	//other panel funcs
+	void OnCommand(const char* pszCommand);
+	MESSAGE_FUNC_PARAMS(OnTextChanged, "TextChanged", data);
+private:
+	friend class CNewGamePanelInterface;
+
+	GameListInfo_t* m_CurrentSelectedGameInfo;
+	CUtlVector<GameListInfo_t> m_GameInfo;		//array of game info
+	int m_SelectedGameIndex = 0;				//the selected game index
+	int m_CurrentChapterIndex = 0;				//current chapter
+
+	//chapter texts
+	vgui::Label* m_ChapterNames[3];
+	
+	//chapter images
+	vgui::ImagePanel* m_ChapterImages[3];
+
+	//chapter buttons
+	vgui::Button* m_ChapterButtons[3];
+
+	//previous and next chapter
+	vgui::Button* m_NextButton;
+	vgui::Button* m_PrevButton;
+
+	//make the game combo box
+	vgui::ComboBox* m_GameComboBox;
+};
+
+//-----------------------------------------------------------------------
+// Purpose: Constructor for the new game panel
+//-----------------------------------------------------------------------
+CNewGamePanel::CNewGamePanel(vgui::VPANEL parent) : BaseClass(nullptr, "NewGamePanel")
+{
+	//set parent
 	SetParent(parent);
 
+	//set other panel stuff
 	SetKeyBoardInputEnabled(true);
 	SetMouseInputEnabled(true);
 
@@ -73,343 +104,382 @@ CNewGamePanel::CNewGamePanel(vgui::VPANEL parent, bool hl1panel)
 	SetMoveable(true);
 	SetVisible(true);
 
-	SetScheme(vgui::scheme()->LoadSchemeFromFile("resource/SourceScheme.res", "SourceScheme"));
-
-	vgui::ivgui()->AddTickSignal(GetVPanel(), 50);
-
-	Init(hl1panel);
-}
-
-void CNewGamePanel::Init(bool hl1panel)
-{
-	KeyValues* kv = new KeyValues("");
-	kv->LoadFromFile(filesystem, "resource/HL2_AloneMod_english.txt", "MOD");
-	KeyValues* sub = kv->GetFirstTrueSubKey();
-
-	if (!hl1panel)
-	{
-		for (int i = 1; i <= 101; i++)
-		{
-			if (!filesystem->FileExists(CFmtStr("cfg/hl2/chapter%d.cfg", i)))
-				break;
-
-			ChapterNames.AddToTail(sub->GetString(CFmtStr("HL2_Chapter%d_Title", i)));
-		}
-	}
-	else
-	{
-		for (int i = 1; i <= 101; i++)
-		{
-			if (!filesystem->FileExists(CFmtStr("cfg/hl1/chapter%d.cfg", i)))
-				break;
-
-			ChapterNames.AddToTail(sub->GetString(CFmtStr("HL1_Chapter%d_Title", i)));
-		}
-	}
-
+	//set title
 	SetTitle("Chapter Select", false);
-	SetSize(520, 193);
+	SetSize(520, 190);
+	MoveToCenterOfScreen();
 
-	int screenWidth, screenHeight;
-	vgui::surface()->GetScreenSize(screenWidth, screenHeight);
+	//init the elements
+	InitElements();
 
-	int xPos = (screenWidth - 520) / 2;
-	int yPos = (screenHeight - 193) / 2;
-
-	SetPos(xPos, yPos);
-
-	ImageC1 = new ImagePanel(this, "ImageC1");
-	ImageC1->SetBounds(10, 40, 160, 90);
-	ImageC1->SetImage(CFmtStr("chapters/%s/chapter1", bUsingHl1Panel ? "hl1" : "hl2"));
-
-	ImageC2 = new ImagePanel(this, "ImageC2");
-	ImageC2->SetBounds(180, 40, 160, 90);
-	ImageC2->SetImage(CFmtStr("chapters/%s/chapter2", bUsingHl1Panel ? "hl1" : "hl2"));
-
-	ImageC3 = new ImagePanel(this, "ImageC2");
-	ImageC3->SetBounds(350, 40, 160, 90);
-	ImageC3->SetImage(CFmtStr("chapters/%s/chapter3", bUsingHl1Panel ? "hl1" : "hl2"));
-
-	chapter1l = new Label(this, "Chapter1l", ChapterNames[0]);
-	chapter1l->SetBounds(10, 20, 170, 20);
-
-	chapter2l = new Label(this, "Chapter2l", ChapterNames[1]);
-	chapter2l->SetBounds(180, 20, 165, 20);
-
-	chapter3l = new Label(this, "Chapter3l", ChapterNames[2]);
-	chapter3l->SetBounds(350, 20, 165, 20);
-
-	//Divider* div1 = new Divider(this, "div1");
-	//div1->SetBounds(5, 23, 510, 2);
-
-	prev = new Button(this, "prev", "Previous");
-	prev->SetBounds(10, 165, 80, 25);
-	prev->SetCommand("Prev");
-	prev->SetEnabled(false);
-
-	next = new Button(this, "next", "Next");
-	next->SetBounds(430, 165, 80, 25);
-	next->SetCommand("Next");
-
-	Divider* div2 = new Divider(this, "div1");
-	div2->SetBounds(5, 158, 510, 2);
-
-	chapter1b = new Button(this, "Chapter1b", "Load Chapter 1");
-	chapter1b->SetBounds(10, 135, 160, 20);
-	chapter1b->SetCommand("chapter1");
-
-	chapter2b = new Button(this, "Chapter2b", "Load Chapter 2");
-	chapter2b->SetBounds(180, 135, 160, 20);
-	chapter2b->SetCommand("chapter2");
-
-	chapter3b = new Button(this, "Chapter3b", "Load Chapter 3");
-	chapter3b->SetBounds(350, 135, 160, 20);
-	chapter3b->SetCommand("chapter3");
-
-	//oldpanelbutfornew = new CheckButton(this, "oldbuttonfornewpanel", "Use Other Panel");
-	//oldpanelbutfornew->SetCommand("OBPress");
-	//oldpanelbutfornew->SetBounds(186, 165, 150, 25);
+	//load the new game info
+	LoadNewGameInfo("resource/gamelist.txt");
+	ActivateGame(m_SelectedGameIndex);
 }
 
-class CNGPanellInterface : public NewGamePanel
+//-----------------------------------------------------------------------
+// Purpose: Destructor
+//-----------------------------------------------------------------------
+CNewGamePanel::~CNewGamePanel()
 {
-private:
-	CNewGamePanel* NPanel;
+	//delete all the game info
+	for (int g = 0; g < m_GameInfo.Count(); g++)
+	{
+		for (int c = 0; c < m_GameInfo[g].ChapterNames.Count(); c++)
+			free((void*)m_GameInfo[g].ChapterNames[c]);
+	}
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Initalizes the elements
+//-----------------------------------------------------------------------
+void CNewGamePanel::InitElements()
+{
+	//create the 3 chapter labels
+	m_ChapterNames[0] = new vgui::Label(this, "Chapter1Label", "");
+	m_ChapterNames[0]->SetBounds(10, 20, 170, 20);
+
+	m_ChapterNames[1] = new vgui::Label(this, "Chapter2Label", "");
+	m_ChapterNames[1]->SetBounds(180, 20, 165, 20);
+
+	m_ChapterNames[2] = new vgui::Label(this, "Chapter3Label", "");
+	m_ChapterNames[2]->SetBounds(350, 20, 165, 20);
+
+	//create the images
+	m_ChapterImages[0] = new vgui::ImagePanel(this, "Chapter1Image");
+	m_ChapterImages[0]->SetBounds(10, 40, 160, 90);
+
+	m_ChapterImages[1] = new vgui::ImagePanel(this, "Chapter2Image");
+	m_ChapterImages[1]->SetBounds(180, 40, 160, 90);
+
+	m_ChapterImages[2] = new vgui::ImagePanel(this, "Chapter3Image");
+	m_ChapterImages[2]->SetBounds(350, 40, 160, 90);
+
+	//create the buttons
+	m_ChapterButtons[0] = new vgui::Button(this, "Chapter1Button", "Load Chapter 1");
+	m_ChapterButtons[0]->SetBounds(10, 135, 160, 20);
+	m_ChapterButtons[0]->SetCommand(COMMAND_CHAPTER_1);
+
+	m_ChapterButtons[1] = new vgui::Button(this, "Chapter2Button", "Load Chapter 2");
+	m_ChapterButtons[1]->SetBounds(180, 135, 160, 20);
+	m_ChapterButtons[1]->SetCommand(COMMAND_CHAPTER_2);
+
+	m_ChapterButtons[2] = new vgui::Button(this, "Chapter3Button", "Load Chapter 3");
+	m_ChapterButtons[2]->SetBounds(350, 135, 160, 20);
+	m_ChapterButtons[2]->SetCommand(COMMAND_CHAPTER_3);
+
+	//create the next and previous button
+	m_PrevButton = new vgui::Button(this, "PreviousButton", "Previous");
+	m_PrevButton->SetBounds(10, 160, 80, 25);
+	m_PrevButton->SetCommand(COMMAND_PREV);
+	m_PrevButton->SetEnabled(false);
+
+	m_NextButton = new vgui::Button(this, "NextButton", "Next");
+	m_NextButton->SetBounds(430, 160, 80, 25);
+	m_NextButton->SetCommand(COMMAND_NEXT);
+	m_NextButton->SetEnabled(false);
+
+	//make the game combo box
+	m_GameComboBox = new vgui::ComboBox(this, "GameComboBox", 10, false);
+	m_GameComboBox->SetBounds(100, 160, 320, 25);
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Loads the new game info
+//-----------------------------------------------------------------------
+void CNewGamePanel::LoadNewGameInfo(const char* filename)
+{
+	//load the HL2_AloneMod_english.txt
+	KeyValues* AloneModEnglish = new  KeyValues("AloneModEnglish");
+	if (!AloneModEnglish->LoadFromFile(filesystem, "resource/HL2_AloneMod_english.txt", "MOD"))
+	{
+		ConWarning("Error: Failed to load the 'resource/HL2_AloneMod_english.txt' for the new game panel!\n%s\n", filename);
+		AloneModEnglish->deleteThis();
+		return;
+	}
+
+	//get the tokens
+	KeyValues* tokens = AloneModEnglish->FindKey("Tokens");
+	if (!tokens)
+	{
+		ConWarning("Error: Failed to find the 'Tokens' key for 'resource/HL2_AloneMod_english.txt' for the new game panel!\n%s\n", filename);
+		AloneModEnglish->deleteThis();
+		return;
+	}
+
+	//load the file
+	KeyValues* gamelist = new KeyValues("gamelist");
+	if (!gamelist->LoadFromFile(filesystem, filename, "MOD"))
+	{
+		ConWarning("Error: Failed to load the gamelist for the new game panel!\n%s\n", filename);
+		AloneModEnglish->deleteThis();
+		gamelist->deleteThis();
+		return;
+	}
+
+	//go through each subkey
+	FOR_EACH_TRUE_SUBKEY(gamelist, game)
+	{
+		//check for default
+		if (game->GetBool("Default"))
+			m_SelectedGameIndex = m_GameInfo.Count();
+
+		//get the game info
+		GameListInfo_t& info = m_GameInfo[m_GameInfo.AddToTail()];
+		Q_strncpy(info.name, game->GetName(), sizeof(info.name));
+		Q_strncpy(info.prefix, game->GetString("Prefix"), sizeof(info.prefix));
+
+		//get the chapter names
+		for (int i = 1; i < MAX_CHAPTERS; i++)
+		{
+			//check for the string
+			const char* chapter = tokens->GetString(CFmtStr("%s_Chapter%d_Title", info.prefix, i), nullptr);
+			if (!chapter)
+				break;
+
+			info.ChapterNames.AddToTail(_strdup(chapter));
+		}
+
+		//get the day info
+		KeyValues* day = game->FindKey("DayInfo");
+		if (!day)
+			continue;
+
+		FOR_EACH_TRUE_SUBKEY(day, days)
+		{
+			//check for the convar
+			ConVar* convar = cvar->FindVar(days->GetString("Convar"));
+			if (!convar)
+				continue;
+
+			//add the info
+			GameListInfo_t::DayInfo_t& dayinfo = info.m_DayInfo[info.m_DayInfo.AddToTail()];
+			dayinfo.min = days->GetInt("StartChapter");
+			dayinfo.max = days->GetInt("EndChapter");
+			dayinfo.convar = convar;
+		}
+	}
+
+	//add the games to the combo box
+	for (int i = 0; i < m_GameInfo.Count(); i++)
+	{
+		m_GameComboBox->AddItem(CFmtStr("Game: %s", m_GameInfo[i].name), nullptr);
+		m_GameComboBox->ActivateItem(m_SelectedGameIndex);
+	}
+
+	//delete the configs
+	AloneModEnglish->deleteThis();
+	gamelist->deleteThis();
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Activates the chapter
+//-----------------------------------------------------------------------
+void CNewGamePanel::ActivateGame(int gameindex)
+{
+	//reset the chapter index
+	m_CurrentChapterIndex = 0;
+	m_SelectedGameIndex = gameindex;
+
+	//get the info
+	if (gameindex >= m_GameInfo.Count() || gameindex < 0)
+	{
+		ConWarning("Error: Got invalid index: %d for the NewGamePanel::ActivateGame(int);\n", gameindex);
+		return;
+	}
+
+	//select the new game
+	m_CurrentSelectedGameInfo = &m_GameInfo[gameindex];
+	SelectPage(0);
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Sets the panel to the next page
+//-----------------------------------------------------------------------
+void CNewGamePanel::SelectPage(int page)
+{
+	//the actuall index should be page * 3;
+	int index = page * 3;
+
+	//check the chapters
+	if (!m_CurrentSelectedGameInfo || index >= m_CurrentSelectedGameInfo->ChapterNames.Count() || index < 0)
+		return;
+
+	//set the new index
+	m_CurrentChapterIndex = page;
+
+	//hide all the elements first
+	for (int i = 0; i < 3; i++)
+	{
+		m_ChapterNames[i]->SetVisible(false);
+		m_ChapterImages[i]->SetVisible(false);
+		m_ChapterButtons[i]->SetVisible(false);
+	}
+
+	//go through all the elements
+	for (int i = 0; i < 3; i++)
+	{
+		//real correct index
+		int realindex = index + i + 1;
+
+		//bounds check
+		if (index + i >= m_CurrentSelectedGameInfo->ChapterNames.Count())
+			break;
+
+		//set the text + image + button text
+		m_ChapterNames[i]->SetText(m_CurrentSelectedGameInfo->ChapterNames[index + i]);
+		m_ChapterButtons[i]->SetText(CFmtStr("Load Chapter %d", realindex));
+
+		//check for daytime
+		bool did = false;
+		for (int j = 0; j < m_CurrentSelectedGameInfo->m_DayInfo.Count(); j++)
+		{
+			//check the info
+			GameListInfo_t::DayInfo_t& info = m_CurrentSelectedGameInfo->m_DayInfo[j];
+			
+			if (info.convar->GetBool() && (realindex >= info.min && realindex <= info.max))
+			{
+				m_ChapterImages[i]->SetImage(CFmtStr("chapters/%s/chapter%d%s", m_CurrentSelectedGameInfo->prefix, realindex, "_day"));
+				did = true;
+				break;
+			}
+		}
+		
+		if (!did)
+			m_ChapterImages[i]->SetImage(CFmtStr("chapters/%s/chapter%d", m_CurrentSelectedGameInfo->prefix, realindex));
+
+		//set visibility
+		m_ChapterNames[i]->SetVisible(true);
+		m_ChapterButtons[i]->SetVisible(true);
+		m_ChapterImages[i]->SetVisible(true);
+	}
+
+	m_PrevButton->SetEnabled(true);
+	m_NextButton->SetEnabled(true);
+
+	//check for the buttons
+	if (m_CurrentChapterIndex <= 0)
+		m_PrevButton->SetEnabled(false);
+	if (!m_ChapterButtons[2]->IsVisible() || index + 3 >= m_CurrentSelectedGameInfo->ChapterNames.Count())
+		m_NextButton->SetEnabled(false);
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Called on command
+//-----------------------------------------------------------------------
+void CNewGamePanel::OnCommand(const char* pszCommand)
+{
+	//check for next or previous command
+	if (!Q_stricmp(pszCommand, COMMAND_NEXT))
+	{
+		SelectPage(m_CurrentChapterIndex + 1);
+		return;
+	}
+	else if (!Q_stricmp(pszCommand, COMMAND_PREV))
+	{
+		SelectPage(m_CurrentChapterIndex - 1);
+		return;
+	}
+	else if (!Q_stricmp(pszCommand, COMMAND_CHAPTER_1))
+	{
+		engine->ClientCmd(CFmtStr("exec %s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentChapterIndex * 3) + 1));
+	}
+	else if (!Q_stricmp(pszCommand, COMMAND_CHAPTER_2))
+	{
+		engine->ClientCmd(CFmtStr("exec %s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentChapterIndex * 3) + 2));
+	}
+	else if (!Q_stricmp(pszCommand, COMMAND_CHAPTER_3))
+	{
+		engine->ClientCmd(CFmtStr("exec %s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentChapterIndex * 3) + 3));
+	}
+
+	BaseClass::OnCommand(pszCommand);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Called on text changed
+//-----------------------------------------------------------------------------
+void CNewGamePanel::OnTextChanged(KeyValues* kv)
+{
+	//check the panel
+	if (kv->GetPtr("Panel") != m_GameComboBox)
+		return;
+
+	//select the new game
+	ActivateGame(m_GameComboBox->GetActiveItem());
+}
+
+
+
+
+
+//new game panel interface
+class CNewGamePanelInterface : public INewGamePanel
+{
 public:
-	CNGPanellInterface()
+	//creates the new game panel
+	virtual void Create(vgui::VPANEL parent)
 	{
-		NPanel = NULL;
-	}
-	void Create(vgui::VPANEL parent)
-	{
-		NPanel = new CNewGamePanel(parent, false);
-	}
-	void Init(bool hl1panel)
-	{
-		bUsingHl1Panel = hl1panel;
-
-		if (NPanel)
-			NPanel->DeletePanel();
-
-		NPanel = new CNewGamePanel(enginevgui->GetPanel(VGuiPanel_t::PANEL_GAMEUIDLL), hl1panel);
-		NPanel->SetVisible(true);
-		NPanel->RequestFocus();
-		NPanel->MoveToFront();
-	}
-	void Destroy()
-	{
-		if (NPanel)
-		{
-			NPanel->SetParent((vgui::Panel*)NULL);
-			delete NPanel;
-			NPanel = nullptr;
-		}
-	}
-	void Activate(void)
-	{
-		if (NPanel)
-		{
-			NPanel->Activate();
-			NPanel->MoveToFront();
-		}
-	}
-
-	void DayCheck()
-	{
-		if (NPanel)
-		{
-			NPanel->DoDayCheck();
-		}
-	}
-};
-static CNGPanellInterface g_NGanel;
-NewGamePanel* newgamepanel = (NewGamePanel*)&g_NGanel;
-
-void CNewGamePanel::OnTick()
-{
-	BaseClass::OnTick();
-	SetVisible(cl_drawnewgamepanel.GetBool());
-}
-
-CON_COMMAND_F(ToggleNewGamePanel, "Toggles The Alone Mod New Game Panel", FCVAR_HIDDEN)
-{
-	if (bUsingHl1Panel)
-	{
-		bUsingHl1Panel = false;
-		newgamepanel->Init(false);
-		cl_drawnewgamepanel.SetValue(true);
-		return;
-	}
-
-	cl_drawnewgamepanel.SetValue(!cl_drawnewgamepanel.GetBool());
-	newgamepanel->Activate();
-};
-
-CON_COMMAND_F(Togglehl1NewGamePanel, "Toggles The Alone Mod hl1 New Game Panel", FCVAR_HIDDEN)
-{
-	if (!bUsingHl1Panel)
-	{
-		bUsingHl1Panel = true;
-		newgamepanel->Init(true);
-		return;
-	}
-
-	cl_drawnewgamepanel.SetValue(!cl_drawnewgamepanel.GetBool());
-	newgamepanel->Activate();
-};
-
-void CNewGamePanel::OnClose()
-{
-	cl_drawnewgamepanel.SetValue(0);
-}
-
-//i have absolutly 0 idea how to use % so i just did this
-void CNewGamePanel::OnCommand(const char* pcCommand)
-{
-	static ConVar* commentary = cvar->FindVar("commentary");
-
-	BaseClass::OnCommand(pcCommand);
-
-	if (!Q_strcmp(pcCommand, "Prev"))
-	{
-		if (ButtonExp == 0)
+		if (m_NewGamePanel)
 			return;
 
-		chapter2b->SetSize(160, 20);
-		chapter3b->SetSize(160, 20);
-
-		ImageC2->SetSize(160, 90);
-		ImageC3->SetSize(160, 90);
-
-		chapter1b->SetText(CFmtStr("Load Chapter %d", ButtonExp - 2));
-		chapter2b->SetText(CFmtStr("Load Chapter %d", ButtonExp - 1));
-		chapter3b->SetText(CFmtStr("Load Chapter %d", ButtonExp));
-
-		next->SetEnabled(true);
-
-		if (ButtonExp == 3)
-		{
-			prev->SetEnabled(false);
-		}
-
-		next->SetEnabled(true);
-		ButtonExp -= 3;
-		chapter1l->SetText(ChapterNames[ButtonExp]);
-		ImageC1->SetImage(CFmtStr1024("chapters/%s/chapter%d%s", bUsingHl1Panel ? "hl1" : "hl2", ButtonExp + 1, IsDay(1) ? "_day" : ""));
-
-		if (ChapterNames.Size() > ButtonExp + 1)
-		{
-			chapter2l->SetText(ChapterNames[ButtonExp + 1]);
-			ImageC2->SetImage(CFmtStr1024("chapters/%s/chapter%d%s", bUsingHl1Panel ? "hl1" : "hl2", ButtonExp + 2, IsDay(2) ? "_day" : ""));
-		}
-		else
-		{
-			chapter2l->SetText("");
-		}
-
-		if (ChapterNames.Size() > ButtonExp + 2)
-		{
-			chapter3l->SetText(ChapterNames[ButtonExp + 2]);
-			ImageC3->SetImage(CFmtStr1024("chapters/%s/chapter%d%s", bUsingHl1Panel ? "hl1" : "hl2", ButtonExp + 3, IsDay(3) ? "_day" : ""));
-		}
-		else
-		{
-			chapter3l->SetText("");
-		}
+		m_NewGamePanel = new CNewGamePanel(parent);
+		m_NewGamePanel->SetVisible(false);
 	}
-	else if (!Q_strcmp(pcCommand, "Next"))
+
+	//destroys the new game panel
+	virtual void Activate(void)
 	{
-		prev->SetEnabled(true);
-
-		ButtonExp += 3;
-		if (ButtonExp + 3 >= ChapterNames.Size())
-			next->SetEnabled(false);
-
-		chapter1b->SetText(CFmtStr("Load Chapter %d", ButtonExp + 1));
-
-		if (ButtonExp + 1 < ChapterNames.Size())
+		if (m_NewGamePanel)
 		{
-			chapter2b->SetText(CFmtStr("Load Chapter %d", ButtonExp + 2));
-			if (ButtonExp + 2 < ChapterNames.Size())
-			{
-				chapter3b->SetText(CFmtStr("Load Chapter %d", ButtonExp + 3));
-			}
-			else
-			{
-				chapter3b->SetSize(0, 0);
-				ImageC3->SetSize(0, 0);
-			}
-		}
-		else
-		{
-			chapter2b->SetSize(0, 0);
-			chapter3b->SetSize(0, 0);
-			ImageC2->SetSize(0, 0);
-			ImageC3->SetSize(0, 0);
-		}
-
-		chapter1l->SetText(ChapterNames[ButtonExp]);
-		ImageC1->SetImage(CFmtStr1024("chapters/%s/chapter%d%s", bUsingHl1Panel ? "hl1" : "hl2", ButtonExp + 1, IsDay(1) ? "_day" : ""));
-
-		if (ChapterNames.Size() > ButtonExp + 1)
-		{
-			chapter2l->SetText(ChapterNames[ButtonExp + 1]);
-			ImageC2->SetImage(CFmtStr1024("chapters/%s/chapter%d%s", bUsingHl1Panel ? "hl1" : "hl2", ButtonExp + 2, IsDay(2) ? "_day" : ""));
-		}
-		else
-		{
-			chapter2l->SetText("");
-		}
-
-		if (ChapterNames.Size() > ButtonExp + 2)
-		{
-			chapter3l->SetText(ChapterNames[ButtonExp + 2]);
-			ImageC3->SetImage(CFmtStr1024("chapters/%s/chapter%d%s", bUsingHl1Panel ? "hl1" : "hl2", ButtonExp + 3, IsDay(3) ? "_day" : ""));
-		}
-		else
-		{
-			chapter3l->SetText("");
+			m_NewGamePanel->Activate();
+			m_NewGamePanel->MoveToCenterOfScreen();
 		}
 	}
-	else if (!Q_strcmp(pcCommand, "chapter1"))
+
+	//does a day check
+	virtual void DoDayCheck(void)
 	{
-		if (commentary) commentary->SetValue(0);
-		engine->ClientCmd(CFmtStr("exec %s/chapter%d", bUsingHl1Panel ? "hl1" : "hl2", ButtonExp + 1));
+		if (m_NewGamePanel)
+			m_NewGamePanel->SelectPage(m_NewGamePanel->m_CurrentChapterIndex);
 	}
-	else if (!Q_strcmp(pcCommand, "chapter2"))
-	{
-		if (commentary) commentary->SetValue(0);
-		engine->ClientCmd(CFmtStr("exec %s/chapter%d", bUsingHl1Panel ? "hl1" : "hl2", ButtonExp + 2));
-	}
-	else if (!Q_strcmp(pcCommand, "chapter3"))
-	{
-		if (commentary) commentary->SetValue(0);
-		engine->ClientCmd(CFmtStr("exec %s/chapter%d", bUsingHl1Panel ? "hl1" : "hl2", ButtonExp + 3));
-	}
-}
 
-void CNewGamePanel::DoDayCheck()
+	//destroys the new game panel
+	virtual void Destroy(void)
+	{
+		if (m_NewGamePanel)
+			delete m_NewGamePanel;
+
+		m_NewGamePanel = nullptr;
+	}
+private:
+	CNewGamePanel* m_NewGamePanel = nullptr;
+};
+
+//new game panel interface singleton
+static CNewGamePanelInterface g_sNewGamePanelInterface;
+INewGamePanel* newgamepanel = &g_sNewGamePanelInterface;
+
+//-----------------------------------------------------------------------
+// Purpose: Opens the new game panel
+//-----------------------------------------------------------------------
+CON_COMMAND(togglenewgamepanel, "Toggles the alone mod new game panel")
 {
-	if (bUsingHl1Panel)
-		return;
-
-	ImageC1->SetImage(CFmtStr1024("chapters/%s/chapter%d%s", bUsingHl1Panel ? "hl1" : "hl2", ButtonExp + 1, IsDay(1) ? "_day" : ""));
-
-	if (ChapterNames.Size() > ButtonExp + 1)
-		ImageC2->SetImage(CFmtStr1024("chapters/%s/chapter%d%s", bUsingHl1Panel ? "hl1" : "hl2", ButtonExp + 2, IsDay(2) ? "_day" : ""));
-
-	if (ChapterNames.Size() > ButtonExp + 2)
-		ImageC3->SetImage(CFmtStr1024("chapters/%s/chapter%d%s", bUsingHl1Panel ? "hl1" : "hl2", ButtonExp + 3, IsDay(3) ? "_day" : ""));
+	g_sNewGamePanelInterface.Activate();
 }
 
+//-----------------------------------------------------------------------
+// Purpose: Alone mod day change callbacks
+//-----------------------------------------------------------------------
 void AmodDayChangeCallback(IConVar* var, const char*, float)
 {
-	g_NGanel.DayCheck();
-
-	ConMsg("%d %d %d %s\n", engine->IsInGame(), !engine->IsLevelMainMenuBackground(), IsCityMap(szMapName), szMapName);
+	//check for daytime
+	g_sNewGamePanelInterface.DoDayCheck();
 
 	if (engine->IsInGame() && !engine->IsLevelMainMenuBackground() && IsCityMap(szMapName))
+	{
 		engine->ExecuteClientCmd("save tmp_day001; load tmp_day001");
+	}
 	else
 	{
 		if (engine->IsInGame() && engine->IsLevelMainMenuBackground() && !Q_strcmp(szMapName, "background06_d"))
@@ -424,9 +494,13 @@ void AmodDayChangeCallback(IConVar* var, const char*, float)
 #endif
 }
 
+//-----------------------------------------------------------------------
+// Purpose: Alone mod ravenholm day change callback
+//-----------------------------------------------------------------------
 void AmodDayRavChangeCallback(IConVar* var, const char*, float)
 {
-	g_NGanel.DayCheck();
+	//check for daytime
+	g_sNewGamePanelInterface.DoDayCheck();
 
 	if (engine->IsInGame() && !engine->IsLevelMainMenuBackground() && Q_strcmp(szMapName, "d1_town_05_d") && Q_strstr(szMapName, "d1_town_"))
 		engine->ExecuteClientCmd("save tmp_day001; load tmp_day001");

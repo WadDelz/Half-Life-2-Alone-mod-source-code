@@ -127,7 +127,7 @@ bool IsCityMap(const char* szName)
 	if (!Q_strcmp(szName, "background06_d") || !Q_strcmp(szName, "background07_d"))
 		return true;
 
-	return StringHasPrefix(szName, "d3_c17_");
+	return StringHasPrefix(szName, "d3_");
 }
 
 #ifdef CLIENT_DLL

@@ -256,7 +256,7 @@ public:
 	void WriteToFile(KeyValues* keyvalues);
 
 	//sets the convar text entry
-	void SetConvarText(const char* name, const char* value = nullptr);
+	void SetConvarText(const char* name, const char* value = nullptr, ConvarActiveType_e type = ConvarActiveType_e::Active_Always);
 
 	//other panel functions
 	void OnMapLoad();

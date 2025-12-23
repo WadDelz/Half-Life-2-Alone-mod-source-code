@@ -182,6 +182,7 @@ private:
 	float			m_Remainder;	// particles we should render next time
 	PrecipitationType_t	m_nPrecipType;			// Precip type
 	bool m_bEnabled;
+	float m_flFrozenTime = 0.0f;
 	bool m_bHack;
 	float			m_flHalfScreenWidth;	// Precalculated each frame.
 
@@ -307,7 +308,7 @@ CON_COMMAND_F(rain_density_check, "", FCVAR_HIDDEN)
 	else if (CClient_Precipitation::s_raindensity.GetFloat() > 0.0015 && CClient_Precipitation::s_raindensity.GetFloat() < 0.0025)
 		engine->ClientCmd_Unrestricted(CFmtStr("r_rainradius %d", (int)(r_RainRadius.GetInt() / 1.35f)));
 	else if (CClient_Precipitation::s_raindensity.GetFloat() > 0.0025)
-		engine->ClientCmd_Unrestricted(CFmtStr("r_rainradius %d", (int)(r_RainRadius.GetInt() / 1.8f)));
+		engine->ClientCmd_Unrestricted(CFmtStr("r_rainradius %d", (int)(r_RainRadius.GetInt() / 1.9f)));
 }
 
 Vector CClient_Precipitation::s_WindVector;		// Stores the wind speed vector
@@ -324,6 +325,13 @@ void CClient_Precipitation::OnDataChanged( DataUpdateType_t updateType )
 			SnowFallManagerCreate( this );
 		}
 	}
+	else
+	{
+		if (m_nPrecipType == PRECIPITATION_TYPE_SNOWFALL)
+			SnowFallManagerCreate(this);
+		else
+			SnowFallManagerDestroy();
+	}
 
 	m_flDensity = RemapVal( m_clrRender->a, 0, 255, 0, s_raindensity.GetFloat());
 
@@ -339,7 +347,7 @@ void CClient_Precipitation::ClientThink()
 CON_COMMAND(amod_do_breath, "")
 {
 	CBasePlayer* player = CBasePlayer::GetLocalPlayer();
-	if (!player || Q_strstr(szMapName, "credits_"))
+	if (!player || Q_strstr(szMapName, "credits"))
 		return;
 
 	Vector origin = player->EyePosition();
@@ -352,7 +360,7 @@ CON_COMMAND(amod_do_breath, "")
 	angle.x += 105;
 
 	DispatchParticleEffect("fog_breath", origin + (forward * -4), angle);
-	enginesound->EmitAmbientSound("player\\breathe2.wav", player->GetAbsVelocity().Length() > 25 ? 0.025f : 0.1f, random->RandomInt(85,95), 0);
+	enginesound->EmitAmbientSound("player\\breathe2.wav", player->GetAbsVelocity().Length() > 25 ? 0.02f : 0.03f, random->RandomInt(85,95), 0);
 }
 
 
@@ -468,6 +476,9 @@ void CClient_Precipitation::Simulate( float dt )
 	// NOTE: When client-side prechaching works, we need to remove this
 	Precache();
 
+	if (!r_RainSimulate.GetInt() || !m_bEnabled)
+		return;
+
 	m_flHalfScreenWidth = (float)ScreenWidth() / 2;
 
 	// Our sim methods needs dt	and wind vector
@@ -492,10 +503,6 @@ void CClient_Precipitation::Simulate( float dt )
 		m_Lifetime = (GetClientWorldEntity()->m_WorldMaxs[2] - GetClientWorldEntity()->m_WorldMins[2]) / m_Speed;
 	else
 		m_Lifetime = (WorldAlignMaxs()[2] - WorldAlignMins()[2]) / m_Speed;
-
-
-	if ( !r_RainSimulate.GetInt() || !m_bEnabled)
-		return;
 
 	CFastTimer timer;
 	timer.Start();
@@ -547,10 +554,9 @@ inline void CClient_Precipitation::RenderParticle( CPrecipitationParticle* pPart
 	if ( m_nPrecipType == PRECIPITATION_TYPE_SNOWFALL )
 		 return;
 
-
 	// make streaks 0.1 seconds long, but prevent from going past end
 	float lifetimeRemaining = GetRemainingLifetime( pParticle );
-	if (lifetimeRemaining >= GetLength())
+	if (lifetimeRemaining >= GetLength() || !m_bEnabled || !r_RainSimulate.GetBool())
 		scale = GetLength() * pParticle->m_Ramp;
 	else
 		scale = lifetimeRemaining * pParticle->m_Ramp;

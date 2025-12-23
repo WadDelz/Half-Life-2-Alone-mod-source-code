@@ -78,7 +78,7 @@ CLightingPageList::CLightingPageList(vgui::Panel* parent, const char* name, cons
 
 	//make the scroll bar
 	m_ScrollBar = new vgui::ScrollBar(this, "_ScrollBar", true);
-	m_ScrollBar->SetBounds(520 - 20, 0, 20, 140);
+	m_ScrollBar->SetBounds(520 - 20, 0, 20, 120);
 	m_ScrollBar->SetRangeWindow(1);
 	m_ScrollBar->AddActionSignalTarget(this);
 
@@ -123,7 +123,7 @@ void CLightingPageList::OnScrollBarSliderMoved()
 //---------------------------------------------------------------------------------
 // Purpose: Adds a lighting button
 //---------------------------------------------------------------------------------
-bool CLightingPageList::AddLighting(const char* LightName, Color color, int distance, int fov, Vector offset, QAngle angoffset, LightingMode_t mode, LightingMovementMode_t movemode, const char* entity, const char* attachment, Vector origin, QAngle angle)
+bool CLightingPageList::AddLighting(const char* LightName, Color color, int distance, int fov, Vector offset, QAngle angoffset, LightingMode_t mode, LightingMovementMode_t movemode, LightingType_e activetype, const char* entity, const char* attachment, Vector origin, QAngle angle)
 {
 	//check for player
 	CBasePlayer* pPlayer = CBasePlayer::GetLocalPlayer();
@@ -157,6 +157,7 @@ bool CLightingPageList::AddLighting(const char* LightName, Color color, int dist
 	button->m_LightingData.origin = origin;
 	button->m_LightingData.angles = angle;
 	button->m_LightingData.mode = mode;
+	button->m_LightingData.ActiveType = activetype;
 	button->m_LightingData.movementmode = movemode;
 
 	if (button->m_LightingData.origin == vec3_origin)
@@ -346,7 +347,7 @@ bool CLightingPageList::HasLighting(const char* LightName)
 //---------------------------------------------------------------------------------
 // Purpose: Changes an overlay button's value
 //---------------------------------------------------------------------------------
-bool CLightingPageList::ChangeLighting(const char* LightName, const char* NewLightName, Color color, int distance, int fov, Vector offset, QAngle angoffset, LightingMode_t mode, LightingMovementMode_t movemode, const char* entity, const char* attachment)
+bool CLightingPageList::ChangeLighting(const char* LightName, const char* NewLightName, Color color, int distance, int fov, Vector offset, QAngle angoffset, LightingMode_t mode, LightingMovementMode_t movemode, LightingType_e activetype, const char* entity, const char* attachment)
 {
 	bool bRet = false;
 
@@ -377,6 +378,7 @@ bool CLightingPageList::ChangeLighting(const char* LightName, const char* NewLig
 			button->m_LightingData.offset = offset;
 			button->m_LightingData.angoffset = angoffset;
 			button->m_LightingData.mode = mode;
+			button->m_LightingData.ActiveType = activetype;
 			button->m_LightingData.movementmode = movemode;
 
 			//set the button's text
@@ -392,7 +394,7 @@ bool CLightingPageList::ChangeLighting(const char* LightName, const char* NewLig
 //---------------------------------------------------------------------------------
 // Purpose: Changes a selected overlay
 //---------------------------------------------------------------------------------
-bool CLightingPageList::ChangeSelectedLighting(const char* NewLightName, Color color, int distance, int fov, Vector offset, QAngle angoffset, LightingMode_t mode, LightingMovementMode_t movemode, const char* entity, const char* attachment)
+bool CLightingPageList::ChangeSelectedLighting(const char* NewLightName, Color color, int distance, int fov, Vector offset, QAngle angoffset, LightingMode_t mode, LightingMovementMode_t movemode, LightingType_e activetype, const char* entity, const char* attachment)
 {
 	//check each button
 	for (int i = 0; i < m_ButtonList.Count(); i++)
@@ -411,7 +413,7 @@ bool CLightingPageList::ChangeSelectedLighting(const char* NewLightName, Color c
 			return false;
 
 		//change the value
-		return ChangeLighting(button->m_LightingData.name, NewLightName, color, distance, fov, offset, angoffset, mode, movemode, entity, attachment);
+		return ChangeLighting(button->m_LightingData.name, NewLightName, color, distance, fov, offset, angoffset, mode, movemode, activetype, entity, attachment);
 	}
 
 	return false;
@@ -521,6 +523,72 @@ bool CLightingPageList::RemoveSelectedLight()
 }
 
 //---------------------------------------------------------------------------------
+// Purpose: Returns if an overlay should draw
+//---------------------------------------------------------------------------------
+bool CLightingPageList::ShouldLightBeActive(C_BaseHLPlayer* pPlayer, LightingType_e type)
+{
+	//check for player
+	if (!pPlayer)
+		return false;
+
+	//check for always draw
+	if (((int)type & (int)LightingType_e::Active_Always))
+		return true;
+
+	//check for flashlight on
+	if (((int)type & (int)LightingType_e::Active_WhenPlayerFlashlightOn) && pPlayer->IsEffectActive(EF_DIMLIGHT))
+		return true;
+
+	//check for flashlight off
+	if (((int)type & (int)LightingType_e::Active_WhenPlayerFlashlightOff) && !pPlayer->IsEffectActive(EF_DIMLIGHT))
+		return true;
+
+	//moving?
+	Vector vel = pPlayer->GetAbsVelocity();
+	vel.z = 0;
+	bool moving = vel.Length() >= 25;
+
+	//check for walking
+	if (((int)type & (int)LightingType_e::Active_WhenWalking) && moving && !pPlayer->IsSprinting())
+		return true;
+
+	//check for sprinting
+	if (((int)type & (int)LightingType_e::Active_WhenSprinting) && moving && pPlayer->IsSprinting())
+		return true;
+
+	//check for health
+	if (((int)type & (int)LightingType_e::Active_WhenHealthLow) && pPlayer->GetHealth() <= 20)
+		return true;
+
+	//check for under water
+	if (((int)type & (int)LightingType_e::Active_WhenUnderWater) && pPlayer->GetWaterLevel() < WL_Eyes)
+		return true;
+
+	//check for crouching
+	if (((int)type & (int)LightingType_e::Active_WhenCrouching) && (pPlayer->GetFlags() & FL_DUCKING))
+		return true;
+
+	//check for on ground
+	if (((int)type & (int)LightingType_e::Active_WhenOnGround) && (pPlayer->GetFlags() & FL_ONGROUND))
+		return true;
+
+	//check for holding object
+	if (((int)type & (int)LightingType_e::Active_WhenHoldingObject) && pPlayer->GetUseEntity())
+		return true;
+
+	//check for zooming
+	if (((int)type & (int)LightingType_e::Active_WhenUsingSuitZoom) && pPlayer->IsZoomed())
+		return true;
+
+	//check for in air
+	if (((int)type & (int)LightingType_e::Active_WhenInAir) && !(pPlayer->GetFlags() & FL_ONGROUND))
+		return true;
+
+	//should draw
+	return false;
+}
+
+//---------------------------------------------------------------------------------
 // Purpose: Quick helper func to see if type is of the flashlight type
 //---------------------------------------------------------------------------------
 static const bool IsFlashlightMode(const LightingMode_t& mode)
@@ -554,6 +622,10 @@ int Q_strcmpwildcard(const char* str, const char* pattern)
 {
 	const char* star = NULL;
 	const char* backup = NULL;
+
+	//check str
+	if (!*str)
+		return 1;
 
 	while (*str)
 	{
@@ -731,7 +803,7 @@ void CLightingPageList::RemoveLight(LightingButtonData_t* data, int index, const
 		{
 			//you cant actually 'delete' dlight_t*'s because they are located in an array in the engine's code. So just
 			//make the dlight die now so the engine removes the light
-			data->m_DynamicLights[index]->die = gpGlobals->curtime;
+			data->m_DynamicLights[index]->die = gpGlobals->curtime + 0.0f;
 			data->m_DynamicLights[index]->radius = 0.0f;
 			data->m_DynamicLights.Remove(index);
 		}
@@ -782,6 +854,9 @@ void CLightingPageList::UpdatePlayerViewmodelight(LightingButtonData_t* data, C_
 //---------------------------------------------------------------------------------
 void CLightingPageList::UpdateEntityLight(LightingButtonData_t* data, const LightingMode_t& LightMode)
 {
+	if (!engine->IsConnected())
+		return;
+
 	//get the entity stuff
 	C_BaseEntity* pEntity = nullptr;
 	C_BaseEntityIterator itterator;
@@ -897,7 +972,7 @@ void CLightingPageList::UpdateLights()
 		return;
 
 	//check for the player
-	CBasePlayer* pPlayer = CBasePlayer::GetLocalPlayer();
+	CHL2_Player* pPlayer = dynamic_cast<CHL2_Player*>(CBasePlayer::GetLocalPlayer());
 	if (!pPlayer)
 		return;
 
@@ -906,6 +981,23 @@ void CLightingPageList::UpdateLights()
 	{
 		//get the data
 		LightingButtonData_t* data = &m_ButtonList[i]->m_LightingData;
+
+		//remove unactive lights and return
+		if (!ShouldLightBeActive(pPlayer, data->ActiveType))
+		{
+			//go through each light
+			for (int j = 0; j < data->m_DynamicLights.Count(); j++)
+			{
+				RemoveLight(data, j, LightingMode_t::Mode_DynamicLight);
+				RemoveLight(data, j, LightingMode_t::Mode_DynamicEnvironmentalLight);
+			}
+
+			//go through each flashlight
+			for (int j = 0; j < data->m_DynamicFlashlights.Count(); j++)
+				RemoveLight(data, j, LightingMode_t::Mode_Flashlight);
+
+			continue;
+		}
 
 		//check the mode
 		if (data->movementmode == LightingMovementMode_t::Mode_Static)
@@ -1030,12 +1122,12 @@ CEffectsPanelLightingPage::CEffectsPanelLightingPage(vgui::Panel* parent, const 
 	m_ColorTextEntry->SetText("255 255 255 255");
 	m_ColorTextEntry->SetMaximumCharCount(32);
 
-	m_FarSlider = new vgui::Slider(this, "FarSlider");
+	m_FarSlider = new WheelSlider(this, "FarSlider");
 	m_FarSlider->SetRange(0, 3000);
 	m_FarSlider->SetValue(750);
 	
-	m_FovSlider = new vgui::Slider(this, "FovSlider");
-	m_FovSlider->SetRange(0, 180);
+	m_FovSlider = new WheelSlider(this, "FovSlider");
+	m_FovSlider->SetRange(0, 179);
 	m_FovSlider->SetValue(45);
 
 	//make buttons
@@ -1043,6 +1135,21 @@ CEffectsPanelLightingPage::CEffectsPanelLightingPage(vgui::Panel* parent, const 
 	m_ChangeLight = new vgui::Button(this, "ChangeButton", "Update Selected Light", this, CHANGE_LIGHT_BUTTON_COMMAND);
 	m_RemoveLight = new vgui::Button(this, "RemoveOverlay", "Remove Selected Light", this, REMOVE_LIGHT_BUTTON_COMMAND);
 	m_SetSelectedToPlayer = new vgui::Button(this, "SetSelectedToPlayerButton", "Set selected lights position and angle to players current position and angle + offset", this, LIGHT_SET_TO_PLAYERS_POS_BUTTON);
+
+	//active type combo box
+	m_ActiveModeComboBox = new vgui::ComboBox(this, "ActiveTypeComboBox", 14, false);
+	m_ActiveModeComboBox->SetMaximumCharCount(254);
+
+	//add types
+	for (int i = 0; i < SIZE_OF_ARRAY(g_LightingActiveType); i++)
+	{
+		m_ActiveModeComboBox->GetMenu()->AddCheckableMenuItem(g_LightingActiveType[i], new KeyValues("SetText", "text", g_LightingActiveType[i]), this, nullptr);
+		m_ActiveModeComboBox->GetMenu()->GetMenuItem(i)->SetCommand(CFmtStr(LIGHTING_PAGE_ACTIVE_TYPE_PREFIX "%d", i));
+		m_ActiveModeComboBox->GetMenu()->GetMenuItem(i)->AddActionSignalTarget(this);
+	}
+
+	//set the text
+	m_ActiveModeComboBox->SetText("Active Types:");
 
 	//finally make the light list
 	m_LightList = new CLightingPageList(this, "LightingList", "Lights:");
@@ -1071,6 +1178,13 @@ CEffectsPanelLightingPage::~CEffectsPanelLightingPage()
 //---------------------------------------------------------------------------------
 void CEffectsPanelLightingPage::ResetEffects()
 {
+	//reset mode
+	m_ActiveModeComboBox->SetText("Active Types:");
+
+	//only select menu item 1 (Always active)
+	for (int i = 0; i < m_ActiveModeComboBox->GetItemCount(); i++)
+		m_ActiveModeComboBox->GetMenu()->SetMenuItemChecked(i, i == 0);
+
 	//delete the lights
 	m_LightList->ClearLights();
 
@@ -1125,7 +1239,7 @@ void CEffectsPanelLightingPage::ReadFromFile(KeyValues* keyvalues, bool reset)
 		UTIL_StringToVector(angle.Base(), light->GetString("Angle"));
 
 		//add it to the list
-		m_LightList->AddLighting(light->GetString("Name"), light->GetColor("Color"), light->GetInt("Distance"), light->GetInt("Fov"), offset, angoffset, (LightingMode_t)light->GetInt("Mode"), (LightingMovementMode_t)light->GetInt("MovementMode"), light->GetString("Entity"), light->GetString("EntityAttachment"), origin, angle);
+		m_LightList->AddLighting(light->GetString("Name"), light->GetColor("Color"), light->GetInt("Distance"), light->GetInt("Fov"), offset, angoffset, (LightingMode_t)light->GetInt("Mode"), (LightingMovementMode_t)light->GetInt("MovementMode"), (LightingType_e)light->GetInt("ActiveType"), light->GetString("Entity"), light->GetString("EntityAttachment"), origin, angle);
 	}
 }
 
@@ -1148,9 +1262,10 @@ void CEffectsPanelLightingPage::WriteToFile(KeyValues* keyvalues)
 
 		lightsub->SetString("Name", LightingData[i]->name);
 		lightsub->SetInt("Mode", (int)LightingData[i]->mode);
-		lightsub->SetInt("MovementMode", (int)LightingData[i]->mode);
+		lightsub->SetInt("MovementMode", (int)LightingData[i]->movementmode);
 		lightsub->SetString("Offset", CFmtStr("%.4f %.4f %.4f", LightingData[i]->offset.x, LightingData[i]->offset.y, LightingData[i]->offset.z));
 		lightsub->SetString("AngleOffset", CFmtStr("%.4f %.4f %.4f", LightingData[i]->angoffset.x, LightingData[i]->angoffset.y, LightingData[i]->angoffset.z));
+		lightsub->SetInt("ActiveType", (int)LightingData[i]->ActiveType);
 
 		//only write the origin/angles if static
 		if (LightingData[i]->movementmode == LightingMovementMode_t::Mode_Static)
@@ -1188,6 +1303,16 @@ void CEffectsPanelLightingPage::SetLightingText(LightingButtonData_t& data)
 	m_ColorTextEntry->SetText(CFmtStr("%d %d %d %d", data.color.r(), data.color.g(), data.color.b(), data.color.a()));
 	m_FarSlider->SetValue(data.distance);
 	m_FovSlider->SetValue(data.fov);
+
+	//set the selected stuff
+	for (int i = 0; i < m_ActiveModeComboBox->GetItemCount(); i++)
+	{
+		//see if that component is active
+		if ((int)data.ActiveType & (1 << i))
+			m_ActiveModeComboBox->GetMenu()->SetMenuItemChecked(i, true);
+		else
+			m_ActiveModeComboBox->GetMenu()->SetMenuItemChecked(i, false);
+	}
 }
 
 //---------------------------------------------------------------------------------
@@ -1246,8 +1371,16 @@ void CEffectsPanelLightingPage::OnCommand(const char* pszCommand)
 		char attachment[64];
 		m_LightingEntityAttachmentTextEntry->GetText(attachment, sizeof(attachment));
 
+		//get the flags
+		int drawtype = NULL;
+		for (int i = 0; i < m_ActiveModeComboBox->GetItemCount(); i++)
+		{
+			if (m_ActiveModeComboBox->GetMenu()->IsChecked(i))
+				drawtype |= (1 << i);
+		}
+
 		//see if we add the lighting
-		if (!m_LightList->AddLighting(buf, Color(r, g, b, a), m_FarSlider->GetValue(), m_FovSlider->GetValue(), offset, angoffset, (LightingMode_t)m_TypeComboBox->GetActiveItem(), (LightingMovementMode_t)m_LightMovementComboBox->GetActiveItem(), entity, attachment))
+		if (!m_LightList->AddLighting(buf, Color(r, g, b, a), m_FarSlider->GetValue(), m_FovSlider->GetValue(), offset, angoffset, (LightingMode_t)m_TypeComboBox->GetActiveItem(), (LightingMovementMode_t)m_LightMovementComboBox->GetActiveItem(), (LightingType_e)drawtype, entity, attachment))
 		{
 			//play an error sound
 			vgui::surface()->PlaySound("resource/warning.wav");
@@ -1312,8 +1445,16 @@ void CEffectsPanelLightingPage::OnCommand(const char* pszCommand)
 		char attachment[64];
 		m_LightingEntityAttachmentTextEntry->GetText(attachment, sizeof(attachment));
 
+		//get the flags
+		int drawtype = NULL;
+		for (int i = 0; i < m_ActiveModeComboBox->GetItemCount(); i++)
+		{
+			if (m_ActiveModeComboBox->GetMenu()->IsChecked(i))
+				drawtype |= (1 << i);
+		}
+
 		//see if we can change the light
-		if (!m_LightList->ChangeSelectedLighting(buf, Color(r, g, b, a), m_FarSlider->GetValue(), m_FovSlider->GetValue(), offset, angoffset, (LightingMode_t)m_TypeComboBox->GetActiveItem(), (LightingMovementMode_t)m_LightMovementComboBox->GetActiveItem(), entity, attachment))
+		if (!m_LightList->ChangeSelectedLighting(buf, Color(r, g, b, a), m_FarSlider->GetValue(), m_FovSlider->GetValue(), offset, angoffset, (LightingMode_t)m_TypeComboBox->GetActiveItem(), (LightingMovementMode_t)m_LightMovementComboBox->GetActiveItem(), (LightingType_e)drawtype, entity, attachment))
 		{
 			//play an error sound
 			vgui::surface()->PlaySound("resource/warning.wav");
@@ -1361,6 +1502,19 @@ void CEffectsPanelLightingPage::OnCommand(const char* pszCommand)
 			error->AddActionSignalTarget(this);
 			error->DoModal(dynamic_cast<vgui::PropertyDialog*>(GetParent()));
 		}
+	}
+
+	//check for LIGHTING_PAGE_ACTIVE_TYPE_PREFIX
+	else if (StringHasPrefix(pszCommand, LIGHTING_PAGE_ACTIVE_TYPE_PREFIX))
+	{
+		//get index
+		//int index = Q_atoi(pszCommand + Q_strlen(LIGHTING_PAGE_ACTIVE_TYPE_PREFIX));
+
+		//set selected state of menu item
+		//m_ActiveModeComboBox->GetMenu()->SetMenuItemChecked(index, m_ActiveModeComboBox->GetMenu()->IsChecked(index));
+
+		//set text
+		//m_ActiveModeComboBox->SetText("Active Types:");
 	}
 
 	//call base function
@@ -1424,10 +1578,13 @@ void CEffectsPanelLightingPage::OnMapShutdown()
 void CEffectsPanelLightingPage::PerformLayout()
 {
 	//make the light list
-	m_LightList->SetBounds(5, 10, 520, 142);
+	m_LightList->SetBounds(5, 10, 520, 122);
 
 	//selected to player button
-	m_SetSelectedToPlayer->SetBounds(5, 158, 520, 20);
+	m_SetSelectedToPlayer->SetBounds(5, 136, 520, 20);
+
+	//lighting active mode combo box
+	m_ActiveModeComboBox->SetBounds(5, 160, 520, 20);
 
 	//name and type stuff
 	m_LightNameLabel->SetBounds(5, 186, 50, 22);

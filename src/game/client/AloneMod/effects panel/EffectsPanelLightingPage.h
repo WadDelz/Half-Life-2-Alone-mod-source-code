@@ -55,6 +55,39 @@ static const char* gsz_LightingMovementModeStrings[] = {
 };
 
 
+//lighting active type
+enum class LightingType_e
+{
+	Active_Always = (1 << 0),
+	Active_WhenPlayerFlashlightOn = (1 << 1),
+	Active_WhenPlayerFlashlightOff = (1 << 2),
+	Active_WhenWalking = (1 << 3),
+	Active_WhenSprinting = (1 << 4),
+	Active_WhenCrouching = (1 << 5),
+	Active_WhenOnGround = (1 << 6),
+	Active_WhenInAir = (1 << 7),
+	Active_WhenUnderWater = (1 << 8),
+	Active_WhenHealthLow = (1 << 9),
+	Active_WhenHoldingObject = (1 << 10),
+	Active_WhenUsingSuitZoom = (1 << 11),
+};
+
+//lighting active type string's for combo box
+static const char* g_LightingActiveType[] =
+{
+	"Always Active",
+	"When flashlight on",
+	"When flashlight off",
+	"When walking",
+	"When sprinting",
+	"When crouching",
+	"When on ground",
+	"When in air",
+	"When under water",
+	"When health low",
+	"When holding object",
+	"When using suit zoom"
+};
 
 //text entry
 
@@ -88,6 +121,9 @@ struct LightingButtonData_t
 	//modes
 	LightingMode_t mode = LightingMode_t::Mode_DynamicLight;
 	LightingMovementMode_t movementmode = LightingMovementMode_t::Mode_Static;
+
+	//lighting active type
+	LightingType_e ActiveType = LightingType_e::Active_Always;
 
 	//list of flashlight effects and dynamic lights
 	CUtlVector<dlight_t*> m_DynamicLights;
@@ -173,6 +209,7 @@ private:
 #define LIGHTING_LIST_PANEL_BUTTON_HEIGHT 22
 #define LIGHTING_LIST_PANEL_BUTTON_COMMAND_PREFIX "LightingButton:"
 #define LIGHTING_LIST_PANEL_MAX_ITEMS_BEFORE_SCROLL 3
+#define LIGHTING_PAGE_ACTIVE_TYPE_PREFIX "LightingType:"
 
 class CLightingPageList : public vgui::Divider
 {
@@ -186,14 +223,17 @@ public:
 	MESSAGE_FUNC(OnScrollBarSliderMoved, "ScrollBarSliderMoved");
 
 	//lighting funcs
-	bool AddLighting(const char* LightName, Color color, int distance, int fov, Vector offset, QAngle angoffset, LightingMode_t mode, LightingMovementMode_t movemode, const char* entity, const char* attachment, Vector origin = vec3_origin, QAngle angle = vec3_angle);
+	bool AddLighting(const char* LightName, Color color, int distance, int fov, Vector offset, QAngle angoffset, LightingMode_t mode, LightingMovementMode_t movemode, LightingType_e activetype, const char* entity, const char* attachment, Vector origin = vec3_origin, QAngle angle = vec3_angle);
 	bool HasLighting(const char* LightName);
-	bool ChangeLighting(const char* LightName, const char* NewLightName, Color color, int distance, int fov, Vector offset, QAngle angoffset, LightingMode_t mode, LightingMovementMode_t movemode, const char* entity, const char* attachment);
-	bool ChangeSelectedLighting(const char* NewLightName, Color color, int distance, int fov, Vector offset, QAngle angoffset, LightingMode_t mode, LightingMovementMode_t movemode, const char* entity, const char* attachment);
+	bool ChangeLighting(const char* LightName, const char* NewLightName, Color color, int distance, int fov, Vector offset, QAngle angoffset, LightingMode_t mode, LightingMovementMode_t movemode, LightingType_e activetype, const char* entity, const char* attachment);
+	bool ChangeSelectedLighting(const char* NewLightName, Color color, int distance, int fov, Vector offset, QAngle angoffset, LightingMode_t mode, LightingMovementMode_t movemode, LightingType_e activetype, const char* entity, const char* attachment);
 	void GetLightingData(CUtlVector<LightingButtonData_t*>& data);
 	void ClearLights();
 	bool RemoveSelectedLight();
 	bool SetSelectedLightToPlayersEyes();
+
+	//returns if the light should be active
+	bool ShouldLightBeActive(C_BaseHLPlayer* pPlayer, LightingType_e type);
 
 	//sets the light state for level transitioning
 	void SetLightTransitionState(bool transitioning);
@@ -299,6 +339,9 @@ private:
 	vgui::Label* m_LightNameLabel;
 	CLightingPageTextEntry* m_LightNameTextEntry;
 
+	//active combo box
+	vgui::ComboBox* m_ActiveModeComboBox;
+
 	vgui::Label* m_TypeLabel;
 	vgui::ComboBox* m_TypeComboBox;
 
@@ -323,10 +366,10 @@ private:
 	CLightingPageTextEntry* m_ColorTextEntry;
 
 	vgui::Label* m_FarLabel;
-	vgui::Slider* m_FarSlider;
+	WheelSlider* m_FarSlider;
 	
 	vgui::Label* m_FovLabel;
-	vgui::Slider* m_FovSlider;
+	WheelSlider* m_FovSlider;
 };
 
 #endif //__EFFECTSPANELLIGHTINGPAGE_H

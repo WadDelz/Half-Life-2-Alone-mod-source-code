@@ -2123,6 +2123,10 @@ void C_BasePlayer::Simulate()
 		UpdateStepSound( GetGroundSurface(), GetAbsOrigin(), vel );
 	}
 
+	//simulate our stunstick
+	//extern void SimulateStunstick(CBaseCombatWeapon * weapon, CBaseViewModel* viewmodel);
+	//SimulateStunstick(GetActiveWeapon(), GetViewModel(0));
+
 	BaseClass::Simulate();
 	if ( IsNoInterpolationFrame() || Teleported() )
 	{

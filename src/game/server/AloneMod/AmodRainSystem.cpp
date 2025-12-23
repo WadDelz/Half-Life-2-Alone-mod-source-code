@@ -40,7 +40,7 @@ void AmodRainChangeCallback(IConVar* cvar, const char*, float val)
 	else
 	{
 		if (type == 2)
-			bRainEnabled = false;
+			bRainEnabled = random->RandomInt(0, 1) != 0;
 	}
 
 	if (bRainEnabled)
@@ -56,7 +56,7 @@ void AmodRainChangeCallback(IConVar* cvar, const char*, float val)
 			continue;
 		}
 
-		clientengine->ClientCmd("amod_soundscape_startrain");
+		clientengine->ClientCmd("wait 15; amod_soundscape_startrain");
 	}
 	else
 	{
@@ -64,12 +64,28 @@ void AmodRainChangeCallback(IConVar* cvar, const char*, float val)
 		clientengine->ClientCmd_Unrestricted("amod_soundscape_stoprain");
 	}
 
+	//disable/enable rain windows
+	CBaseEntity* FirstEnt = gEntList.FirstEnt();
+	while (FirstEnt)
+	{
+		if (!Q_stricmp(FirstEnt->GetEntityName().ToCStr(), "brush_rain_windows"))
+		{
+			if (bRainEnabled)
+				FirstEnt->AcceptInput("Enable", nullptr, nullptr, variant_t{}, 0);
+			else
+				FirstEnt->AcceptInput("Disable", nullptr, nullptr, variant_t{}, 0);
+		}
+
+		FirstEnt = gEntList.NextEnt(FirstEnt);
+		continue;
+	}
+
 	//set the player's variable
 	CBasePlayer* pPlayer = UTIL_GetLocalPlayer();
 	if (pPlayer)
 	{
 		pPlayer->m_fNextRainTime = gpGlobals->curtime + random->RandomFloat(amod_rain_wait_min.GetFloat(), amod_rain_wait_max.GetFloat());
-		pPlayer->m_bInRain = false;
+		pPlayer->m_bInRain = bRainEnabled;
 	}
 }
 
@@ -105,9 +121,13 @@ void AmodCloudsChangeCallback(IConVar* var, const char*, float)
 
 	//enable or disable
 	if (amod_clouds.GetBool())
+	{
 		pEntity->AcceptInput("enable", nullptr, nullptr, variant_t{}, 0);
+	}
 	else
+	{
 		pEntity->AcceptInput("disable", nullptr, nullptr, variant_t{}, 0);
+	}
 }
 
 //play a random thunder sound
@@ -178,27 +198,10 @@ public:
 			}
 			bDidInit = true;
 		}
-
-		if (gpGlobals->eLoadType == MapLoad_Background)
-			return;
 	}
 
 	void LevelInitPostEntity()
 	{
-		bool bRainEnabled = true;
-
-		if (!amod_rain_type.GetInt() || !amod_rain_enable.GetBool())
-			bRainEnabled = false;
-
-		if (amod_rain_type.GetInt() == 2)
-		{
-			CBasePlayer* pPlayer = UTIL_GetLocalPlayer();
-			if (!pPlayer)
-				bRainEnabled = false;
-			else
-				bRainEnabled = pPlayer->m_bInRain;
-		}
-
 		//find the clouds brush
 		CBaseEntity* pEntity = gEntList.FindEntityByName(nullptr, "brush_clouds");
 		if (!pEntity)

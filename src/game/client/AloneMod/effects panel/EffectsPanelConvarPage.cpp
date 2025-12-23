@@ -360,7 +360,7 @@ void CConvarPageConvarList::ClearConvars()
 
 		//revert the convar to it's default value
 		button->m_ConvarData.convar->SetValue(button->m_ConvarData.default);
-
+		
 		//delete the button now
 		delete button;
 	}
@@ -476,7 +476,7 @@ void CConvarPageConvarList::OnCommand(const char* pszCommand)
 			//set the convar page text if i == index
 			if (i == index)
 			{
-				m_ConvarPage->SetConvarText(button->m_ConvarData.name, button->m_ConvarData.value);
+				m_ConvarPage->SetConvarText(button->m_ConvarData.name, button->m_ConvarData.value, button->m_ConvarData.type);
 
 				//also set the convar value
 				if (Q_strcmp(button->m_ConvarData.convar->GetString(), button->m_ConvarData.value) && ShouldConvarBeActive(dynamic_cast<C_BaseHLPlayer*>(CBasePlayer::GetLocalPlayer()), button->m_ConvarData.type))
@@ -514,7 +514,9 @@ bool CConvarPageConvarList::ShouldConvarBeActive(CHL2_Player* pPlayer, ConvarAct
 		return true;
 
 	//moving?
-	bool moving = pPlayer->GetAbsVelocity().Length() >= 25;
+	Vector vel = pPlayer->GetAbsVelocity();
+	vel.z = 0;
+	bool moving = vel.Length() >= 25;
 
 	//check for walking
 	if (((int)type & (int)ConvarActiveType_e::Active_WhenWalking) && moving && !pPlayer->IsSprinting())
@@ -895,8 +897,8 @@ CEffectsPanelConvarPage::CEffectsPanelConvarPage(vgui::Panel* parent, const char
 		m_TypeComboBox->GetMenu()->GetMenuItem(i)->AddActionSignalTarget(this);
 	}
 
-	//active the items
-	m_TypeComboBox->ActivateItem(0);
+	//set the text
+	m_TypeComboBox->SetText("Active Types:");
 
 	//create the name stuff
 	m_ConvarNameText = new vgui::Label(this, "ConvarNameText", "Convar Name");
@@ -942,7 +944,7 @@ void CEffectsPanelConvarPage::ResetEffects()
 	m_ConvarListPanel->ClearConvars();
 
 	//reset mode
-	m_TypeComboBox->ActivateItem(0);
+	m_TypeComboBox->SetText("Active Types:");
 
 	//only select menu item 1 (Always active)
 	for (int i = 0; i < m_TypeComboBox->GetItemCount(); i++)
@@ -1007,12 +1009,22 @@ void CEffectsPanelConvarPage::WriteToFile(KeyValues* keyvalues)
 //---------------------------------------------------------------------------------
 // Purpose: Sets the convar text entrys
 //---------------------------------------------------------------------------------
-void CEffectsPanelConvarPage::SetConvarText(const char* name, const char* value)
+void CEffectsPanelConvarPage::SetConvarText(const char* name, const char* value, ConvarActiveType_e type)
 {
 	m_ConvarNameTextEntry->SetText(name);
 	
 	if (value)
 		m_ConvarValueTextEntry->SetText(value);
+
+	//set the selected stuff
+	for (int i = 0; i < m_TypeComboBox->GetItemCount(); i++)
+	{
+		//see if that component is active
+		if ((int)type & (1 << i))
+			m_TypeComboBox->GetMenu()->SetMenuItemChecked(i, true);
+		else
+			m_TypeComboBox->GetMenu()->SetMenuItemChecked(i, false);
+	}
 }
 
 //---------------------------------------------------------------------------------
@@ -1147,10 +1159,12 @@ void CEffectsPanelConvarPage::OnCommand(const char* pszCommand)
 	else if (StringHasPrefix(pszCommand, CONVAR_PAGE_OVERLAY_TYPE_PREFIX))
 	{
 		//get index
-		int index = Q_atoi(pszCommand + Q_strlen(CONVAR_PAGE_OVERLAY_TYPE_PREFIX));
+		//int index = Q_atoi(pszCommand + Q_strlen(CONVAR_PAGE_OVERLAY_TYPE_PREFIX));
 
 		//set selected state of menu item
-		m_TypeComboBox->GetMenu()->SetMenuItemChecked(index, m_TypeComboBox->GetMenu()->IsChecked(index));
+		//m_TypeComboBox->GetMenu()->SetMenuItemChecked(index, m_TypeComboBox->GetMenu()->IsChecked(index));
+
+		//m_TypeComboBox->SetText("Active Types:");
 	}
 
 	//check for find convar button

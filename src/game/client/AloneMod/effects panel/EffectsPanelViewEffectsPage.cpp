@@ -36,14 +36,14 @@ extern ConVar cl_pitchup;
 
 //smooth angles slider value
 #define SMOOTH_ANGLES_SLIDER_MIN 50
-#define SMOOTH_ANGLES_SLIDER_MAX 1
+#define SMOOTH_ANGLES_SLIDER_MAX 2
 #define SMOOTH_ANGLES_SLIDER_DEFAULT 50
 
 //smooth origin slider value
-#define SMOOTH_ORIGIN_SLIDER_MIN 20
-#define SMOOTH_ORIGIN_SLIDER_MAX 1
-#define SMOOTH_ORIGIN_SLIDER_DEFAULT 20
-#define SMOOTH_ANGLES_ORIGIN_DIVIDER 1000
+#define SMOOTH_ORIGIN_SLIDER_MIN 50
+#define SMOOTH_ORIGIN_SLIDER_MAX 2
+#define SMOOTH_ORIGIN_SLIDER_DEFAULT 50
+#define SMOOTH_ANGLES_ORIGIN_DIVIDER 500
 
 //origin/angle offset defaults
 #define ORIGIN_OFFSET_DEFAULT "0 0 0"
@@ -85,32 +85,32 @@ CEffectsPanelViewEffects::CEffectsPanelViewEffects(vgui::Panel* parent, const ch
 
 	//create the bottom stuff
 	m_BlackBoxWidthText = new vgui::Label(this, "BlackBoxWidthText", "Black Boxes Width");
-	m_BlackBoxWidthSlider = new vgui::Slider(this, "BlackBoxWidthSlider");
+	m_BlackBoxWidthSlider = new WheelSlider(this, "BlackBoxWidthSlider");
 	m_BlackBoxWidthSlider->AddActionSignalTarget(this);
 	m_BlackBoxWidthSlider->SetRange(BLACK_BOX_WIDTH_SLIDER_MIN, BLACK_BOX_WIDTH_SLIDER_MAX);
 	m_BlackBoxWidthSlider->SetValue(BLACK_BOX_WIDTH_SLIDER_DEFAULT);
 
 	m_BlackBoxHeightText = new vgui::Label(this, "BlackBoxHeightText", "Black Boxes Height");
-	m_BlackBoxHeightSlider = new vgui::Slider(this, "BlackBoxHeightSlider");
+	m_BlackBoxHeightSlider = new WheelSlider(this, "BlackBoxHeightSlider");
 	m_BlackBoxHeightSlider->AddActionSignalTarget(this);
 	m_BlackBoxHeightSlider->SetRange(BLACK_BOX_HEIGHT_SLIDER_MIN, BLACK_BOX_HEIGHT_SLIDER_MAX);
 	m_BlackBoxHeightSlider->SetValue(BLACK_BOX_HEIGHT_SLIDER_DEFAULT);
 
 	m_ClaustrapphobiaAmountText = new vgui::Label(this, "ClaustraphobiaAmountText", "Claustraphobia Amount");
-	m_ClaustrapphobiaAmountSlider = new vgui::Slider(this, "ClaustraphobiaAmountSlider");
+	m_ClaustrapphobiaAmountSlider = new WheelSlider(this, "ClaustraphobiaAmountSlider");
 	m_ClaustrapphobiaAmountSlider->AddActionSignalTarget(this);
 	m_ClaustrapphobiaAmountSlider->SetRange(CLAUSTRAPHOBIA_SLIDER_MIN, CLAUSTRAPHOBIA_SLIDER_MAX);
 	m_ClaustrapphobiaAmountSlider->SetValue(CLAUSTRAPHOBIA_SLIDER_DEFAULT);
 
 	m_ClaustrapphobiaFovText = new vgui::Label(this, "ClaustraphobiaFovText", "Claustraphobia Fov Amount");
-	m_ClaustrapphobiaFovSlider = new vgui::Slider(this, "ClaustraphobiaFovSlider");
+	m_ClaustrapphobiaFovSlider = new WheelSlider(this, "ClaustraphobiaFovSlider");
 	m_ClaustrapphobiaFovSlider->AddActionSignalTarget(this);
 	m_ClaustrapphobiaFovSlider->SetRange(CLAUSTRAPHOBIA_FOV_SLIDER_MIN, CLAUSTRAPHOBIA_FOV_SLIDER_MAX);
 	m_ClaustrapphobiaFovSlider->SetValue(fov_desired.GetInt());
 	m_ClaustrapphobiaFovSlider->SetEnabled(false);
 
 	m_ViewmodelFovOverrideText = new vgui::Label(this, "ViewmodelFovOverrideText", "Viewmodel Fov Amount");
-	m_ViewmodelFovOverrideSlider = new vgui::Slider(this, "ViewmodelFovOverrideSlider");
+	m_ViewmodelFovOverrideSlider = new WheelSlider(this, "ViewmodelFovOverrideSlider");
 	m_ViewmodelFovOverrideSlider->AddActionSignalTarget(this);
 	m_ViewmodelFovOverrideSlider->SetRange(VIEWMODEL_FOV_SLIDER_MIN, VIEWMODEL_FOV_SLIDER_MAX);
 	m_ViewmodelFovOverrideSlider->SetValue(v_viewmodel_fov.GetInt());
@@ -123,13 +123,13 @@ CEffectsPanelViewEffects::CEffectsPanelViewEffects(vgui::Panel* parent, const ch
 	m_EnableCameraEditorViewmodelFix = new vgui::CheckButton(this, "EnableSmoothCameraViewmodelFix",	"Enable Smooth Camera Viewmodel Fix");
 	
 	m_SmoothAngleAmountText = new vgui::Label(this, "SmoothAngleAmountText", "Angles Smooth Amount");
-	m_SmoothAngleAmountSlider = new vgui::Slider(this, "SmoothAngleAmountSlider");
+	m_SmoothAngleAmountSlider = new WheelSlider(this, "SmoothAngleAmountSlider");
 	m_SmoothAngleAmountSlider->AddActionSignalTarget(this);
 	m_SmoothAngleAmountSlider->SetRange(SMOOTH_ANGLES_SLIDER_MIN, SMOOTH_ANGLES_SLIDER_MAX);
 	m_SmoothAngleAmountSlider->SetValue(SMOOTH_ANGLES_SLIDER_DEFAULT);
 	
 	m_SmoothOriginAmountText = new vgui::Label(this, "SmoothOriginAmountText", "Origin Smooth Amount");
-	m_SmoothOriginAmountSlider = new vgui::Slider(this, "SmoothOriginAmountSlider");
+	m_SmoothOriginAmountSlider = new WheelSlider(this, "SmoothOriginAmountSlider");
 	m_SmoothOriginAmountSlider->AddActionSignalTarget(this);
 	m_SmoothOriginAmountSlider->SetRange(SMOOTH_ORIGIN_SLIDER_MIN, SMOOTH_ORIGIN_SLIDER_MAX);
 	m_SmoothOriginAmountSlider->SetValue(SMOOTH_ORIGIN_SLIDER_DEFAULT);
@@ -147,13 +147,13 @@ CEffectsPanelViewEffects::CEffectsPanelViewEffects(vgui::Panel* parent, const ch
 	m_AngleOverrideTextEntry->AddActionSignalTarget(this);
 
 	m_MinimumPitchText = new vgui::Label(this, "MinimumPitchText", "Minimum View Pitch");
-	m_MinimumPitchSlider = new vgui::Slider(this, "SmoothAngleAmountSlider");
+	m_MinimumPitchSlider = new WheelSlider(this, "SmoothAngleAmountSlider");
 	m_MinimumPitchSlider->AddActionSignalTarget(this);
 	m_MinimumPitchSlider->SetRange(MINIMUM_PITCH_SLIDER_MIN, MINIMUM_PITCH_SLIDER_MAX);
 	m_MinimumPitchSlider->SetValue(MINIMUM_PITCH_SLIDER_DEFAULT);
 
 	m_MaximumPitchText = new vgui::Label(this, "MaximumPitchText", "Maximum View Pitch");
-	m_MaximumPitchSlider = new vgui::Slider(this, "MaximumPitchSlider");
+	m_MaximumPitchSlider = new WheelSlider(this, "MaximumPitchSlider");
 	m_MaximumPitchSlider->AddActionSignalTarget(this);
 	m_MaximumPitchSlider->SetRange(MAXIMUM_PITCH_SLIDER_MIN, MAXIMUM_PITCH_SLIDER_MAX);
 	m_MaximumPitchSlider->SetValue(MAXIMUM_PITCH_SLIDER_DEFAULT);

@@ -25,6 +25,7 @@ extern ConVar metropolice_move_and_melee;
 
 IMPLEMENT_SERVERCLASS_ST(CWeaponStunStick, DT_WeaponStunStick)
 	SendPropInt( SENDINFO( m_bActive ), 1, SPROP_UNSIGNED ),
+	SendPropInt( SENDINFO( m_bInGlow ), 1, SPROP_UNSIGNED ),
 END_SEND_TABLE()
 
 #ifndef HL2MP
@@ -44,6 +45,7 @@ IMPLEMENT_ACTTABLE(CWeaponStunStick);
 BEGIN_DATADESC( CWeaponStunStick )
 
 	DEFINE_FIELD( m_bActive, FIELD_BOOLEAN ),
+	DEFINE_FIELD( m_bInGlow, FIELD_BOOLEAN ),
 
 END_DATADESC()
 
@@ -57,6 +59,7 @@ CWeaponStunStick::CWeaponStunStick( void )
 	// HACK:  Don't call SetStunState because this tried to Emit a sound before
 	//  any players are connected which is a bug
 	m_bActive = false;
+	//m_bInGlow = true;
 }
 
 //-----------------------------------------------------------------------------
@@ -64,7 +67,6 @@ CWeaponStunStick::CWeaponStunStick( void )
 void CWeaponStunStick::Spawn()
 {
 	Precache();
-
 
 	BaseClass::Spawn();
 	AddSolidFlags( FSOLID_NOT_STANDABLE );

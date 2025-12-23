@@ -50,19 +50,19 @@ private:
 
 	//bottom stuff
 	vgui::Label* m_BlackBoxWidthText;
-	vgui::Slider* m_BlackBoxWidthSlider;
+	WheelSlider* m_BlackBoxWidthSlider;
 	
 	vgui::Label* m_BlackBoxHeightText;
-	vgui::Slider* m_BlackBoxHeightSlider;
+	WheelSlider* m_BlackBoxHeightSlider;
 	
 	vgui::Label* m_ClaustrapphobiaAmountText;
-	vgui::Slider* m_ClaustrapphobiaAmountSlider;
+	WheelSlider* m_ClaustrapphobiaAmountSlider;
 	
 	vgui::Label* m_ClaustrapphobiaFovText;
-	vgui::Slider* m_ClaustrapphobiaFovSlider;
+	WheelSlider* m_ClaustrapphobiaFovSlider;
 	
 	vgui::Label* m_ViewmodelFovOverrideText;
-	vgui::Slider* m_ViewmodelFovOverrideSlider;
+	WheelSlider* m_ViewmodelFovOverrideSlider;
 
 	//verticle divider
 	vgui::Divider* m_VerticalDivider;
@@ -72,10 +72,10 @@ private:
 	vgui::CheckButton* m_EnableCameraEditorViewmodelFix;
 
 	vgui::Label* m_SmoothAngleAmountText;
-	vgui::Slider* m_SmoothAngleAmountSlider;
+	WheelSlider* m_SmoothAngleAmountSlider;
 	
 	vgui::Label* m_SmoothOriginAmountText;
-	vgui::Slider* m_SmoothOriginAmountSlider;
+	WheelSlider* m_SmoothOriginAmountSlider;
 
 	vgui::Label* m_OriginOverrideText;
 	vgui::TextEntry* m_OriginOverrideTextEntry;
@@ -84,10 +84,10 @@ private:
 	vgui::TextEntry* m_AngleOverrideTextEntry;
 
 	vgui::Label* m_MinimumPitchText;
-	vgui::Slider* m_MinimumPitchSlider;
+	WheelSlider* m_MinimumPitchSlider;
 
 	vgui::Label* m_MaximumPitchText;
-	vgui::Slider* m_MaximumPitchSlider;
+	WheelSlider* m_MaximumPitchSlider;
 
 	//previous fov desired value
 	int m_iPrevFovValue;

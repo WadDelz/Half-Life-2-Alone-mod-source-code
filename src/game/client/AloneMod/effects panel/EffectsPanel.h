@@ -4,6 +4,7 @@
 #include "vgui/VGUI.h"
 #include "vgui_controls/PropertyPage.h"
 #include "vgui_controls/Tooltip.h"
+#include "vgui_controls/Slider.h"
 
 #ifdef _WIN32
 #pragma once
@@ -18,6 +19,31 @@ if (multiline) \
 	element->GetTooltip()->SetTooltipFormatToMultiLine(); \
 else \
 	element->GetTooltip()->SetTooltipFormatToSingleLine(); \
+
+//quick mouse wheel slider
+class WheelSlider : public vgui::Slider
+{
+	DECLARE_CLASS_SIMPLE(WheelSlider, vgui::Slider);
+public:
+	//constructor
+	WheelSlider(vgui::Panel* parent, const char* name) : BaseClass(parent, name)
+	{
+	}
+
+	//called on mouse wheeled
+	void OnMouseWheeled(int delta)
+	{
+		//check range
+		int min, max;
+		GetRange(min, max);
+		
+		if (min > max)
+			delta *= -1;
+
+		SetValue(GetValue() + delta);
+		BaseClass::OnMouseWheeled(delta);
+	}
+};
 
 //base page for each effects panel
 class IEffectsPanelPage : public vgui::PropertyPage

@@ -54,6 +54,7 @@ public:
 private:
 
 	CNetworkVar( bool, m_bActive );
+	CNetworkVar( bool, m_bInGlow);
 	float m_fNextHitTime;
 };
 

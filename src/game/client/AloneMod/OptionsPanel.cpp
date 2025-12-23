@@ -52,6 +52,12 @@ public:
 	{
 		szMapName = MapName();
 	}
+	
+	//called on game shutdown
+	void Shutdown()
+	{
+		Amod_WriteConfig();
+	}
 };
 CAutoAmodDaySystem g_AutoAmodDaySys;
 
@@ -392,18 +398,8 @@ void CAModWeatherPanel::OnCommand(const char* command)
 //-------------------------------------------------------------------------------------------------------
 // Purpose: writes the rain info into the config
 //-------------------------------------------------------------------------------------------------------
-CON_COMMAND(amod_write_rain_config, "writes the rain info into the config")
+void Amod_WriteRainConfig(KeyValues* file)
 {
-	//load the config
-	KeyValues* file = new KeyValues("AloneModConfig");
-	if (!file->LoadFromFile(filesystem, "cfg/AloneMod_Config.txt", "MOD"))
-	{
-		//write the config and delete the keyvalues
-		Amod_WriteConfig();
-		file->deleteThis();
-		return;
-	}
-
 	//write the weather stuff
 	ConVarRef amod_rain_type("amod_rain_type");
 	ConVarRef amod_rain_enable("amod_rain_enable");
@@ -416,7 +412,7 @@ CON_COMMAND(amod_write_rain_config, "writes the rain info into the config")
 	ConVarRef r_raindensity("r_raindensity");
 
 	file->SetBool("amod_do_breathing", amod_do_breathing.GetBool());
-	file->SetString("amod_clouds", amod_clouds.GetString());
+	file->SetBool("amod_clouds", amod_clouds.GetBool());
 	file->SetInt("amod_rain_type", amod_rain_type.GetInt());
 	file->SetBool("amod_rain_enable", amod_rain_enable.GetBool());
 	file->SetBool("amod_rain_thunder", amod_rain_thunder.GetBool());
@@ -424,6 +420,24 @@ CON_COMMAND(amod_write_rain_config, "writes the rain info into the config")
 	file->SetInt("amod_rain_wait_min", amod_rain_wait_min.GetInt());
 	file->SetInt("amod_rain_wait_max", amod_rain_wait_max.GetInt());
 	file->SetString("r_raindensity", r_raindensity.GetString());
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: writes the rain info into the config
+//-------------------------------------------------------------------------------------------------------
+CON_COMMAND(amod_write_rain_config, "writes the rain info into the config")
+{
+	//load the config
+	KeyValues* file = new KeyValues("AloneModConfig");
+	if (!file->LoadFromFile(filesystem, "cfg/AloneMod_Config.txt", "MOD"))
+	{
+		//delete the keyvalues
+		file->deleteThis();
+		return;
+	}
+
+	//write
+	Amod_WriteRainConfig(file);
 
 	//save the file
 	file->SaveToFile(filesystem, "cfg/AloneMod_Config.txt", "MOD");

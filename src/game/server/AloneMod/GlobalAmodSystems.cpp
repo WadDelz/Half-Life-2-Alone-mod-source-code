@@ -50,7 +50,7 @@ void AmodSkyCallback(IConVar* var, const char*, float)
 	if (!day)
 		return;
 
-	if (day->GetBool() && Q_strcmp(amod_sky.GetString(), "sky_day02_09") && IsCityMap(gpGlobals->mapname.ToCStr()))
+	if (day->GetBool() && Q_strcmp(amod_sky.GetString(), "sky_day02_09") && IsCityMap(gpGlobals->mapname.ToCStr()) || !clientengine->IsConnected())
 		return;
 
 	if (gpGlobals->eLoadType == MapLoad_Background)
@@ -66,7 +66,13 @@ void AmodEpicFilterCallback(IConVar* var, const char*, float)
 
 	CBaseEntity* epicfilter = gEntList.FindEntityByName(nullptr, "_cc_epic_filter_");
 	if (!epicfilter)
+	{
+		//check the value
+		if (!amod_epic_filter.GetBool())
+			return;
+
 		epicfilter = CreateEpicFilter();
+	}
 
 	if (amod_epic_filter.GetBool())
 		epicfilter->AcceptInput("Enable", nullptr, nullptr, variant_t{}, 0);

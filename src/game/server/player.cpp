@@ -5023,7 +5023,7 @@ void CBasePlayer::PostThink()
 	//show breathing
 	if (gpGlobals->curtime >= f_dobreath)
 	{
-		if (amod_do_breathing.GetBool())
+		if (amod_do_breathing.GetBool() && gpGlobals->eLoadType != MapLoadType_t::MapLoad_Background)
 			clientengine->ClientCmd("amod_do_breath");
 
 		f_dobreath = gpGlobals->curtime + random->RandomInt(3, 5);
@@ -5062,7 +5062,23 @@ void CBasePlayer::PostThink()
 				}
 
 				m_bInRain = true;
-				clientengine->ClientCmd("amod_soundscape_startrain");
+				clientengine->ClientCmd("wait 15; amod_soundscape_startrain");
+			}
+
+			//disable/enable rain windows
+			CBaseEntity* FirstEnt = gEntList.FirstEnt();
+			while (FirstEnt)
+			{
+				if (!Q_stricmp(FirstEnt->GetEntityName().ToCStr(), "brush_rain_windows"))	
+				{
+					if (m_bInRain)
+						FirstEnt->AcceptInput("Enable", nullptr, nullptr, variant_t{}, 0);
+					else
+						FirstEnt->AcceptInput("Disable", nullptr, nullptr, variant_t{}, 0);
+				}
+
+				FirstEnt = gEntList.NextEnt(FirstEnt);
+				continue;
 			}
 		}
 		m_fNextRainTime = gpGlobals->curtime + random->RandomFloat(amod_rain_wait_min.GetFloat(), amod_rain_wait_max.GetFloat());
@@ -5549,13 +5565,17 @@ void CBasePlayer::InitialSpawn( void )
 //-----------------------------------------------------------------------------
 void CBasePlayer::Spawn( void )
 {
+	//check if the player owns half life 2.
+	if (steamapicontext && steamapicontext->SteamApps() && !steamapicontext->SteamApps()->BIsSubscribedApp(220))
+		Error("You must own half life 2 for this mod to run!");
+
 	//amod
 	f_dobob = gpGlobals->curtime + amod_standbob_wait.GetFloat();
 	f_dobreath = gpGlobals->curtime + 5;
 	f_doweatherinfo = gpGlobals->curtime + 60;
 	m_fNextRainTime = gpGlobals->curtime + random->RandomFloat(amod_rain_wait_min.GetFloat(), amod_rain_wait_max.GetFloat());;
 	m_fNextThunder = gpGlobals->curtime + random->RandomFloat(15, 45);
-	m_bInRain = false;
+	m_bInRain = random->RandomInt(0, 1) != 0;
 
 	bool bRainEnabled = true;
 
@@ -5584,6 +5604,22 @@ void CBasePlayer::Spawn( void )
 			FirstEnt = gEntList.NextEnt(FirstEnt);
 			continue;
 		}
+	}
+
+	//disable/enable rain windows
+	CBaseEntity* FirstEnt = gEntList.FirstEnt();
+	while (FirstEnt)
+	{
+		if (!Q_stricmp(FirstEnt->GetEntityName().ToCStr(), "brush_rain_windows"))
+		{
+			if (bRainEnabled)
+				FirstEnt->AcceptInput("Enable", nullptr, nullptr, variant_t{}, 0);
+			else
+				FirstEnt->AcceptInput("Disable", nullptr, nullptr, variant_t{}, 0);
+		}
+
+		FirstEnt = gEntList.NextEnt(FirstEnt);
+		continue;
 	}
 
 	// Needs to be done before weapons are given
@@ -5940,6 +5976,22 @@ int CBasePlayer::Restore( IRestore &restore )
 //-----------------------------------------------------------------------------
 void CBasePlayer::OnRestore( void )
 {
+	//disable/enable rain windows
+	CBaseEntity* FirstEnt = gEntList.FirstEnt();
+	while (FirstEnt)
+	{
+		if (!Q_stricmp(FirstEnt->GetEntityName().ToCStr(), "brush_rain_windows"))
+		{
+			if (amod_rain_enable.GetBool() && amod_rain_type.GetBool() || (m_bInRain && amod_rain_type.GetInt() == 2))
+				FirstEnt->AcceptInput("Enable", nullptr, nullptr, variant_t{}, 0);
+			else
+				FirstEnt->AcceptInput("Disable", nullptr, nullptr, variant_t{}, 0);
+		}
+
+		FirstEnt = gEntList.NextEnt(FirstEnt);
+		continue;
+	}
+
 	BaseClass::OnRestore();
 
 	SetViewEntity( m_hViewEntity );

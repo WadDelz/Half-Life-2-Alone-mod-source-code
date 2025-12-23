@@ -418,8 +418,6 @@ void RecvProxy_EffectFlags( const CRecvProxyData *pData, void *pStruct, void *pO
 
 BEGIN_RECV_TABLE_NOBASE( C_BaseEntity, DT_AnimTimeMustBeFirst )
 	RecvPropInt( RECVINFO(m_flAnimTime), 0, RecvProxy_AnimTime ),
-	RecvPropString( RECVINFO(m_EntityName) ),
-	RecvPropString( RECVINFO(m_RealClassname) ),
 END_RECV_TABLE()
 
 
@@ -478,6 +476,9 @@ BEGIN_RECV_TABLE_NOBASE(C_BaseEntity, DT_BaseEntity)
 #ifdef TF_CLIENT_DLL
 	RecvPropArray3( RECVINFO_ARRAY(m_nModelIndexOverrides),	RecvPropInt( RECVINFO(m_nModelIndexOverrides[0]) ) ),
 #endif
+
+	RecvPropString(RECVINFO(m_EntityName)),
+	RecvPropString(RECVINFO(m_RealClassname)),
 
 END_RECV_TABLE()
 
@@ -1979,7 +1980,7 @@ int C_BaseEntity::DrawModel( int flags )
 	{
 		return drawn;
 	}
-
+	
 	int modelType = modelinfo->GetModelType( model );
 	switch ( modelType )
 	{

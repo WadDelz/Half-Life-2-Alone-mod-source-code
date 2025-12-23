@@ -280,13 +280,13 @@ static RainInfo_t s_RainInfo[] = {
 	{"klab",					"common.rain.inside",	0.1f},
 	{"inside.ravenholm_cave",	"common.rain.inside",	0.1f},
 
-	{"inside.prison",			"common.rain.inside",	0.18f},
-	{"inside_prison",			"common.rain.inside",	0.18f},
+	{"inside.prison",			"common.rain.inside",	0.25f},
+	{"inside_prison",			"common.rain.inside",	0.25f},
 
 	{"Nothing",					"common.rain.inside",	0.4f},
 
 	{"portal.inside_facility_metal_intro_loudrain",		"common.rain.inside",	0.3f},
-	{"portal.",											"common.rain.inside",	0.03f},
+	{"portal.",											"common.rain.inside",	0.01f},
 };
 
 //rain density exponent amount
@@ -295,7 +295,7 @@ static const float gs_RainDensityVolumeExponent[] = {
 	0.7,
 	1.0,
 	1.3,
-	1.65
+	1.5
 };
 
 extern const char* sg_RainTypes[5];
@@ -381,6 +381,10 @@ CON_COMMAND(amod_soundscape_stoprain, "")
 //--------------------------------------------------------------------------------------
 CON_COMMAND(amod_soundscape_startrain, "")
 {
+	//check for background map
+	if (Q_strstr(szMapName, "background_"))
+		return;
+
 	int current = g_SoundscapeSystem.GetCurrentSoundscape();
 	g_SoundscapeSystem.StartNewSoundscape(g_SoundscapeSystem.SoundscapeByIndex(current));
 }

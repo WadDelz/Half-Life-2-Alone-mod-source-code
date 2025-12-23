@@ -398,7 +398,7 @@ bool COverlayPageList::ShouldOverlayDraw(C_BaseHLPlayer *pPlayer, OverlayDrawTyp
 		return false;
 
 	//check for always draw
-	if (((int)type & (int)OverlayDrawType_e::Draw_Always) && !pPlayer->IsEffectActive(EF_DIMLIGHT))
+	if (((int)type & (int)OverlayDrawType_e::Draw_Always))
 		return true;
 	
 	//check for flashlight on
@@ -410,7 +410,9 @@ bool COverlayPageList::ShouldOverlayDraw(C_BaseHLPlayer *pPlayer, OverlayDrawTyp
 		return true;
 	
 	//moving?
-	bool moving = pPlayer->GetAbsVelocity().Length() >= 25;
+	Vector vel = pPlayer->GetAbsVelocity();
+	vel.z = 0;
+	bool moving = vel.Length() >= 25;
 
 	//check for walking
 	if (((int)type & (int)OverlayDrawType_e::Draw_WhenWalking) && moving && !pPlayer->IsSprinting())
@@ -457,6 +459,9 @@ bool COverlayPageList::ShouldOverlayDraw(C_BaseHLPlayer *pPlayer, OverlayDrawTyp
 //---------------------------------------------------------------------------------
 void COverlayPageList::PaintOverlays(int x, int y, int w, int h)
 {
+	if (!engine->IsConnected())
+		return;
+
 	//get the player
 	C_BaseHLPlayer* pPlayer = dynamic_cast<C_BaseHLPlayer*>(CBasePlayer::GetLocalPlayer());
 
@@ -565,7 +570,7 @@ CEffectsPanelOverlayPage::CEffectsPanelOverlayPage(vgui::Panel* parent, const ch
 	}
 
 	//active the items
-	m_TypeComboBox->ActivateItem(0);
+	m_TypeComboBox->SetText("Active Types:");
 
 	//make texts and sliders
 	m_RedText = new vgui::Label(this, "RedTextLabel", "Red Color = -1");
@@ -573,10 +578,10 @@ CEffectsPanelOverlayPage::CEffectsPanelOverlayPage(vgui::Panel* parent, const ch
 	m_BlueText = new vgui::Label(this, "BlueTextLabel", "Blue Color = -1");
 	m_AlphaText = new vgui::Label(this, "AlphaTextLabel", "Alpha = -1");
 	
-	m_RedSlider = new WheelSlider(this, "RedSlider");
-	m_GreenSlider = new WheelSlider(this, "GreenSlider");
-	m_BlueSlider = new WheelSlider(this, "BlueSlider");
-	m_AlphaSlider = new WheelSlider(this, "AlphaSlider");
+	m_RedSlider = new OverlaySlider(this, "RedSlider");
+	m_GreenSlider = new OverlaySlider(this, "GreenSlider");
+	m_BlueSlider = new OverlaySlider(this, "BlueSlider");
+	m_AlphaSlider = new OverlaySlider(this, "AlphaSlider");
 
 	m_RedSlider->SetRange(0, 255);
 	m_GreenSlider->SetRange(0, 255);
@@ -691,7 +696,7 @@ void CEffectsPanelOverlayPage::ResetEffects()
 	m_OverlayList->ClearOverlays();
 
 	//reset draw mode
-	m_TypeComboBox->ActivateItem(0);
+	m_TypeComboBox->SetText("Active Types:");
 
 	//only select menu item 1 (Always active)
 	for (int i = 0; i < m_TypeComboBox->GetItemCount(); i++)
@@ -888,10 +893,10 @@ void CEffectsPanelOverlayPage::OnCommand(const char* pszCommand)
 	else if (StringHasPrefix(pszCommand, OVERLAY_PAGE_OVERLAY_TYPE_PREFIX))
 	{
 		//get index
-		int index = Q_atoi(pszCommand + Q_strlen(OVERLAY_PAGE_OVERLAY_TYPE_PREFIX));
+		//int index = Q_atoi(pszCommand + Q_strlen(OVERLAY_PAGE_OVERLAY_TYPE_PREFIX));
 
 		//set selected state of menu item
-		m_TypeComboBox->GetMenu()->SetMenuItemChecked(index, m_TypeComboBox->GetMenu()->IsChecked(index));
+		//m_TypeComboBox->GetMenu()->SetMenuItemChecked(index, m_TypeComboBox->GetMenu()->IsChecked(index));
 	}
 
 	//call base function

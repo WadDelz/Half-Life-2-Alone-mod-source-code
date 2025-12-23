@@ -1641,8 +1641,10 @@ private:
 	
 	string_t		m_ModelName;
 
+protected:
 	CNetworkString(m_EntityName, 128);
 	CNetworkString(m_RealClassname, 128);
+private:
 
 	// Velocity of the thing we're standing on (world space)
 	CNetworkVarForDerived( Vector, m_vecBaseVelocity );
@@ -1925,7 +1927,7 @@ inline string_t CBaseEntity::GetEntityName()
 inline void CBaseEntity::SetName( string_t newName )
 {
 	m_iName = newName;
-	Q_strncpy(m_EntityName.GetForModify(), newName.ToCStr(), sizeof(m_EntityName));
+	Q_strncpy(m_EntityName.GetForModify(), newName.ToCStr(), 128);
 }
 
 

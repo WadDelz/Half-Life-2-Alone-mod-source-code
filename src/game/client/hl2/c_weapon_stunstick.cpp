@@ -11,6 +11,9 @@
 #include "materialsystem/imaterial.h"
 #include "clienteffectprecachesystem.h"
 #include "beamdraw.h"
+#include "dlight.h"
+#include "iefx.h"
+#include "debugoverlay_shared.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -148,8 +151,9 @@ public:
 		return RENDER_GROUP_TRANSLUCENT_ENTITY;
 	}
 
-private:
+
 	CNetworkVar( bool, m_bActive );
+	CNetworkVar( bool, m_bInGlow);
 };
 
 
@@ -183,5 +187,44 @@ STUB_WEAPON_CLASS_IMPLEMENT( weapon_stunstick, C_WeaponStunStick );
 
 IMPLEMENT_CLIENTCLASS_DT( C_WeaponStunStick, DT_WeaponStunStick, CWeaponStunStick )
 	RecvPropInt( RECVINFO(m_bActive), 0, RecvProxy_StunActive ),
+	RecvPropInt( RECVINFO(m_bInGlow) ),
 END_RECV_TABLE()
 
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void SimulateStunstick(CBaseCombatWeapon* weapon, CBaseViewModel* viewmodel)
+{
+	C_WeaponStunStick* stunstick = dynamic_cast<C_WeaponStunStick*>(weapon);
+	if (stunstick && stunstick->m_bInGlow)
+	{
+		//get viewmodel position + angles
+		Vector pos;
+		QAngle angle;
+		viewmodel->GetAttachment(viewmodel->LookupAttachment("Sparkrear"), pos, angle);
+
+		//get offset
+		Vector offset;
+		AngleVectors(angle, &offset);
+
+		//get actuall position
+		Vector origin = pos + (offset * -20);
+
+		dlight_t* dlight = effects->CL_AllocDlight(viewmodel->index);
+		dlight->radius = 400;
+		dlight->color.r = 255;
+		dlight->color.g = 255;
+		dlight->color.b = 255;
+		dlight->color.exponent = 1;
+		dlight->die = gpGlobals->curtime + 0.1f;
+		//dlight->decay = dlight->radius / 500;
+		dlight->origin = origin;
+
+		
+
+		
+
+		NDebugOverlay::Axis(pos, angle, 20, false, 0.01f);
+		NDebugOverlay::Line(pos, origin, 255, 100, 0, false, 0.01f);
+	}
+}
