@@ -892,8 +892,13 @@ void CAchievementMgr::SaveGlobalStateIfDirty( bool bAsync )
 }
 
 #ifdef CLIENT_DLL
+ConVar amod_show_achievements("amod_show_achievements", "1");
+
 CON_COMMAND_F(_do_achievement_notification, "", FCVAR_HIDDEN)
 {
+	if (!amod_show_achievements.GetBool())
+		return;
+
 	//get achievement name
 	const wchar_t* achievement_name = ACHIEVEMENT_LOCALIZED_NAME_FROM_STR(args.Arg(0));
 	int progress = atoi(args.Arg(1));

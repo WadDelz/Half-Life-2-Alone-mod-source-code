@@ -562,7 +562,7 @@ void CEffectsPanelSettingsPage::OnMapLoad()
 void CEffectsPanelSettingsPage::OnMapShutdown()
 {
 	//dont reset if empty
-	if (m_FileList->GetFileCount() <= 0)
+	if (m_FileList->GetFileCount() <= 0 || !amod_effects_panel_autoload_files.GetBool())
 		return;
 
 	//tell the effects panel to reset everything

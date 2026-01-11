@@ -467,7 +467,7 @@ private:
 	void				UpdateGlowEffect( void );
 	void				DestroyGlowEffect( void );
 
-protected:
+public:
 	int			m_bloodColor;			// color of blood particless
 
 	// -------------------

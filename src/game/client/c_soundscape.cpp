@@ -278,6 +278,7 @@ static RainInfo_t s_RainInfo[] = {
 	{"inside.under_ep1",		"common.rain.inside",	0.08f},
 
 	{"klab",					"common.rain.inside",	0.1f},
+	{"inside_eli",				"common.rain.inside",	0.1f},
 	{"inside.ravenholm_cave",	"common.rain.inside",	0.1f},
 
 	{"inside.prison",			"common.rain.inside",	0.25f},

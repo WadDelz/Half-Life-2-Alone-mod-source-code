@@ -2631,6 +2631,47 @@ CON_COMMAND_F(ToggleSongPanel, "Toggles The Alone Mod Song Panel", FCVAR_HIDDEN)
 	songpanel->Activate();
 };
 
+
+
+//HACK: i used to call the enginesound->EmitAmbientSound insid the _amod_playsound
+//console command, BUT i would sometimes have issues where the game would lag ALOT
+//for some reason. The only explination i could have for the lag is due to the enginesound->EmitAmbientSound
+//function is getting called on the client from the server when the server is currently running. 
+//So instead we will wait for the client to start running code to then run the song.
+struct CurrentSongItem_t
+{
+	char filename[512];
+	float volume;
+	float duration;
+	int pitch;
+	bool InUse = false;
+};
+static CurrentSongItem_t s_CurrentSongItem;
+
+class CAutoPlaySongSystem : public CAutoGameSystemPerFrame
+{
+public:
+	void Update(float frametime) override
+	{
+		if (s_CurrentSongItem.InUse)
+		{
+			//make sure the sound is precached
+			if (!enginesound->IsSoundPrecached(s_CurrentSongItem.filename))
+				enginesound->PrecacheSound(s_CurrentSongItem.filename);
+
+			//play the song at normal speed then set the pitch so we start at the correct time
+			enginesound->EmitAmbientSound(s_CurrentSongItem.filename, s_CurrentSongItem.volume, 100, SND_SHOULDPAUSE, s_CurrentSongItem.duration);
+
+			//check pitch so the song starts at the correct time
+			if (s_CurrentSongItem.pitch != 100)
+				enginesound->EmitAmbientSound(s_CurrentSongItem.filename, s_CurrentSongItem.volume, s_CurrentSongItem.pitch, SND_CHANGE_PITCH);
+
+			s_CurrentSongItem.InUse = false;
+		}
+	}
+};
+static CAutoPlaySongSystem s_AutoSongPlaHackySystem;
+
 //command to play sound from server. Used for transitioning songs through levels
 CON_COMMAND_F(_amod_playsound, "", FCVAR_HIDDEN)
 {
@@ -2644,18 +2685,21 @@ CON_COMMAND_F(_amod_playsound, "", FCVAR_HIDDEN)
 		}
 	}
 
+	//stop all songs
+	StopAllSongs();
+
 	//get args
 	const char* songname = args.Arg(1);
 	float volume = atof(args.Arg(2));
 	int pitch = atoi(args.Arg(3));
 	float duration = atof(args.Arg(4));
 
-	//play the song at normal speed then set the pitch so we start at the correct time
-	enginesound->EmitAmbientSound(songname, volume / 10, 100, SND_SHOULDPAUSE, duration);
-
-	//check pitch
-	if (pitch != 100)
-		enginesound->EmitAmbientSound(songname, volume / 10, pitch, SND_CHANGE_PITCH);
+	//set s_CurrentSongItem
+	Q_strncpy(s_CurrentSongItem.filename, songname, sizeof(s_CurrentSongItem.filename));
+	s_CurrentSongItem.volume = volume / 10;
+	s_CurrentSongItem.pitch = pitch;
+	s_CurrentSongItem.duration = duration;
+	s_CurrentSongItem.InUse = true;
 }
 
 //debug

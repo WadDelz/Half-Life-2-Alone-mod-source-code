@@ -1148,7 +1148,14 @@ void CPlayerPickupController::Use( CBaseEntity *pActivator, CBaseEntity *pCaller
 			// JAY: Scale this with mass because some small objects really go flying
 			float massFactor = clamp( pPhys->GetMass(), 0.5, 15 );
 			massFactor = RemapVal( massFactor, 0.5, 15, 0.5, 4 );
-			vecLaunch *= player_throwforce.GetFloat() * massFactor;
+
+			float force = player_throwforce.GetFloat();
+
+			//HACK FOR BASKETBALL
+			if (!Q_stricmp(pAttached->GetEntityName().ToCStr(), "basketball"))
+				force *= 2;
+
+			vecLaunch *= force * massFactor;
 
 			pPhys->ApplyForceCenter( vecLaunch );
 			AngularImpulse aVel = RandomAngularImpulse( -10, 10 ) * massFactor;

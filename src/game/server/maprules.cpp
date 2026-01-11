@@ -286,7 +286,7 @@ public:
 	}
 
 private:
-
+	
 	string_t m_iszMessage;
 	hudtextparms_t	m_textParms;
 };

@@ -26,7 +26,7 @@
 class C_NPC_Barnacle : public C_AI_BaseNPC
 {
 public:
-
+	
 	DECLARE_CLASS( C_NPC_Barnacle, C_AI_BaseNPC );
 	DECLARE_CLIENTCLASS();
 

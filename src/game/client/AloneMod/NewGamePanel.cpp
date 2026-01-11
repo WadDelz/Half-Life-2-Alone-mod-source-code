@@ -19,6 +19,7 @@ struct GameListInfo_t
 	//prefix and name
 	char name[128];
 	char prefix[32];
+	int CurrentChapterIndex = 0;
 	CUtlVector<const char*> ChapterNames;
 
 	//day info
@@ -64,7 +65,6 @@ private:
 	GameListInfo_t* m_CurrentSelectedGameInfo;
 	CUtlVector<GameListInfo_t> m_GameInfo;		//array of game info
 	int m_SelectedGameIndex = 0;				//the selected game index
-	int m_CurrentChapterIndex = 0;				//current chapter
 
 	//chapter texts
 	vgui::Label* m_ChapterNames[3];
@@ -112,8 +112,35 @@ CNewGamePanel::CNewGamePanel(vgui::VPANEL parent) : BaseClass(nullptr, "NewGameP
 	//init the elements
 	InitElements();
 
-	//load the new game info
-	LoadNewGameInfo("resource/gamelist.txt");
+	//invalidate
+	m_SelectedGameIndex = -1;
+	m_CurrentSelectedGameInfo = nullptr;
+
+	//load all the new game lists in the games/* folder BUT always load resource/gamelist.txt first
+	{
+		LoadNewGameInfo("resource/gamelist.txt");
+
+		FileFindHandle_t handle;
+		const char* firstfile = filesystem->FindFirst("resource/games/*.txt", &handle);
+		while (firstfile)
+		{
+			//dont read the . filenames
+			if (!Q_stricmp(firstfile, ".") || !Q_stricmp(firstfile, ".."))
+			{
+				firstfile = filesystem->FindNext(handle);
+				continue;
+			}
+
+			//see if its a file or not
+			if (!filesystem->FindIsDirectory(handle) && strchr(firstfile, '.'))
+				LoadNewGameInfo(CFmtStr("resource/games/%s", firstfile));
+
+			firstfile = filesystem->FindNext(handle);
+		}
+	}
+
+	//select the current game
+	m_GameComboBox->ActivateItem(m_SelectedGameIndex);
 	ActivateGame(m_SelectedGameIndex);
 }
 
@@ -221,7 +248,7 @@ void CNewGamePanel::LoadNewGameInfo(const char* filename)
 	FOR_EACH_TRUE_SUBKEY(gamelist, game)
 	{
 		//check for default
-		if (game->GetBool("Default"))
+		if (game->GetBool("Default") && m_SelectedGameIndex == -1)
 			m_SelectedGameIndex = m_GameInfo.Count();
 
 		//get the game info
@@ -260,12 +287,16 @@ void CNewGamePanel::LoadNewGameInfo(const char* filename)
 		}
 	}
 
+	//check our index
+	if (m_SelectedGameIndex == -1 && m_GameInfo.Count() > 0)
+		m_SelectedGameIndex = 0;
+
+	//clear m_GameComboBox
+	m_GameComboBox->RemoveAll();
+
 	//add the games to the combo box
 	for (int i = 0; i < m_GameInfo.Count(); i++)
-	{
 		m_GameComboBox->AddItem(CFmtStr("Game: %s", m_GameInfo[i].name), nullptr);
-		m_GameComboBox->ActivateItem(m_SelectedGameIndex);
-	}
 
 	//delete the configs
 	AloneModEnglish->deleteThis();
@@ -278,7 +309,6 @@ void CNewGamePanel::LoadNewGameInfo(const char* filename)
 void CNewGamePanel::ActivateGame(int gameindex)
 {
 	//reset the chapter index
-	m_CurrentChapterIndex = 0;
 	m_SelectedGameIndex = gameindex;
 
 	//get the info
@@ -290,7 +320,7 @@ void CNewGamePanel::ActivateGame(int gameindex)
 
 	//select the new game
 	m_CurrentSelectedGameInfo = &m_GameInfo[gameindex];
-	SelectPage(0);
+	SelectPage(m_CurrentSelectedGameInfo->CurrentChapterIndex);
 }
 
 //-----------------------------------------------------------------------
@@ -306,7 +336,7 @@ void CNewGamePanel::SelectPage(int page)
 		return;
 
 	//set the new index
-	m_CurrentChapterIndex = page;
+	m_CurrentSelectedGameInfo->CurrentChapterIndex = page;
 
 	//hide all the elements first
 	for (int i = 0; i < 3; i++)
@@ -339,7 +369,7 @@ void CNewGamePanel::SelectPage(int page)
 			
 			if (info.convar->GetBool() && (realindex >= info.min && realindex <= info.max))
 			{
-				m_ChapterImages[i]->SetImage(CFmtStr("chapters/%s/chapter%d%s", m_CurrentSelectedGameInfo->prefix, realindex, "_day"));
+				m_ChapterImages[i]->SetImage(CFmtStr("chapters/%s/chapter%d_day", m_CurrentSelectedGameInfo->prefix, realindex));
 				did = true;
 				break;
 			}
@@ -358,7 +388,7 @@ void CNewGamePanel::SelectPage(int page)
 	m_NextButton->SetEnabled(true);
 
 	//check for the buttons
-	if (m_CurrentChapterIndex <= 0)
+	if (m_CurrentSelectedGameInfo->CurrentChapterIndex <= 0)
 		m_PrevButton->SetEnabled(false);
 	if (!m_ChapterButtons[2]->IsVisible() || index + 3 >= m_CurrentSelectedGameInfo->ChapterNames.Count())
 		m_NextButton->SetEnabled(false);
@@ -372,25 +402,25 @@ void CNewGamePanel::OnCommand(const char* pszCommand)
 	//check for next or previous command
 	if (!Q_stricmp(pszCommand, COMMAND_NEXT))
 	{
-		SelectPage(m_CurrentChapterIndex + 1);
+		SelectPage(m_CurrentSelectedGameInfo->CurrentChapterIndex + 1);
 		return;
 	}
 	else if (!Q_stricmp(pszCommand, COMMAND_PREV))
 	{
-		SelectPage(m_CurrentChapterIndex - 1);
+		SelectPage(m_CurrentSelectedGameInfo->CurrentChapterIndex - 1);
 		return;
 	}
 	else if (!Q_stricmp(pszCommand, COMMAND_CHAPTER_1))
 	{
-		engine->ClientCmd(CFmtStr("exec %s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentChapterIndex * 3) + 1));
+		engine->ClientCmd(CFmtStr("exec %s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentSelectedGameInfo->CurrentChapterIndex * 3) + 1));
 	}
 	else if (!Q_stricmp(pszCommand, COMMAND_CHAPTER_2))
 	{
-		engine->ClientCmd(CFmtStr("exec %s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentChapterIndex * 3) + 2));
+		engine->ClientCmd(CFmtStr("exec %s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentSelectedGameInfo->CurrentChapterIndex * 3) + 2));
 	}
 	else if (!Q_stricmp(pszCommand, COMMAND_CHAPTER_3))
 	{
-		engine->ClientCmd(CFmtStr("exec %s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentChapterIndex * 3) + 3));
+		engine->ClientCmd(CFmtStr("exec %s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentSelectedGameInfo->CurrentChapterIndex * 3) + 3));
 	}
 
 	BaseClass::OnCommand(pszCommand);
@@ -440,8 +470,8 @@ public:
 	//does a day check
 	virtual void DoDayCheck(void)
 	{
-		if (m_NewGamePanel)
-			m_NewGamePanel->SelectPage(m_NewGamePanel->m_CurrentChapterIndex);
+		if (m_NewGamePanel && m_NewGamePanel->m_CurrentSelectedGameInfo)
+			m_NewGamePanel->SelectPage(m_NewGamePanel->m_CurrentSelectedGameInfo->CurrentChapterIndex);
 	}
 
 	//destroys the new game panel

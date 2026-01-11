@@ -1016,7 +1016,15 @@ public:
 
 		//is the song still playing. if not then mark the song as 'not in use'
 		if (fabs(g_SongToTransition.TimeElapsed) >= g_SongToTransition.SongDuration)
+		{
 			g_SongToTransition.bInUse = false;
+			g_SongToTransition.pitch = 100;
+			g_SongToTransition.SongDuration = 0.0f;
+			g_SongToTransition.TimeElapsed = 0.0f;
+			g_SongToTransition.SongStartTime = 0.0f;
+			g_SongToTransition.Volume = 0.0f;
+			g_SongToTransition.SongName[0] = '\0';
+		}
 	}
 
 

@@ -4016,9 +4016,8 @@ void CBasePlayer::HandleFuncTrain(void)
 		m_iTrain |= TRAIN_ACTIVE|TRAIN_NEW;
 	}
 }
-
 void CBasePlayer::PreThink(void)
-{						
+{	
 	if ( g_fGameOver || m_iPlayerLocked )
 		return;         // intermission or finale
 
@@ -4077,7 +4076,6 @@ void CBasePlayer::PreThink(void)
 
 	// track where we are in the nav mesh
 	UpdateLastKnownArea();
-
 
 	// StudioFrameAdvance( );//!!!HACKHACK!!! Can't be hit by traceline when not animating?
 }
@@ -4907,8 +4905,43 @@ WeatherInfo_t GetWeatherMessageInfo(CBasePlayer* pPlayer)
 	return info;
 }
 
+
+CBaseEntity* helicopter = nullptr;
+
+CON_COMMAND(helicopter_test, "")
+{
+	if (!helicopter)
+	{
+		CBaseEntity::PrecacheModel("models/combine_helicopter.mdl");
+		helicopter = CreateEntityByName("prop_dynamic");
+		helicopter->SetName(AllocPooledString("bob"));
+		helicopter->SetModel("models/combine_helicopter.mdl");
+		helicopter->Precache();
+		DispatchSpawn(helicopter);
+		helicopter->Activate();
+	}
+	else
+	{
+		helicopter = gEntList.FindEntityByName(nullptr, "bob");
+	}
+
+	QAngle ang = UTIL_GetLocalPlayer()->EyeAngles();
+	Vector origin = UTIL_GetLocalPlayer()->GetAbsOrigin();
+
+	Vector forawrd;
+	AngleVectors(ang, &forawrd);
+
+	helicopter->SetAbsOrigin(origin + (forawrd * atoi(args.Arg(1))));
+	helicopter->SetAbsAngles(ang);
+
+	variant_t vt;
+	vt.SetString(AllocPooledString("idle"));
+	helicopter->AcceptInput("SetAnimation", nullptr, nullptr, vt, 0);
+}
+
 void CBasePlayer::PostThink()
 {
+	if (helicopter)
 	if (g_bInSoundscapePositionEditor)
 	{
 		do {
@@ -5566,8 +5599,8 @@ void CBasePlayer::InitialSpawn( void )
 void CBasePlayer::Spawn( void )
 {
 	//check if the player owns half life 2.
-	if (steamapicontext && steamapicontext->SteamApps() && !steamapicontext->SteamApps()->BIsSubscribedApp(220))
-		Error("You must own half life 2 for this mod to run!");
+	//if (steamapicontext && steamapicontext->SteamApps() && !steamapicontext->SteamApps()->BIsSubscribedApp(220))
+	//	Error("You must own half life 2 for this mod to run!");
 
 	//amod
 	f_dobob = gpGlobals->curtime + amod_standbob_wait.GetFloat();
@@ -5584,11 +5617,7 @@ void CBasePlayer::Spawn( void )
 
 	if (amod_rain_type.GetInt() == 2)
 	{
-		CBasePlayer* pPlayer = UTIL_GetLocalPlayer();
-		if (!pPlayer)
-			bRainEnabled = false;
-		else
-			bRainEnabled = pPlayer->m_bInRain;
+		bRainEnabled = m_bInRain;
 	}
 
 	if (bRainEnabled)
@@ -6010,11 +6039,7 @@ void CBasePlayer::OnRestore( void )
 
 	if (amod_rain_type.GetInt() == 2)
 	{
-		CBasePlayer* pPlayer = UTIL_GetLocalPlayer();
-		if (!pPlayer)
-			bRainEnabled = false;
-		else
-			bRainEnabled = pPlayer->m_bInRain;
+		bRainEnabled = m_bInRain;
 	}
 
 	if (bRainEnabled)

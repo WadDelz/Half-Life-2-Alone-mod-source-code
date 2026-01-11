@@ -1,5 +1,7 @@
 #include "cbase.h"
+#include "Amod_SharedDefs.h"
 
+//list of maps
 const char* g_szMapNames[] = {
 	//Station
 	"d1_trainstation_01_d",
@@ -93,7 +95,6 @@ const char* g_szMapNames[] = {
 	"ep1_citadel_02b_d",
 	"ep1_citadel_03_d",
 	"ep1_citadel_04_d",
-
 	"ep1_c17_00_d",
 	"ep1_c17_00a_d",
 	"ep1_c17_01_d",
@@ -103,6 +104,7 @@ const char* g_szMapNames[] = {
 	"ep1_c17_05_d",
 	"ep1_c17_06_d",
 
+	//episode 2
 	"ep2_outland_01_d",
 	"ep2_outland_01a_d",
 	"ep2_outland_02_d",
@@ -122,11 +124,14 @@ const char* g_szMapNames[] = {
 	"ep2_outland_12a_d",
 };
 
+//--------------------------------------------------------------------------------------------
+// Purpose: Returns if the map is a daytime map or not
+//--------------------------------------------------------------------------------------------
 bool IsCityMap(const char* szName)
 {
 	if (!Q_strcmp(szName, "background06_d") || !Q_strcmp(szName, "background07_d"))
 		return true;
-
+	
 	return StringHasPrefix(szName, "d3_");
 }
 
