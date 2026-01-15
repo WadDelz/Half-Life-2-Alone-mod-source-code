@@ -224,7 +224,7 @@ void CBackgroundPanel::OnTick()
 		BackgroundPic->SetImage(v_MapPics[MapNames->GetActiveItem()]);
 	else
 	{
-		if (!Q_strcmp(v_MapNames[MapNames->GetActiveItem()], "background06_d"))
+		if (IsDaytimeEnabled() && !CMaterialReference(CFmtStr("vgui/%s_day", v_MapPics[MapNames->GetActiveItem()]), TEXTURE_GROUP_VGUI, false)->IsErrorMaterial())
 			BackgroundPic->SetImage(CFmtStr("%s_day", v_MapPics[MapNames->GetActiveItem()]));
 		else
 			BackgroundPic->SetImage(v_MapPics[MapNames->GetActiveItem()]);

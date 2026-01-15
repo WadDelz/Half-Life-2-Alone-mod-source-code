@@ -14,6 +14,8 @@ public:
 	virtual void		Create(vgui::VPANEL parent) = 0;
 	virtual void		Destroy(void) = 0;
 	virtual void		Activate(void) = 0;
+	virtual void		SetSkyboxButtonEnabled(bool enabled) = 0;
+	virtual void		SetFilterButtonValue(bool state, bool setconvar = false) = 0;
 };
 extern OptionsPanel* optionspanel;
 
@@ -43,6 +45,7 @@ class AmodSkyboxPanel
 public:
 	virtual void Open(Panel* parent) = 0;
 	virtual void ClearPanel() = 0;
+	virtual void ResetPanel() = 0;
 	virtual void Close() = 0;
 };
 extern AmodSkyboxPanel* skyboxpanel;

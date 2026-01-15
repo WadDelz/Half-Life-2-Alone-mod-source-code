@@ -377,8 +377,9 @@ void CGameText::Display( CBaseEntity *pActivator )
 			if (!key)
 				key = "<unbound>";
 
-			if (IsCityMap(gpGlobals->mapname.ToCStr()))
-				msg = CFmtStr("use %s to toggle the filter (Disabled If Daytime)", key);
+			//check for daytime
+			if (IsDaytimeEnabled())
+				msg = CFmtStr("use %s to toggle the filter (Currently disabled due to day enabled)", key);
 			else
 				msg = CFmtStr("use %s to toggle the filter", key);
 		}

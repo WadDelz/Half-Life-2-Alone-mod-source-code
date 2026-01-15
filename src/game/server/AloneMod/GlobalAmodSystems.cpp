@@ -1,338 +1,490 @@
-////hello anyone reading this.
-//
-////I coded this over a year ago so thats why the code is so shit (i didnt start adding comments to my code untill 10+ish months ago). I tried to change it but there's so much shit in here its pretty much impossible to find out what to change + everything breaks. So im just gonna leave this here.
-//
-//#include "cbase.h"
-//#include "cdll_int.h"
-//#include "fmtstr.h"
-//#include <filesystem.h>
-//#include "AloneMod/Amod_SharedDefs.h"
-//
-//#if !AMOD_DAYTIME_EDITION
-//
-//extern IVEngineClient* clientengine;
-//
-//void AmodSkyCallback(IConVar* var, const char*, float);
-//void AmodEpicFilterCallback(IConVar* var, const char*, float);
-//
-//ConVar amod_sky_override("amod_sky_override", "1");
-//ConVar amod_sky("amod_sky", "sky_borealis01", 0, "", AmodSkyCallback);
-//ConVar amod_epic_filter("amod_epic_filter", "0", 0, "", AmodEpicFilterCallback);
-//
-////
-//CBaseEntity* CreateEpicFilter()
-//{
-//	CBaseEntity* cc = gEntList.FindEntityByName(nullptr, "_cc_epic_filter_");
-//	if (cc)
-//		return cc;
-//
-//	cc = CreateEntityByName("color_correction");
-//	cc->KeyValue("targetname", "_cc_epic_filter_");
-//	cc->KeyValue("minfalloff", "-1");
-//	cc->KeyValue("maxfalloff", "-1");
-//	cc->KeyValue("maxweight", "0.8");
-//	cc->KeyValue("filename", "scripts/colorcorrection/cc_epic_filter.raw");;
-//
-//	cc->Precache();
-//	DispatchSpawn(cc);
-//	cc->Activate();
-//
-//	return cc;
-//}
-//
-////im not even kidding i tinkered around with this for like an hour to get it to work
-//void AmodSkyCallback(IConVar* var, const char*, float)
-//{
-//	if (!amod_sky_override.GetBool())
-//		return;
-//
-//	if (Q_strstr(gpGlobals->mapname.ToCStr(), "ep1") || Q_strstr(gpGlobals->mapname.ToCStr(), "amod_outro") || !Q_strcmp(gpGlobals->mapname.ToCStr(), "background08_d") || !Q_strcmp(gpGlobals->mapname.ToCStr(), "background10_d"))
-//		return;
-//
-//	static ConVar* day = cvar->FindVar("amod_day");
-//	if (!day)
-//		return;
-//
-//	if (day->GetBool() && Q_strcmp(amod_sky.GetString(), "sky_day02_09") && IsCityMap(gpGlobals->mapname.ToCStr()) || !clientengine->IsConnected())
-//		return;
-//
-//	if (gpGlobals->eLoadType == MapLoad_Background)
-//		clientengine->ExecuteClientCmd(CFmtStr("map_background %s", gpGlobals->mapname.ToCStr()));
-//	else
-//		clientengine->ExecuteClientCmd("save quick001_sky; load quick001_sky");
-//}
-//
-//void AmodEpicFilterCallback(IConVar* var, const char*, float)
-//{
-//	if (!clientengine->IsConnected())
-//		return;
-//
-//	CBaseEntity* epicfilter = gEntList.FindEntityByName(nullptr, "_cc_epic_filter_");
-//	if (!epicfilter)
-//	{
-//		return;
-//	}
-//
-//	if (amod_epic_filter.GetBool())
-//		epicfilter->AcceptInput("Enable", nullptr, nullptr, variant_t{}, 0);
-//	else
-//		epicfilter->AcceptInput("Disable", nullptr, nullptr, variant_t{}, 0);
-//}
-//
-//KeyValues* KvSkyes = nullptr;
-//
-//void DefaultFogOverride()
-//{
-//	clientengine->ClientCmd_Unrestricted("fog_override 1");
-//
-//	clientengine->ClientCmd_Unrestricted("fog_enable 1");
-//	clientengine->ClientCmd_Unrestricted("fog_enableskybox 1");
-//
-//	clientengine->ClientCmd_Unrestricted("fog_start 1500");
-//	clientengine->ClientCmd_Unrestricted("fog_end 2750");
-//
-//	clientengine->ClientCmd_Unrestricted("fog_startskybox 1500");
-//	clientengine->ClientCmd_Unrestricted("fog_endskybox 3000");
-//
-//	clientengine->ClientCmd_Unrestricted("fog_maxdensity 0.95");
-//	clientengine->ClientCmd_Unrestricted("fog_maxdensityskybox 0.8");
-//
-//	clientengine->ClientCmd_Unrestricted("fog_color 55 55 70");
-//	clientengine->ClientCmd_Unrestricted("fog_colorskybox 55 55 70");
-//
-//	clientengine->ClientCmd_Unrestricted("r_farz -1");
-//	clientengine->ClientCmd_Unrestricted("r_pixelfog 1");
-//}
-//
-//void DoFogOverride(KeyValues* kv, const char* str = nullptr)
-//{
-//	KeyValues* mapkv = kv->FindKey(str ? str : gpGlobals->mapname.ToCStr());
-//	if (!mapkv)
-//	{
-//		DefaultFogOverride();
-//		return;
-//	}
-//
-//	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_override %d", mapkv->GetBool("fog_override", true)));
-//
-//	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_enable %d", mapkv->GetBool("fog_enable", true)));
-//	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_enableskybox %d", mapkv->GetBool("fog_enableskybox", true)));
-//
-//	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_start %d", mapkv->GetInt("fog_start", 1500)));
-//	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_end %d", mapkv->GetInt("fog_end", 2750)));
-//
-//	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_startskybox %d", mapkv->GetInt("fog_startskybox", true)));
-//	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_endskybox %d", mapkv->GetInt("fog_endskybox", true)));
-//
-//	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_maxdensity %f", mapkv->GetFloat("fog_maxdensity", 0.95)));
-//	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_maxdensityskybox %f", mapkv->GetFloat("fog_maxdensityskybox", 0.7)));
-//
-//	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_color %s", mapkv->GetString("fog_color", "55 55 70")));
-//	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_colorskybox %s", mapkv->GetString("fog_colorskybox", "55 55 70")));
-//
-//	clientengine->ClientCmd_Unrestricted(CFmtStr("r_farz %s", mapkv->GetString("r_farz", "-1")));
-//	clientengine->ClientCmd_Unrestricted(CFmtStr("r_pixelfog %d", mapkv->GetBool("r_pixelfog", true)));
-//}
-//
-//CON_COMMAND(amod_fog_reset, "")
-//{
-//	ConVar* day = cvar->FindVar("amod_day");
-//	if (!day)
-//		return;
-//
-//	if (!day->GetBool())
-//		return;
-//
-//	if (KvSkyes)
-//		KvSkyes->deleteThis();
-//
-//	KvSkyes = nullptr;
-//
-//	KvSkyes = new KeyValues("");
-//	if (!KvSkyes->LoadFromFile(filesystem, "resource\\amod_city_fogs.txt", "MOD"))
-//	{
-//		ConWarning("Failed To Load amod_city_fog.txt Day Time Section Use Default Fog\n");
-//		KvSkyes->deleteThis();
-//		KvSkyes = nullptr;
-//
-//		DefaultFogOverride();
-//
-//		return;
-//	}
-//	else
-//	{
-//
-//		if (day->GetBool())
-//		{
-//			if (IsCityMap(gpGlobals->mapname.ToCStr()))
-//			{
-//				DoFogOverride(KvSkyes);
-//			}
-//		}
-//	}
-//}
-//
-//static bool bDidFilterOn = false;
-//
-//bool DoBonusMapCheck(const char* mapname)
-//{
-//	for (int i = 0; i < sizeof(g_pBonusMaps) / sizeof(g_pBonusMaps[0]); i++)
-//	{
-//		if (!Q_strcmp(g_pBonusMaps[i], mapname))
-//		{
-//			ConVar* sname = cvar->FindVar("sv_skyname");
-//			if (sname && amod_sky_override.GetBool())
-//				sname->SetValue(amod_sky.GetString());
-//
-//			return false;
-//		}
-//	}
-//
-//	return true;
-//}
-//
-////TODO: MAKE ALGORITHM SO I CAN USE MORE SKYBOXES
-//class CAmodAutoGameSystem : public CAutoGameSystem
-//{
-//public:
-//	void LevelInitPreEntity()
-//	{
-//		static ConVar* fog_override = cvar->FindVar("fog_override");
-//		if (!fog_override)
-//			return;
-//
-//		fog_override->SetValue(0);
-//
-//		//no 
-//		if (Q_strstr(gpGlobals->mapname.ToCStr(), "ep1") || Q_strstr(gpGlobals->mapname.ToCStr(), "amod_outro") || !Q_strcmp(gpGlobals->mapname.ToCStr(), "background08_d") || !Q_strcmp(gpGlobals->mapname.ToCStr(), "background10_d"))
-//			return;
-//
-//		if (!DoBonusMapCheck(gpGlobals->mapname.ToCStr()))
-//			return;
-//
-//		if (!KvSkyes)
-//		{
-//			KvSkyes = new KeyValues("");
-//			if (!KvSkyes->LoadFromFile(filesystem, "resource\\amod_city_fogs.txt", "MOD"))
-//			{
-//				ConWarning("Failed To Load amod_city_fog.txt Day Time Section Use Default Fog\n");
-//				KvSkyes->deleteThis();
-//				KvSkyes = nullptr;
-//			}
-//		}
-//
-//		clientengine->ClientCmd_Unrestricted("r_pixelfog 1");
-//
-//		if (!amod_sky_override.GetBool())
-//			return;
-//
-//		static ConVar* sname = cvar->FindVar("sv_skyname");
-//		if (!sname)
-//			return;
-//
-//		static ConVar* day = cvar->FindVar("amod_day");
-//		if (!day)
-//			return;
-//
-//		static ConVar* day_rav = cvar->FindVar("amod_day_ravenholm");
-//		if (!day_rav)
-//			return;
-//
-//		//if portal_06 then dont bother. Uses its own skybox
-//		if (!Q_stricmp(STRING(gpGlobals->mapname), "portal_06"))
-//			return;
-//
-//		if (day->GetBool() || day_rav->GetBool())
-//		{
-//			if (IsCityMap(gpGlobals->mapname.ToCStr()) && day->GetBool())
-//			{
-//				if (!bDidFilterOn)
-//				{
-//					clientengine->ClientCmd_Unrestricted("tf2");
-//					clientengine->ClientCmd_Unrestricted("alias Amod_ToggleFilter");
-//				}
-//				bDidFilterOn = true;
-//
-//				sname->SetValue("sky_day02_09");
-//
-//				if (KvSkyes)
-//					DoFogOverride(KvSkyes);
-//				else
-//					DefaultFogOverride();
-//
-//				return;
-//			}
-//			else if (day_rav->GetBool() && Q_strcmp(gpGlobals->mapname.ToCStr(), "d1_town_05_d") && Q_strstr(gpGlobals->mapname.ToCStr(), "d1_town_"))
-//			{
-//				if (!bDidFilterOn)
-//				{
-//					clientengine->ClientCmd_Unrestricted("tf2");
-//					clientengine->ClientCmd_Unrestricted("alias Amod_ToggleFilter");
-//				}
-//				bDidFilterOn = true;
-//
-//				sname->SetValue("sky_day01_05");
-//
-//				if (KvSkyes)
-//					DoFogOverride(KvSkyes);
-//				else
-//					DefaultFogOverride();
-//
-//				return;
-//			}
-//			else
-//			{
-//				if (bDidFilterOn)
-//				{
-//					clientengine->ClientCmd_Unrestricted("alias Amod_ToggleFilter tf2; tf1");
-//					bDidFilterOn = false;
-//				}
-//
-//				fog_override->SetValue(false);
-//
-//				if (((!Q_strcmp(sname->GetString(), "sky_day02_09") && Q_strcmp(amod_sky.GetString(), "sky_day02_09")) || (Q_strcmp(sname->GetString(), "sky_day02_09") && Q_strcmp(amod_sky.GetString(), "sky_day02_09")))
-//					|| ((!Q_strcmp(sname->GetString(), "sky_day01_05") && Q_strcmp(amod_sky.GetString(), "sky_day01_05")) || (Q_strcmp(sname->GetString(), "sky_day01_05") && Q_strcmp(amod_sky.GetString(), "sky_day01_05"))))
-//					sname->SetValue(amod_sky.GetString());
-//				else
-//					sname->SetValue("sky_borealis01");
-//			}
-//		}
-//		else
-//		{
-//			if (bDidFilterOn)
-//			{
-//				clientengine->ClientCmd_Unrestricted("alias Amod_ToggleFilter tf2; tf1");
-//				bDidFilterOn = false;
-//			}
-//
-//			fog_override->SetValue(false);
-//
-//			if (((!Q_strcmp(sname->GetString(), "sky_day02_09") && Q_strcmp(amod_sky.GetString(), "sky_day02_09")) || (Q_strcmp(sname->GetString(), "sky_day02_09") && Q_strcmp(amod_sky.GetString(), "sky_day02_09")))
-//				|| ((!Q_strcmp(sname->GetString(), "sky_day01_05") && Q_strcmp(amod_sky.GetString(), "sky_day01_05")) || (Q_strcmp(sname->GetString(), "sky_day01_05") && Q_strcmp(amod_sky.GetString(), "sky_day01_05"))))
-//				sname->SetValue(amod_sky.GetString());
-//			else
-//				sname->SetValue("sky_borealis01");
-//		}
-//	}
-//
-//	void LevelInitPostEntity()
-//	{
-//		CBaseEntity* cc = CreateEpicFilter();
-//
-//		if (amod_epic_filter.GetBool())
-//			cc->AcceptInput("Enable", nullptr, nullptr, variant_t{}, 0);
-//		else
-//			cc->AcceptInput("Disable", nullptr, nullptr, variant_t{}, 0);
-//
-//		if (gpGlobals->eLoadType == MapLoad_Transition)
-//			clientengine->ClientCmd_Unrestricted("amod_songpanel_changelevel");
-//		else
-//			clientengine->ClientCmd_Unrestricted("amod_songpanel_newlevel");
-//	}
-//};
-//CAmodAutoGameSystem g_AmodAGS;
-//
-////simple entity for background06_d
+#include "cbase.h"
+#include "cdll_int.h"
+#include "fmtstr.h"
+#include "AloneMod/Amod_SharedDefs.h"
+#include <filesystem.h>
+#include "../client/AloneMod/DynamicSky.h"
+
+#if !AMOD_DAYTIME_EDITION
+
+#define AMOD_EPIC_FILTER_INTENSITY_DEFAULT_DAYTIME "0.325"
+
+extern IVEngineClient* clientengine;
+
+//change callbacks
+void AmodSkyCallback(IConVar* var, const char*, float);
+void AmodEpicFilterCallback(IConVar* var, const char*, float);
+void AmodEpicFilterChangedDataCallback(IConVar* var, const char*, float);
+void AmodCloudsChangeCallback(IConVar* var, const char*, float);
+void AmodSunChangeCallback(IConVar* var, const char*, float);
+
+//sky
+ConVar amod_sky_override("amod_sky_override", "1");
+ConVar amod_night_sky("amod_night_sky", "", 0, "", AmodSkyCallback);
+ConVar amod_day_sky("amod_day_sky", "", 0, "", AmodSkyCallback);
+
+//epic filter
+ConVar amod_epic_filter("amod_epic_filter", "0", 0, "", AmodEpicFilterCallback);
+ConVar amod_epic_filter_night_filename("amod_epic_filter_night_filename", "", 0, "", AmodEpicFilterChangedDataCallback);
+ConVar amod_epic_filter_night_intensity("amod_epic_filter_night_intensity", "", 0, "", AmodEpicFilterChangedDataCallback);
+ConVar amod_epic_filter_day_filename("amod_epic_filter_day_filename", "", 0, "", AmodEpicFilterChangedDataCallback);
+ConVar amod_epic_filter_day_intensity("amod_epic_filter_day_intensity", "", 0, "", AmodEpicFilterChangedDataCallback);
+
+//alone mod clouds convar
+ConVar amod_clouds("amod_clouds", "0", 0, "", AmodCloudsChangeCallback);
+ConVar amod_clouds_color("amod_clouds_color", "255 255 255 255", 0, "", AmodCloudsChangeCallback);
+ConVar amod_clouds_color_override("amod_clouds_color_override", "0", 0, "", AmodCloudsChangeCallback);
+
+//sun
+ConVar amod_sun_disable("amod_sun_disable", "0", 0, "", AmodSunChangeCallback);
+
+//--------------------------------------------------------------------------------------------
+// Purpose: Alone mod clouds change callback
+//--------------------------------------------------------------------------------------------
+void AmodCloudsChangeCallback(IConVar* var, const char*, float)
+{
+	//check to see if we are connected or not
+	if (!clientengine->IsConnected())
+		return;
+
+	//find the clouds brush
+	CBaseEntity* pEntity = gEntList.FindEntityByName(nullptr, "brush_clouds");
+	if (!pEntity)
+		return;
+
+	//set the clouds color
+	int icolor[4];
+
+	//convert alpha
+	if (amod_clouds_color_override.GetBool())
+	{
+		UTIL_StringToIntArray(icolor, 4, amod_clouds_color.GetString());
+		float a = icolor[3] / 255.0f;
+		icolor[0] = (int)((float)icolor[0] * a);
+		icolor[1] = (int)((float)icolor[1] * a);
+		icolor[2] = (int)((float)icolor[2] * a);
+	}
+	else
+	{
+		//get the string
+		MapTimeInfo_t& info = GetMapTimeInfo(V_GetFileName(gpGlobals->mapname.ToCStr()));
+		const char* color = StringFromMapTimeStringTableIndex(IsDaytimeEnabled() ? info.DayInfo.CloudsColor : info.NightInfo.CloudsColor);
+
+		//get the color now
+		UTIL_StringToIntArray(icolor, 4, color);
+		float a = icolor[3] / 255.0f;
+		icolor[0] = (int)((float)icolor[0] * a);
+		icolor[1] = (int)((float)icolor[1] * a);
+		icolor[2] = (int)((float)icolor[2] * a);
+	}
+
+	pEntity->SetRenderColor(icolor[0], icolor[1], icolor[2]);
+
+	//enable or disable
+	if (amod_clouds.GetBool())
+	{
+		pEntity->AcceptInput("enable", nullptr, nullptr, variant_t{}, 0);
+	}
+	else
+	{
+		pEntity->AcceptInput("disable", nullptr, nullptr, variant_t{}, 0);
+	}
+}
+
+//--------------------------------------------------------------------------------------------
+// Purpose: Creates and returns the epic color correction filter
+//--------------------------------------------------------------------------------------------
+CBaseEntity* CreateEpicFilter()
+{
+	//look for the epic filter first
+	CBaseEntity* cc = gEntList.FindEntityByName(nullptr, "_cc_epic_filter_");
+	if (cc)
+		return cc;
+
+	cc = CreateEntityByName("color_correction");
+	cc->KeyValue("targetname", "_cc_epic_filter_");
+	cc->KeyValue("minfalloff", "-1");
+	cc->KeyValue("maxfalloff", "-1");
+
+	//dont set the filename or weight here. The stuff gets set in the AmodEpicFilterCallback and CAmodAutoSystem::LevelInitPreEntity()
+
+	cc->Precache();
+	DispatchSpawn(cc);
+	cc->Activate();
+
+	return cc;
+}
+
+//--------------------------------------------------------------------------------------------
+// Purpose: Change callback for the amod_sky convars
+//--------------------------------------------------------------------------------------------
+void AmodSkyCallback(IConVar* var, const char* oldstring, float)
+{
+	//see if we should override the sky or not
+	if (!amod_sky_override.GetBool())
+		return;
+
+	//check for episode map
+	if (IsInvalidChangeMap(gpGlobals->mapname.ToCStr()))
+		return;
+
+	//get the convar type
+	bool CalledFromDayConvar = cvar->FindVar(var->GetName()) == &amod_day_sky;
+
+	//see if the sky is already \amod_*_sky
+	if ((CalledFromDayConvar && !Q_stricmp(amod_day_sky.GetString(), oldstring)) || (!CalledFromDayConvar && !Q_stricmp(amod_night_sky.GetString(), oldstring)))
+		return;
+
+	//if dynamic sky is enabled then dont bother
+#if USES_DYNAMIC_SKY
+	if (ConVarRef("modbase_dynamic_skybox").GetBool())
+	{
+		clientengine->ClientCmd("_amod_day_do");
+		return;
+	}
+#endif
+
+	//check if its currently day or night
+	if ((IsDaytimeEnabled() && CalledFromDayConvar) || (!IsDaytimeEnabled() && !CalledFromDayConvar))
+	{
+		if (gpGlobals->eLoadType == MapLoad_Background)
+			clientengine->ExecuteClientCmd(CFmtStr("map_background %s", gpGlobals->mapname.ToCStr()));
+		else
+			clientengine->ExecuteClientCmd("save quick001_sky; load quick001_sky");
+	}
+}
+
+//--------------------------------------------------------------------------------------------
+// Purpose: Enables/disables the epic filter
+//--------------------------------------------------------------------------------------------
+void AmodEpicFilterCallback(IConVar* var, const char*, float)
+{
+	if (!clientengine->IsConnected())
+		return;
+
+	//if the epic filter is invalid. Then we are calling this before entities are initalized OR whilst shutting down.
+	//This is because the epic filter gets created when all the entities are created.
+	CBaseEntity* cc = gEntList.FindEntityByName(nullptr, "_cc_epic_filter_");
+	if (!cc)
+		return;
+
+	//get the map info
+	MapTimeInfo_t& info = GetMapTimeInfo(V_GetFileName(gpGlobals->mapname.ToCStr()));
+
+	//set the color correction differently if daytime
+	if (IsDaytimeEnabled())
+	{
+		// check for invalid map
+		if (IsInvalidChangeMap(gpGlobals->mapname.ToCStr()))
+		{
+			cc->KeyValue("filename", "scripts/colorcorrection/cc_epic_filter.raw");
+			cc->KeyValue("maxweight", "0.6");
+
+		}
+		else
+		{
+			//check the convars
+			const char* filename = amod_epic_filter_day_filename.GetString();
+			if (!filename[0])
+				filename = StringFromMapTimeStringTableIndex(info.DayInfo.FilterName);
+
+			const char* intensity = amod_epic_filter_day_intensity.GetString();
+			if (!intensity[0])
+				intensity = StringFromMapTimeStringTableIndex(info.DayInfo.FilterIntensity);
+
+			cc->KeyValue("filename", filename);
+			cc->KeyValue("maxweight", atof(intensity));
+		}
+	}
+	else
+	{
+		// check for invalid map
+		if (IsInvalidChangeMap(gpGlobals->mapname.ToCStr()))
+		{
+			cc->KeyValue("filename", "scripts/colorcorrection/cc_epic_filter.raw");
+			cc->KeyValue("maxweight", "0.6");
+		}
+		else
+		{
+			//check the convars
+			const char* filename = amod_epic_filter_night_filename.GetString();
+			if (!filename[0])
+				filename = StringFromMapTimeStringTableIndex(info.NightInfo.FilterName);
+
+			const char* intensity = amod_epic_filter_night_intensity.GetString();
+			if (!intensity[0])
+				intensity = StringFromMapTimeStringTableIndex(info.NightInfo.FilterIntensity);
+
+			//set vars
+			cc->KeyValue("filename", filename);
+			cc->KeyValue("maxweight", atof(intensity));
+		}
+	}
+
+	//enable or disable
+	if (amod_epic_filter.GetBool())
+		cc->AcceptInput("Enable", nullptr, nullptr, variant_t{}, 0);
+	else
+		cc->AcceptInput("Disable", nullptr, nullptr, variant_t{}, 0);
+}
+
+//--------------------------------------------------------------------------------------------
+// Purpose: Sets the fog for the daytime stuff
+//--------------------------------------------------------------------------------------------
+void SetFogForTime(MapTimeInfo_t& info)
+{
+	bool disabled = !info.DayInfo.FogEnabled || info.DayInfo.FogInfo.Count() <= 0;
+	if (!IsDaytimeEnabled())
+		disabled = !info.NightInfo.FogEnabled || info.NightInfo.FogInfo.Count() <= 0;
+
+	//is fog override disabled?
+	if (disabled)
+	{
+		clientengine->ClientCmd("fog_override 0");
+		return;
+	}
+
+	CUtlVector<MapTimeInfo_t::FogInfo_t>& finfo = IsDaytimeEnabled() ? info.DayInfo.FogInfo : info.NightInfo.FogInfo;
+
+	for (int i = 0; i < finfo.Count(); i++)
+	{
+		//execute the fog vars
+		clientengine->ClientCmd_Unrestricted(CFmtStr("%s %s", StringFromMapTimeStringTableIndex(finfo[i].convar), StringFromMapTimeStringTableIndex(finfo[i].value)));
+	}
+}
+
+//--------------------------------------------------------------------------------------------
+// Purpose: Sets the env_sun for the daytime stuff
+//--------------------------------------------------------------------------------------------
+void SetSunForDaytime(MapTimeInfo_t& info)
+{
+	//remove current sun
+	CBaseEntity* currentsun = gEntList.FindEntityByClassname(nullptr, "env_sun");
+	if (currentsun)
+		UTIL_RemoveImmediate(currentsun);
+
+	if (!info.DayInfo.SunInfoEnabled || info.DayInfo.SunInfo.Count() <= 0 || !IsDaytimeEnabled() || amod_sun_disable.GetBool())
+		return;
+
+	//create the new sun
+	currentsun = CreateEntityByName("env_sun");
+
+	for (int i = 0; i < info.DayInfo.SunInfo.Count(); i++)
+		currentsun->KeyValue(StringFromMapTimeStringTableIndex(info.DayInfo.SunInfo[i].key), StringFromMapTimeStringTableIndex(info.DayInfo.SunInfo[i].value));
+
+	currentsun->Precache();
+	DispatchSpawn(currentsun);
+	currentsun->Activate();
+}
+
+//--------------------------------------------------------------------------------------------
+// Purpose: Alone mod clouds change callback
+//--------------------------------------------------------------------------------------------
+void AmodSunChangeCallback(IConVar* var, const char*, float)
+{
+	//remove current sun
+	if (amod_sun_disable.GetBool())
+	{
+		CBaseEntity* currentsun = gEntList.FindEntityByClassname(nullptr, "env_sun");
+		if (currentsun)
+			UTIL_RemoveImmediate(currentsun);
+	}
+	else
+	{
+		SetSunForDaytime(GetMapTimeInfo(V_GetFileName(gpGlobals->mapname.ToCStr())));
+	}
+}
+
+
+//alone mod auto game system for epic filter and day/night system
+class CAmodAutoGameSystem : public CAutoGameSystem
+{
+public:
+	void LevelInitPreEntity()
+	{
+		static ConVar* sname = cvar->FindVar("sv_skyname");
+		if (!sname)
+			return;
+
+		bool daytime = IsDaytimeEnabled();
+
+		//enable bloom for daytime maps
+		if (daytime)
+		{
+			clientengine->ClientCmd("mat_force_bloom 1");
+			clientengine->ClientCmd("mat_bloomscale 1");
+			clientengine->ClientCmd("mat_bloom_scalefactor_scalar 0.4");
+		}
+		else
+			clientengine->ClientCmd("mat_force_bloom 0");
+
+		//reset the fog vars var
+		clientengine->ClientCmd_Unrestricted("fog_override 0");
+		clientengine->ClientCmd_Unrestricted("r_pixelfog 1");
+		clientengine->ClientCmd_Unrestricted("r_farz -1");
+
+		//no overriding for invalid change maps
+		if (IsInvalidChangeMap(gpGlobals->mapname.ToCStr()))
+			return;
+
+		//get the time info
+		MapTimeInfo_t& info = GetMapTimeInfo(V_GetFileName(gpGlobals->mapname.ToCStr()));
+
+		//get the current sky name
+		const char* skyname = "";
+		if (daytime)
+		{
+			skyname = StringFromMapTimeStringTableIndex(info.DayInfo.DefaultDaySky);
+			if (amod_day_sky.GetString()[0])
+				skyname = amod_day_sky.GetString();
+		}
+		else
+		{
+			skyname = StringFromMapTimeStringTableIndex(info.NightInfo.DefaultNightSky);
+			if (amod_night_sky.GetString()[0])
+				skyname = amod_night_sky.GetString();
+		}
+
+		//set the skyname convar
+		sname->SetValue(skyname);
+
+		//enable/disable the filter if day or not
+		static bool bDidFilterOn = false;
+		if (daytime && !bDidFilterOn)
+		{
+			clientengine->ClientCmd_Unrestricted("tf2");
+			clientengine->ClientCmd_Unrestricted("alias Amod_ToggleFilter");
+			bDidFilterOn = true;
+		}
+		else if (!daytime && bDidFilterOn)
+		{
+			clientengine->ClientCmd_Unrestricted("alias Amod_ToggleFilter tf2; tf1");
+			bDidFilterOn = false;
+		}
+
+		//set the fog
+		SetFogForTime(info);
+	}
+
+	void LevelInitPostEntity()
+	{
+		//create/enabble the epic filter
+		CBaseEntity* cc = CreateEpicFilter();
+
+		//get the map info
+		MapTimeInfo_t& info = GetMapTimeInfo(V_GetFileName(gpGlobals->mapname.ToCStr()));
+
+		//set the color correction differently if daytime
+		if (IsDaytimeEnabled())
+		{
+			//check the convars
+			const char* filename = amod_epic_filter_day_filename.GetString();
+			if (!filename[0])
+				filename = StringFromMapTimeStringTableIndex(info.DayInfo.FilterName);
+			
+			const char* intensity = amod_epic_filter_day_intensity.GetString();
+			if (!intensity[0])
+				intensity = StringFromMapTimeStringTableIndex(info.DayInfo.FilterIntensity);
+
+			cc->KeyValue("filename", filename);
+			cc->KeyValue("maxweight", atof(intensity));
+		}
+		else
+		{
+			//check the convars
+			const char* filename = amod_epic_filter_night_filename.GetString();
+			if (!filename[0])
+				filename = StringFromMapTimeStringTableIndex(info.NightInfo.FilterName);
+
+			const char* intensity = amod_epic_filter_night_intensity.GetString();
+			if (!intensity[0])
+				intensity = StringFromMapTimeStringTableIndex(info.NightInfo.FilterIntensity);
+
+			//set vars
+			cc->KeyValue("filename", filename);
+			cc->KeyValue("maxweight", atof(intensity));
+		}
+
+		if (amod_epic_filter.GetBool())
+			cc->AcceptInput("Enable", nullptr, nullptr, variant_t{}, 0);
+		else
+			cc->AcceptInput("Disable", nullptr, nullptr, variant_t{}, 0);
+
+		//transition the song panel
+		if (gpGlobals->eLoadType == MapLoad_Transition)
+			clientengine->ClientCmd_Unrestricted("amod_songpanel_changelevel");
+		else
+			clientengine->ClientCmd_Unrestricted("amod_songpanel_newlevel");
+
+		//set the sun for the daytime info
+		SetSunForDaytime(info);
+
+		//find the clouds brush
+		CBaseEntity* pEntity = gEntList.FindEntityByName(nullptr, "brush_clouds");
+		if (!pEntity)
+			return;
+
+		//enable or disable
+		if (amod_clouds.GetBool())
+			pEntity->AcceptInput("enable", nullptr, nullptr, variant_t{}, 0);
+		else
+			pEntity->AcceptInput("disable", nullptr, nullptr, variant_t{}, 0);
+
+		//set the clouds color
+		int icolor[4];
+
+		//convert alpha
+		if (amod_clouds_color_override.GetBool())
+		{
+			//get the color
+			UTIL_StringToIntArray(icolor, 4, amod_clouds_color.GetString());
+			float a = icolor[3] / 255.0f;
+			icolor[0] = (int)((float)icolor[0] * a);
+			icolor[1] = (int)((float)icolor[1] * a);
+			icolor[2] = (int)((float)icolor[2] * a);
+		}
+		else
+		{
+			//get the string
+			const char* color = StringFromMapTimeStringTableIndex(IsDaytimeEnabled() ? info.DayInfo.CloudsColor : info.NightInfo.CloudsColor);
+
+			//get the color now
+			UTIL_StringToIntArray(icolor, 4, color);
+			float a = icolor[3] / 255.0f;
+			icolor[0] = (int)((float)icolor[0] * a);
+			icolor[1] = (int)((float)icolor[1] * a);
+			icolor[2] = (int)((float)icolor[2] * a);
+		}
+
+		pEntity->SetRenderColor(icolor[0], icolor[1], icolor[2]);
+	}
+};
+static CAmodAutoGameSystem g_AmodAutoGameSystem;
+
+
+//updates the daytime if dynamic skyboxes are being used
+CON_COMMAND(_amod_day_do, "")
+{
+	g_AmodAutoGameSystem.LevelInitPreEntity();
+	g_AmodAutoGameSystem.LevelInitPostEntity();
+}
+
+
+//--------------------------------------------------------------------------------------------
+// Purpose: Changes the data for the epic filter
+//--------------------------------------------------------------------------------------------
+void AmodEpicFilterChangedDataCallback(IConVar* var, const char*, float)
+{
+	if (!clientengine->IsConnected())
+		return;
+
+	//hack: call this to update the filter
+	g_AmodAutoGameSystem.LevelInitPostEntity();
+}
+
+
+
+//simple fog setter for background06_d
 //class CAmodFogSetter : public CBaseEntity
 //{
 //public:
@@ -358,527 +510,28 @@
 //	if (!amod_day.GetBool())
 //		return;
 //
+//	//set the fog
 //	m_szFogName = AllocPooledString(input.value.String());
-//	DoFogOverride(KvSkyes, m_szFogName.ToCStr());
+//	SetFogForDaytime(GetMapTimeInfo(m_szFogName.ToCStr()));
 //}
 //
 //void CAmodFogSetter::OnRestore()
 //{
+//	BaseClass::OnRestore();
 //	static ConVarRef amod_day("amod_day");
 //	if (!amod_day.GetBool())
 //		return;
 //
-//	DoFogOverride(KvSkyes, m_szFogName.ToCStr());
-//	BaseClass::OnRestore();
+//	//set the fog
+//	SetFogForDaytime(GetMapTimeInfo(V_GetFileName(gpGlobals->mapname.ToCStr())));
 //}
-//
-//#endif
-//
-////core timer thinggy
-//class CAmodCoreTimer : public CBaseEntity
-//{
-//public:
-//	DECLARE_CLASS(CAmodCoreTimer, CBaseEntity);
-//	DECLARE_DATADESC();
-//
-//	CAmodCoreTimer()
-//	{
-//		m_bEnabled = true;
-//	}
-//
-//	void InputStartCoreTimer(inputdata_t& input);
-//	void InputStartCitadelTimer(inputdata_t& input);
-//
-//	void InputStopCoreTimer(inputdata_t& input);
-//	void InputStopCitadelTimer(inputdata_t& input);
-//
-//	void InputShowCoreTime(inputdata_t& input);
-//	void InputShowCitadelTime(inputdata_t& input);
-//
-//	void InputDisable(inputdata_t& input)
-//	{
-//		m_bEnabled = false;
-//	}
-//private:
-//	bool m_bEnabled = true;
-//};
-//
-//LINK_ENTITY_TO_CLASS(amod_core_timer, CAmodCoreTimer);
-//
-//BEGIN_DATADESC(CAmodCoreTimer)
-//DEFINE_INPUTFUNC(FIELD_INTEGER, "StartCoreTimer", InputStartCoreTimer),
-//DEFINE_INPUTFUNC(FIELD_INTEGER, "StartCitadelTimer", InputStartCitadelTimer),
-//DEFINE_INPUTFUNC(FIELD_VOID, "StopCoreTimer", InputStopCoreTimer),
-//DEFINE_INPUTFUNC(FIELD_VOID, "StopCitadelTimer", InputStopCitadelTimer),
-//DEFINE_INPUTFUNC(FIELD_VOID, "ShowCoreTime", InputShowCoreTime),
-//DEFINE_INPUTFUNC(FIELD_VOID, "ShowCitadel", InputShowCitadelTime),
-//DEFINE_INPUTFUNC(FIELD_VOID, "Disable", InputDisable),
-//END_DATADESC()
-//
-//ConVar amod_do_core_timer("amod_do_core_timer", "1");
-//ConVar amod_do_citadel_timer("amod_do_citadel_timer", "1");
-//
-//void CAmodCoreTimer::InputStartCoreTimer(inputdata_t& input)
-//{
-//	if (!amod_do_core_timer.GetBool())
-//		return;
-//
-//	int seconds = input.value.Int();
-//
-//	CBasePlayer* pPlayer = UTIL_GetLocalPlayer();
-//	pPlayer->m_fCoreTimerTime = gpGlobals->curtime + (float)seconds;
-//	pPlayer->m_bInCoreTimer = true;
-//
-//	char buf[128];
-//	Q_snprintf(buf, sizeof(buf), "%d:%02d Minutes Till Core Collapse", seconds / 60, seconds % 60);
-//	UTIL_HudHintText(pPlayer, buf);
-//}
-//
-//void CAmodCoreTimer::InputStartCitadelTimer(inputdata_t& input)
-//{
-//	if (!amod_do_citadel_timer.GetBool())
-//		return;
-//
-//	int seconds = input.value.Int();
-//
-//	CBasePlayer* pPlayer = UTIL_GetLocalPlayer();
-//	pPlayer->m_fCitadelTimerTime = gpGlobals->curtime + (float)seconds;
-//	pPlayer->m_bInCitadelTimer = true;
-//
-//
-//	char buf[128];
-//	Q_snprintf(buf, sizeof(buf), "%d:%02d Minutes Till Citadel Explosion", seconds / 60, seconds % 60);
-//	UTIL_HudHintText(pPlayer, buf);
-//}
-//
-//void CAmodCoreTimer::InputStopCoreTimer(inputdata_t& input)
-//{
-//	if (!amod_do_core_timer.GetBool())
-//		return;
-//
-//	CBasePlayer* pPlayer = UTIL_GetLocalPlayer();
-//	UTIL_HudHintText(pPlayer, "Citadel Core Neutralized");
-//	pPlayer->m_bInCoreTimer = false;
-//}
-//
-//void CAmodCoreTimer::InputStopCitadelTimer(inputdata_t& input)
-//{
-//	if (!amod_do_citadel_timer.GetBool())
-//		return;
-//
-//	CBasePlayer* pPlayer = UTIL_GetLocalPlayer();
-//	pPlayer->m_bInCitadelTimer = false;
-//	UTIL_HudHintText(pPlayer, "Citadel Explosion Starting Now..");
-//}
-//
-//void CAmodCoreTimer::InputShowCitadelTime(inputdata_t& input)
-//{
-//	if (!m_bEnabled || !amod_do_citadel_timer.GetBool())
-//		return;
-//
-//	CBasePlayer* pPlayer = UTIL_GetLocalPlayer();
-//	if (!pPlayer->m_bInCitadelTimer)
-//		return;
-//
-//	char buf[128];
-//	int ctime = (int)(pPlayer->m_fCitadelTimerTime - gpGlobals->curtime);
-//	Q_snprintf(buf, sizeof(buf), "%d:%02d Minutes Till Citadel Explosion", (int)(ctime / 60), (int)((int)ctime % 60));
-//	UTIL_HudHintText(pPlayer, buf);
-//}
-//
-//void CAmodCoreTimer::InputShowCoreTime(inputdata_t& input)
-//{
-//	if (!m_bEnabled || !amod_do_core_timer.GetBool())
-//		return;
-//
-//	CBasePlayer* pPlayer = UTIL_GetLocalPlayer();
-//	if (!pPlayer->m_bInCoreTimer)
-//		return;
-//
-//	char buf[128];
-//	int ctime = (int)(pPlayer->m_fCoreTimerTime - gpGlobals->curtime);
-//	Q_snprintf(buf, sizeof(buf), "%d:%02d Minutes Till Core Collapse", (int)(ctime / 60), (int)((int)ctime % 60));
-//	UTIL_HudHintText(pPlayer, buf);
-//}
-
-
-//hello anyone reading this.
-
-//I coded this over a year ago so thats why the code is so shit (i didnt start adding comments to my code untill 10+ish months ago). I tried to change it but there's so much shit in here its pretty much impossible to find out what to change + everything breaks. So im just gonna leave this here.
-
-#include "cbase.h"
-#include "cdll_int.h"
-#include "fmtstr.h"
-#include <filesystem.h>
-#include "AloneMod/Amod_SharedDefs.h"
-
-#if !AMOD_DAYTIME_EDITION
-
-extern IVEngineClient* clientengine;
-
-void AmodSkyCallback(IConVar* var, const char*, float);
-void AmodEpicFilterCallback(IConVar* var, const char*, float);
-
-ConVar amod_sky_override("amod_sky_override", "1");
-ConVar amod_sky("amod_sky", "sky_borealis01", 0, "", AmodSkyCallback);
-ConVar amod_epic_filter("amod_epic_filter", "0", 0, "", AmodEpicFilterCallback);
-
-//
-CBaseEntity* CreateEpicFilter()
-{
-	CBaseEntity* cc = gEntList.FindEntityByName(nullptr, "_cc_epic_filter_");
-	if (cc)
-		return cc;
-
-	cc = CreateEntityByName("color_correction");
-	cc->KeyValue("targetname", "_cc_epic_filter_");
-	cc->KeyValue("minfalloff", "-1");
-	cc->KeyValue("maxfalloff", "-1");
-	cc->KeyValue("maxweight", "0.8");
-	cc->KeyValue("filename", "scripts/colorcorrection/cc_epic_filter.raw");;
-
-	cc->Precache();
-	DispatchSpawn(cc);
-	cc->Activate();
-
-	return cc;
-}
-
-//im not even kidding i tinkered around with this for like an hour to get it to work
-void AmodSkyCallback(IConVar* var, const char*, float)
-{
-	if (!amod_sky_override.GetBool())
-		return;
-
-	if (Q_strstr(gpGlobals->mapname.ToCStr(), "ep1") || Q_strstr(gpGlobals->mapname.ToCStr(), "amod_outro") || !Q_strcmp(gpGlobals->mapname.ToCStr(), "background08_d") || !Q_strcmp(gpGlobals->mapname.ToCStr(), "background10_d"))
-		return;
-
-	static ConVar* day = cvar->FindVar("amod_day");
-	if (!day)
-		return;
-
-	if (day->GetBool() && Q_strcmp(amod_sky.GetString(), "sky_day02_09") && IsCityMap(gpGlobals->mapname.ToCStr()) || !clientengine->IsConnected())
-		return;
-
-	if (gpGlobals->eLoadType == MapLoad_Background)
-		clientengine->ExecuteClientCmd(CFmtStr("map_background %s", gpGlobals->mapname.ToCStr()));
-	else
-		clientengine->ExecuteClientCmd("save quick001_sky; load quick001_sky");
-}
-
-void AmodEpicFilterCallback(IConVar* var, const char*, float)
-{
-	if (!clientengine->IsConnected())
-		return;
-
-	CBaseEntity* epicfilter = gEntList.FindEntityByName(nullptr, "_cc_epic_filter_");
-	if (!epicfilter)
-	{
-		return;
-	}
-
-	if (amod_epic_filter.GetBool())
-		epicfilter->AcceptInput("Enable", nullptr, nullptr, variant_t{}, 0);
-	else
-		epicfilter->AcceptInput("Disable", nullptr, nullptr, variant_t{}, 0);
-}
-
-KeyValues* KvSkyes = nullptr;
-
-void DefaultFogOverride()
-{
-	clientengine->ClientCmd_Unrestricted("fog_override 1");
-
-	clientengine->ClientCmd_Unrestricted("fog_enable 1");
-	clientengine->ClientCmd_Unrestricted("fog_enableskybox 1");
-
-	clientengine->ClientCmd_Unrestricted("fog_start 1500");
-	clientengine->ClientCmd_Unrestricted("fog_end 2750");
-
-	clientengine->ClientCmd_Unrestricted("fog_startskybox 1500");
-	clientengine->ClientCmd_Unrestricted("fog_endskybox 3000");
-
-	clientengine->ClientCmd_Unrestricted("fog_maxdensity 0.95");
-	clientengine->ClientCmd_Unrestricted("fog_maxdensityskybox 0.8");
-
-	clientengine->ClientCmd_Unrestricted("fog_color 55 55 70");
-	clientengine->ClientCmd_Unrestricted("fog_colorskybox 55 55 70");
-
-	clientengine->ClientCmd_Unrestricted("r_farz -1");
-	clientengine->ClientCmd_Unrestricted("r_pixelfog 1");
-}
-
-void DoFogOverride(KeyValues* kv, const char* str = nullptr)
-{
-	KeyValues* mapkv = kv->FindKey(str ? str : gpGlobals->mapname.ToCStr());
-	if (!mapkv)
-	{
-		DefaultFogOverride();
-		return;
-	}
-
-	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_override %d", mapkv->GetBool("fog_override", true)));
-
-	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_enable %d", mapkv->GetBool("fog_enable", true)));
-	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_enableskybox %d", mapkv->GetBool("fog_enableskybox", true)));
-
-	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_start %d", mapkv->GetInt("fog_start", 1500)));
-	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_end %d", mapkv->GetInt("fog_end", 2750)));
-
-	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_startskybox %d", mapkv->GetInt("fog_startskybox", true)));
-	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_endskybox %d", mapkv->GetInt("fog_endskybox", true)));
-
-	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_maxdensity %f", mapkv->GetFloat("fog_maxdensity", 0.95)));
-	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_maxdensityskybox %f", mapkv->GetFloat("fog_maxdensityskybox", 0.7)));
-
-	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_color %s", mapkv->GetString("fog_color", "55 55 70")));
-	clientengine->ClientCmd_Unrestricted(CFmtStr("fog_colorskybox %s", mapkv->GetString("fog_colorskybox", "55 55 70")));
-
-	clientengine->ClientCmd_Unrestricted(CFmtStr("r_farz %s", mapkv->GetString("r_farz", "-1")));
-	clientengine->ClientCmd_Unrestricted(CFmtStr("r_pixelfog %d", mapkv->GetBool("r_pixelfog", true)));
-}
-
-CON_COMMAND(amod_fog_reset, "")
-{
-	ConVar* day = cvar->FindVar("amod_day");
-	if (!day)
-		return;
-
-	if (!day->GetBool())
-		return;
-
-	if (KvSkyes)
-		KvSkyes->deleteThis();
-
-	KvSkyes = nullptr;
-
-	KvSkyes = new KeyValues("");
-	if (!KvSkyes->LoadFromFile(filesystem, "resource\\amod_city_fogs.txt", "MOD"))
-	{
-		ConWarning("Failed To Load amod_city_fog.txt Day Time Section Use Default Fog\n");
-		KvSkyes->deleteThis();
-		KvSkyes = nullptr;
-
-		DefaultFogOverride();
-
-		return;
-	}
-	else
-	{
-
-		if (day->GetBool())
-		{
-			if (IsCityMap(gpGlobals->mapname.ToCStr()))
-			{
-				DoFogOverride(KvSkyes);
-			}
-		}
-	}
-}
-
-static bool bDidFilterOn = false;
-
-bool DoBonusMapCheck(const char* mapname)
-{
-	for (int i = 0; i < sizeof(g_pBonusMaps) / sizeof(g_pBonusMaps[0]); i++)
-	{
-		if (!Q_strcmp(g_pBonusMaps[i], mapname))
-		{
-			ConVar* sname = cvar->FindVar("sv_skyname");
-			if (sname && amod_sky_override.GetBool())
-				sname->SetValue(amod_sky.GetString());
-
-			return false;
-		}
-	}
-
-	return true;
-}
-
-//TODO: MAKE ALGORITHM SO I CAN USE MORE SKYBOXES
-class CAmodAutoGameSystem : public CAutoGameSystem
-{
-public:
-	void LevelInitPreEntity()
-	{
-		static ConVar* fog_override = cvar->FindVar("fog_override");
-		if (!fog_override)
-			return;
-
-		fog_override->SetValue(0);
-
-		//no 
-		if (Q_strstr(gpGlobals->mapname.ToCStr(), "ep1") || Q_strstr(gpGlobals->mapname.ToCStr(), "amod_outro") || !Q_strcmp(gpGlobals->mapname.ToCStr(), "background08_d") || !Q_strcmp(gpGlobals->mapname.ToCStr(), "background10_d"))
-			return;
-
-		if (!DoBonusMapCheck(gpGlobals->mapname.ToCStr()))
-			return;
-
-		if (!KvSkyes)
-		{
-			KvSkyes = new KeyValues("");
-			if (!KvSkyes->LoadFromFile(filesystem, "resource\\amod_city_fogs.txt", "MOD"))
-			{
-				ConWarning("Failed To Load amod_city_fog.txt Day Time Section Use Default Fog\n");
-				KvSkyes->deleteThis();
-				KvSkyes = nullptr;
-			}
-		}
-
-		clientengine->ClientCmd_Unrestricted("r_pixelfog 1");
-
-		if (!amod_sky_override.GetBool())
-			return;
-
-		static ConVar* sname = cvar->FindVar("sv_skyname");
-		if (!sname)
-			return;
-
-		static ConVar* day = cvar->FindVar("amod_day");
-		if (!day)
-			return;
-
-		static ConVar* day_rav = cvar->FindVar("amod_day_ravenholm");
-		if (!day_rav)
-			return;
-
-		//if portal_06 then dont bother. Uses its own skybox
-		if (!Q_stricmp(STRING(gpGlobals->mapname), "portal_06"))
-			return;
-
-		if (day->GetBool() || day_rav->GetBool())
-		{
-			if (IsCityMap(gpGlobals->mapname.ToCStr()) && day->GetBool())
-			{
-				if (!bDidFilterOn)
-				{
-					clientengine->ClientCmd_Unrestricted("tf2");
-					clientengine->ClientCmd_Unrestricted("alias Amod_ToggleFilter");
-				}
-				bDidFilterOn = true;
-
-				sname->SetValue("sky_day02_09");
-
-				if (KvSkyes)
-					DoFogOverride(KvSkyes);
-				else
-					DefaultFogOverride();
-
-				return;
-			}
-			else if (day_rav->GetBool() && Q_strcmp(gpGlobals->mapname.ToCStr(), "d1_town_05_d") && Q_strstr(gpGlobals->mapname.ToCStr(), "d1_town_"))
-			{
-				if (!bDidFilterOn)
-				{
-					clientengine->ClientCmd_Unrestricted("tf2");
-					clientengine->ClientCmd_Unrestricted("alias Amod_ToggleFilter");
-				}
-				bDidFilterOn = true;
-
-				sname->SetValue("sky_day01_05");
-
-				if (KvSkyes)
-					DoFogOverride(KvSkyes);
-				else
-					DefaultFogOverride();
-
-				return;
-			}
-			else
-			{
-				if (bDidFilterOn)
-				{
-					clientengine->ClientCmd_Unrestricted("alias Amod_ToggleFilter tf2; tf1");
-					bDidFilterOn = false;
-				}
-
-				fog_override->SetValue(false);
-
-				if (((!Q_strcmp(sname->GetString(), "sky_day02_09") && Q_strcmp(amod_sky.GetString(), "sky_day02_09")) || (Q_strcmp(sname->GetString(), "sky_day02_09") && Q_strcmp(amod_sky.GetString(), "sky_day02_09")))
-					|| ((!Q_strcmp(sname->GetString(), "sky_day01_05") && Q_strcmp(amod_sky.GetString(), "sky_day01_05")) || (Q_strcmp(sname->GetString(), "sky_day01_05") && Q_strcmp(amod_sky.GetString(), "sky_day01_05"))))
-					sname->SetValue(amod_sky.GetString());
-				else
-					sname->SetValue("sky_borealis01");
-			}
-		}
-		else
-		{
-			if (bDidFilterOn)
-			{
-				clientengine->ClientCmd_Unrestricted("alias Amod_ToggleFilter tf2; tf1");
-				bDidFilterOn = false;
-			}
-
-			fog_override->SetValue(false);
-
-			if (((!Q_strcmp(sname->GetString(), "sky_day02_09") && Q_strcmp(amod_sky.GetString(), "sky_day02_09")) || (Q_strcmp(sname->GetString(), "sky_day02_09") && Q_strcmp(amod_sky.GetString(), "sky_day02_09")))
-				|| ((!Q_strcmp(sname->GetString(), "sky_day01_05") && Q_strcmp(amod_sky.GetString(), "sky_day01_05")) || (Q_strcmp(sname->GetString(), "sky_day01_05") && Q_strcmp(amod_sky.GetString(), "sky_day01_05"))))
-				sname->SetValue(amod_sky.GetString());
-			else
-				sname->SetValue("sky_borealis01");
-		}
-	}
-
-	void LevelInitPostEntity()
-	{
-		CBaseEntity* cc = CreateEpicFilter();
-
-		if (amod_epic_filter.GetBool())
-			cc->AcceptInput("Enable", nullptr, nullptr, variant_t{}, 0);
-		else
-			cc->AcceptInput("Disable", nullptr, nullptr, variant_t{}, 0);
-
-		if (gpGlobals->eLoadType == MapLoad_Transition)
-			clientengine->ClientCmd_Unrestricted("amod_songpanel_changelevel");
-		else
-			clientengine->ClientCmd_Unrestricted("amod_songpanel_newlevel");
-	}
-};
-CAmodAutoGameSystem g_AmodAGS;
-
-//simple entity for background06_d
-class CAmodFogSetter : public CBaseEntity
-{
-public:
-	DECLARE_CLASS(CAmodFogSetter, CBaseEntity);
-	DECLARE_DATADESC();
-
-	void InputSetFog(inputdata_t& input);
-	void OnRestore();
-private:
-	string_t m_szFogName;
-};
-
-LINK_ENTITY_TO_CLASS(amod_fog_setter, CAmodFogSetter);
-
-BEGIN_DATADESC(CAmodFogSetter)
-DEFINE_KEYFIELD(m_szFogName, FIELD_STRING, "fogname"),
-DEFINE_INPUTFUNC(FIELD_STRING, "SetFog", InputSetFog)
-END_DATADESC()
-
-void CAmodFogSetter::InputSetFog(inputdata_t& input)
-{
-	static ConVarRef amod_day("amod_day");
-	if (!amod_day.GetBool())
-		return;
-
-	m_szFogName = AllocPooledString(input.value.String());
-	DoFogOverride(KvSkyes, m_szFogName.ToCStr());
-}
-
-void CAmodFogSetter::OnRestore()
-{
-	static ConVarRef amod_day("amod_day");
-	if (!amod_day.GetBool())
-		return;
-
-	DoFogOverride(KvSkyes, m_szFogName.ToCStr());
-	BaseClass::OnRestore();
-}
 
 #endif
 
-//core timer thinggy
+
+
+
+//core timer thinggy for episode 1
 class CAmodCoreTimer : public CBaseEntity
 {
 public:
@@ -890,19 +543,14 @@ public:
 		m_bEnabled = true;
 	}
 
+	//inputs
 	void InputStartCoreTimer(inputdata_t& input);
 	void InputStartCitadelTimer(inputdata_t& input);
-
 	void InputStopCoreTimer(inputdata_t& input);
 	void InputStopCitadelTimer(inputdata_t& input);
-
 	void InputShowCoreTime(inputdata_t& input);
 	void InputShowCitadelTime(inputdata_t& input);
-
-	void InputDisable(inputdata_t& input)
-	{
-		m_bEnabled = false;
-	}
+	void InputDisable(inputdata_t& input) { m_bEnabled = false; }
 private:
 	bool m_bEnabled = true;
 };
@@ -919,6 +567,7 @@ DEFINE_INPUTFUNC(FIELD_VOID, "ShowCitadel", InputShowCitadelTime),
 DEFINE_INPUTFUNC(FIELD_VOID, "Disable", InputDisable),
 END_DATADESC()
 
+//core timer convars
 ConVar amod_do_core_timer("amod_do_core_timer", "1");
 ConVar amod_do_citadel_timer("amod_do_citadel_timer", "1");
 

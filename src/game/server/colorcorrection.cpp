@@ -46,6 +46,19 @@ public:
 	void	InputSetFadeInDuration ( inputdata_t &inputdata );
 	void	InputSetFadeOutDuration ( inputdata_t &inputdata );
 
+	//temp
+	bool KeyValue(const char* key, const char* value)
+	{
+		if (!Q_stricmp(key, "filename"))
+		{
+			m_lookupFilename = AllocPooledString(value);
+			Q_strncpy(m_netlookupFilename.GetForModify(), value, MAX_PATH);
+			return true;
+		}
+
+		return BaseClass::KeyValue(key, value);
+	}
+
 private:
 	void	FadeIn ( void );
 	void	FadeOut ( void );

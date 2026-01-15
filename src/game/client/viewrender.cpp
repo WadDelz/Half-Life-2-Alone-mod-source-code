@@ -56,6 +56,7 @@
 
 //alone mod stuff
 #include "AloneMod/AmodCvars.h"
+#include "AloneMod/DynamicSky.h"
 
 #ifdef PORTAL
 //#include "C_Portal_Player.h"
@@ -1353,7 +1354,11 @@ void CViewRender::ViewDrawScene(bool bDrew3dSkybox, SkyboxVisibility_t nSkyboxVi
 		SetClearColorToFogColor();
 	}
 
+#ifdef USES_DYNAMIC_SKY
+	bool drawSkybox = g_PModBase_DynamicSkybox_bUse ? false : r_skybox.GetBool();
+#else
 	bool drawSkybox = r_skybox.GetBool();
+#endif
 	if (bDrew3dSkybox || (nSkyboxVisible == SKYBOX_NOT_VISIBLE))
 	{
 		drawSkybox = false;
@@ -4963,6 +4968,9 @@ SkyboxVisibility_t CSkyboxView::ComputeSkyboxVisibility()
 //-----------------------------------------------------------------------------
 bool CSkyboxView::GetSkyboxFogEnable()
 {
+	if (amod_fog_disabled.GetBool())
+		return false;
+
 	C_BasePlayer* pbp = C_BasePlayer::GetLocalPlayer();
 	if (!pbp)
 	{
@@ -5110,6 +5118,11 @@ void CSkyboxView::DrawInternal(view_id_t iSkyBoxViewID, bool bInvokePreAndPostRe
 
 	g_pClientShadowMgr->ComputeShadowTextures((*this), m_pWorldListInfo->m_LeafCount, m_pWorldListInfo->m_pLeafList);
 
+#ifdef USES_DYNAMIC_SKY
+	if (g_PModBase_DynamicSkybox_bUse)
+		ModBase_DrawSkyBox(view->GetZFar());
+#endif
+
 	DrawWorld(0.0f);
 
 	// Iterate over all leaves and render objects in those leaves
@@ -5156,6 +5169,12 @@ bool CSkyboxView::Setup(const CViewSetup& view, int* pClearFlags, SkyboxVisibili
 
 	if (!m_pSky3dParams)
 	{
+#ifdef USES_DYNAMIC_SKY
+		//modbase
+		if (g_PModBase_DynamicSkybox_bUse)
+			ModBase_DrawSkyBox(view.zFar);
+#endif
+
 		return false;
 	}
 
@@ -5166,7 +5185,11 @@ bool CSkyboxView::Setup(const CViewSetup& view, int* pClearFlags, SkyboxVisibili
 	*pClearFlags |= VIEW_CLEAR_DEPTH; // Need to clear depth after rednering the skybox
 
 	m_DrawFlags = DF_RENDER_UNDERWATER | DF_RENDER_ABOVEWATER | DF_RENDER_WATER;
-	if (r_skybox.GetBool())
+#ifdef USES_DYNAMIC_SKY
+	if (r_skybox.GetBool() && !g_PModBase_DynamicSkybox_bUse) //modbase
+#else
+	if (r_skybox.GetBool()) //modbase
+#endif
 	{
 		m_DrawFlags |= DF_DRAWSKYBOX;
 	}

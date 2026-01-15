@@ -20,12 +20,13 @@
 #include "AloneMod/AmodCvars.h"
 #include "movevars_shared.h"
 #include "AloneMod/Amod_SharedDefs.h"
+#include "AloneMod/geo guesser/GG_MiniMap.h"
+#include "AloneMod/ColorPicker.h"
 
 using namespace vgui;
 
 //convar declirations
 void AmodDayChangeCallback(IConVar* var, const char*, float);
-void AmodDayRavChangeCallback(IConVar* var, const char*, float);
 
 //writes the alone mod config
 void Amod_WriteConfig();
@@ -33,7 +34,6 @@ void Amod_WriteConfig();
 #if !AMOD_DAYTIME_EDITION
 //day time convars
 ConVar amod_day("amod_day", "0", 0, "", AmodDayChangeCallback);
-ConVar amod_day_ravenholm("amod_day_ravenholm", "0", 0, "", AmodDayRavChangeCallback);
 #endif
 
 //use the new ending?
@@ -51,6 +51,9 @@ public:
 	void LevelInitPreEntity()
 	{
 		szMapName = MapName();
+
+		//enable/disable the skybox button/panel for the options panel if needed
+		optionspanel->SetSkyboxButtonEnabled(!IsInvalidChangeMap(szMapName));
 	}
 	
 	//called on game shutdown
@@ -127,6 +130,8 @@ CAModCreditsPanel::~CAModCreditsPanel()
 
 //alone mod weather panel
 #define WEATHER_PANEL_COMMAND_APPLY "Apply"
+#define WEATHER_PANEL_COMMAND_CLOUDS_COLOR "SetCloudsColor"
+#define WEATHER_PANEL_COMMAND_CLOUDS_OVERRIDE "OverrideCloudsColor"
 
 class CAModWeatherPanel : public vgui::Frame
 {
@@ -141,12 +146,19 @@ public:
 	void OnCommand(const char* command);
 	void OnKeyCodePressed(KeyCode code);
 
+	void Paint();
+
+	//called when the color picker picks a color
+	MESSAGE_FUNC_PARAMS(OnColorSelected, "ColorSelected", data);
+
 	//destructor
 	~CAModWeatherPanel();
 private:
 
 	//panel items
-	CheckButton* m_cbWeatherInfo;
+	CheckButton* m_cbClouds;
+	CheckButton* m_cbCloudsOverrideColor;
+	Button* m_ButtonCloudsColor;
 	CheckButton* m_cbBreaths;
 	CheckButton* m_cbEnable;
 	CheckButton* m_cbThunder;
@@ -157,6 +169,10 @@ private:
 	Slider* m_RainWaitTimeMaxSlider;
 	ComboBox* m_cbType;
 	ComboBox* m_cbMode;
+
+	//clouds color
+	CColorPicker* m_CloudsColorPicker;
+	Color m_CurrentCloudsColor;
 };
 
 //rain densities
@@ -202,10 +218,10 @@ CAModWeatherPanel::CAModWeatherPanel() : vgui::Frame(nullptr, "CAModWeatherPanel
 	SetScheme(vgui::scheme()->LoadSchemeFromFile("resource/SourceScheme.res", "SourceScheme"));
 
 	//set bounds and title
-	SetBounds(100, 100, 200, 330);
+	SetBounds(100, 100, 200, 384);
 	SetTitle("Weather Settings", false);
 	MoveToCenterOfScreen();
-
+		
 	//load the convars for the settings
 	ConVarRef amod_do_breathing("amod_do_breathing");
 	ConVarRef amod_rain_type("amod_rain_type");
@@ -215,20 +231,41 @@ CAModWeatherPanel::CAModWeatherPanel() : vgui::Frame(nullptr, "CAModWeatherPanel
 	ConVarRef amod_rain_wait_min("amod_rain_wait_min");
 	ConVarRef amod_rain_wait_max("amod_rain_wait_max");
 	ConVarRef amod_clouds("amod_clouds");
+	ConVarRef amod_clouds_color("amod_clouds_color");
+	ConVarRef amod_clouds_color_override("amod_clouds_color_override");
 	ConVarRef r_raindensity("r_raindensity");
 
+	//set the clouds color
+	int cloudscolor[4];
+	UTIL_StringToIntArray(cloudscolor, 4, amod_clouds_color.GetString());
+	m_CurrentCloudsColor.SetColor(cloudscolor[0], cloudscolor[1], cloudscolor[2], cloudscolor[3]);
+
 	//create the 'Show weather info' check button
-	m_cbWeatherInfo = new CheckButton(this, "ShowClouds", "Show Moving Clouds");
-	m_cbWeatherInfo->SetSelected(amod_clouds.GetBool());
-	m_cbWeatherInfo->SetBounds(2, 21, 150, 25);
-	m_cbWeatherInfo->GetTooltip()->SetText("Shows moving clouds on maps that allow for clouds in them!");
-	m_cbWeatherInfo->GetTooltip()->SetTooltipDelay(100);
-	m_cbWeatherInfo->GetTooltip()->SetTooltipFormatToMultiLine();
+	m_cbClouds = new CheckButton(this, "ShowClouds", "Show Moving Clouds");
+	m_cbClouds->SetSelected(amod_clouds.GetBool());
+	m_cbClouds->SetBounds(2, 21, 150, 25);
+	m_cbClouds->GetTooltip()->SetText("Shows moving clouds on maps that allow for clouds in them!");
+	m_cbClouds->GetTooltip()->SetTooltipDelay(100);
+	m_cbClouds->GetTooltip()->SetTooltipFormatToMultiLine();
+
+	m_cbCloudsOverrideColor = new vgui::CheckButton(this, "OverrideCloudsColor", "Override Cloud Colors");
+	m_cbCloudsOverrideColor->SetBounds(2, 46, 163, 20);
+	m_cbCloudsOverrideColor->SetSelected(amod_clouds_color_override.GetBool());
+	m_cbCloudsOverrideColor->SetCommand(WEATHER_PANEL_COMMAND_CLOUDS_OVERRIDE);
+
+	//create the clouds color button
+	m_ButtonCloudsColor = new vgui::Button(this, "ButtonCloudsColor", "Set Clouds Color", this, WEATHER_PANEL_COMMAND_CLOUDS_COLOR);
+	m_ButtonCloudsColor->SetBounds(7, 68, 163, 20);
+	m_ButtonCloudsColor->SetEnabled(amod_clouds_color_override.GetBool());
+
+	//create the clouds divider
+	vgui::Divider* CloudsDivider = new Divider(this, "CloudsDivider");
+	CloudsDivider->SetBounds(-2, 93, 200, 1);
 
 	//create the 'show player's breath' check button
 	m_cbBreaths = new CheckButton(this, "ShowPlayersBreath", "Show Players Breath");
 	m_cbBreaths->SetSelected(amod_do_breathing.GetBool());
-	m_cbBreaths->SetBounds(2, 43, 150, 25);
+	m_cbBreaths->SetBounds(2, 95, 150, 25);
 	m_cbBreaths->GetTooltip()->SetText("Show the players breaths to show that it is currently cold.\nNote: you have to stand still for the breaths to show");
 	m_cbBreaths->GetTooltip()->SetTooltipDelay(100);
 	m_cbBreaths->GetTooltip()->SetTooltipFormatToMultiLine();
@@ -236,26 +273,26 @@ CAModWeatherPanel::CAModWeatherPanel() : vgui::Frame(nullptr, "CAModWeatherPanel
 	//create the 'enable rain' check button
 	m_cbEnable = new CheckButton(this, "CheckButtonEnableRain", "Enable Rain");
 	m_cbEnable->SetSelected(amod_rain_enable.GetBool());
-	m_cbEnable->SetBounds(2, 65, 150, 25);
+	m_cbEnable->SetBounds(2, 117, 150, 25);
 
 	//create the 'enable thunder sounds' check button
 	m_cbThunder = new CheckButton(this, "CheckButtonEnableThunder", "Enable Thunder Sounds");
 	m_cbThunder->SetSelected(amod_rain_thunder.GetBool());
-	m_cbThunder->SetBounds(2, 86, 175, 25);
+	m_cbThunder->SetBounds(2, 138, 175, 25);
 
 	//create the splashes check button
 	m_cbSplashes = new CheckButton(this, "CheckButtonEnableSplashes", "Show Rain Splash Particles");
 	m_cbSplashes->SetSelected(amod_rain_splashes.GetBool());
-	m_cbSplashes->SetBounds(2, 107, 175, 25);
+	m_cbSplashes->SetBounds(2, 159, 175, 25);
 	m_cbSplashes->SetEnabled(amod_rain_enable.GetBool());
 
 	//create 'rain Options' label
 	Label* RainType = new Label(this, "RainTypeLabel", "Rain Options");
-	RainType->SetBounds(55, 134, 160, 20);
+	RainType->SetBounds(55, 186, 160, 20);
 
 	//create the type of rain rain button
 	m_cbType = new ComboBox(this, "RainTypeComboBox", 10, false);
-	m_cbType->SetBounds(7, 154, 187, 22);
+	m_cbType->SetBounds(7, 206, 187, 22);
 	m_cbType->AddItem("Rain Intensity: Very Light", nullptr);
 	m_cbType->AddItem("Rain Intensity: Light", nullptr);
 	m_cbType->AddItem("Rain Intensity: Medium", nullptr);
@@ -279,7 +316,7 @@ CAModWeatherPanel::CAModWeatherPanel() : vgui::Frame(nullptr, "CAModWeatherPanel
 
 	//create the rain mode button
 	m_cbMode = new ComboBox(this, "RainModeComboBox", 2, false);
-	m_cbMode->SetBounds(7, 182, 187, 22);
+	m_cbMode->SetBounds(7, 234, 187, 22);
 	m_cbMode->AddItem("Always Rain", nullptr);
 	m_cbMode->AddItem("Rain In Random Intervals", nullptr);
 	m_cbMode->ActivateItem(amod_rain_type.GetInt() ? amod_rain_type.GetInt() - 1 : 0);
@@ -287,27 +324,27 @@ CAModWeatherPanel::CAModWeatherPanel() : vgui::Frame(nullptr, "CAModWeatherPanel
 
 	//create 'rain wait time min' label
 	m_RainWaitTimeMinLabel = new Label(this, "RainWaitTimeMinLabel", "Rain Wait Time Min: 600s");
-	m_RainWaitTimeMinLabel->SetBounds(5, 209, 200, 20);
+	m_RainWaitTimeMinLabel->SetBounds(5, 261, 200, 20);
 
 	//rain wait time min slider
 	m_RainWaitTimeMinSlider = new vgui::Slider(this, "RainWaitTimeMinSlider");
-	m_RainWaitTimeMinSlider->SetBounds(5, 229, 190, 20);
+	m_RainWaitTimeMinSlider->SetBounds(5, 281, 190, 20);
 	m_RainWaitTimeMinSlider->SetRange(10, 600);
 	m_RainWaitTimeMinSlider->SetValue(amod_rain_wait_min.GetInt());
 
 	//create 'rain wait time max' label
 	m_RainWaitTimeMaxLabel = new Label(this, "RainWaitTimeMaxLabel", "Rain Wait Time Max: 1200s");
-	m_RainWaitTimeMaxLabel->SetBounds(10, 254, 200, 20);
+	m_RainWaitTimeMaxLabel->SetBounds(10, 306, 200, 20);
 
 	//rain wait time max slider
 	m_RainWaitTimeMaxSlider = new vgui::Slider(this, "RainWaitTimeMaxSlider");
-	m_RainWaitTimeMaxSlider->SetBounds(5, 274, 190, 20);
+	m_RainWaitTimeMaxSlider->SetBounds(5, 326, 190, 20);
 	m_RainWaitTimeMaxSlider->SetRange(30, 1200);
 	m_RainWaitTimeMaxSlider->SetValue(amod_rain_wait_max.GetInt());
 
 	//make the apply button
-	Button* ApplyButton = new Button(this, "", "Apply Settings");
-	ApplyButton->SetBounds(5, 302, 187, 20);
+	Button* ApplyButton = new Button(this, "_ApplyButtonWeatherPanel", "Apply Settings");
+	ApplyButton->SetBounds(5, 354, 187, 20);
 	ApplyButton->SetCommand(WEATHER_PANEL_COMMAND_APPLY);
 
 	//create a tick signal for this panel so every 100ms the OnTick function gets called
@@ -341,14 +378,20 @@ void CAModWeatherPanel::OnTick()
 //------------------------------------------------------------------------------------------
 void CAModWeatherPanel::OnCommand(const char* command)
 {
-	//check for the 'close' command
+	//check for the 'apply' command
 	if (!Q_strcmp(command, WEATHER_PANEL_COMMAND_APPLY))
 	{
 		//enable/disable breaths
 		engine->ClientCmd_Unrestricted(CFmtStr("amod_do_breathing %d", m_cbBreaths->IsSelected()));
 
 		//enable/disable the weather info
-		engine->ClientCmd_Unrestricted(CFmtStr("amod_clouds %d", m_cbWeatherInfo->IsSelected()));
+		engine->ClientCmd_Unrestricted(CFmtStr("amod_clouds %d", m_cbClouds->IsSelected()));
+		
+		//enable/disable clouds overriding
+		engine->ClientCmd_Unrestricted(CFmtStr("amod_clouds_color_override %d", m_cbCloudsOverrideColor->IsSelected()));
+
+		//set the clouds color
+		engine->ClientCmd_Unrestricted(CFmtStr("amod_clouds_color %d %d %d %d", m_CurrentCloudsColor.r(), m_CurrentCloudsColor.g(), m_CurrentCloudsColor.b(), m_CurrentCloudsColor.a()));
 
 		//get the convars
 		static ConVarRef amod_rain_enable("amod_rain_enable");
@@ -391,6 +434,19 @@ void CAModWeatherPanel::OnCommand(const char* command)
 		g_NeedSoundscapeEnable = m_cbEnable->IsSelected();
 		return;
 	}
+	else if (!Q_strcmp(command, WEATHER_PANEL_COMMAND_CLOUDS_COLOR))
+	{
+		//create the color picker window
+		m_CloudsColorPicker = new CColorPicker(GetVPanel());
+		m_CloudsColorPicker->SetTitle("Set Clouds Color (255 255 255 255 = default clouds color)", true);
+		m_CloudsColorPicker->SetColor(m_CurrentCloudsColor);
+		m_CloudsColorPicker->DoModal();
+		return;
+	}
+	else if (!Q_strcmp(command, WEATHER_PANEL_COMMAND_CLOUDS_OVERRIDE))
+	{
+		m_ButtonCloudsColor->SetEnabled(m_cbCloudsOverrideColor->IsSelected());
+	}
 
 	BaseClass::OnCommand(command);
 }
@@ -409,10 +465,14 @@ void Amod_WriteRainConfig(KeyValues* file)
 	ConVarRef amod_rain_wait_max("amod_rain_wait_max");
 	ConVarRef amod_do_breathing("amod_do_breathing");
 	ConVarRef amod_clouds("amod_clouds");
+	ConVarRef amod_clouds_color("amod_clouds_color");
+	ConVarRef amod_clouds_color_override("amod_clouds_color_override");
 	ConVarRef r_raindensity("r_raindensity");
 
 	file->SetBool("amod_do_breathing", amod_do_breathing.GetBool());
 	file->SetBool("amod_clouds", amod_clouds.GetBool());
+	file->SetString("amod_clouds_color", amod_clouds_color.GetString());
+	file->SetBool("amod_clouds_color_override", amod_clouds_color_override.GetBool());
 	file->SetInt("amod_rain_type", amod_rain_type.GetInt());
 	file->SetBool("amod_rain_enable", amod_rain_enable.GetBool());
 	file->SetBool("amod_rain_thunder", amod_rain_thunder.GetBool());
@@ -447,6 +507,22 @@ CON_COMMAND(amod_write_rain_config, "writes the rain info into the config")
 }
 
 //-------------------------------------------------------------------------------------------------------
+// Purpose: Paints the panel
+//-------------------------------------------------------------------------------------------------------
+void CAModWeatherPanel::Paint()
+{
+	BaseClass::Paint();
+
+	//paint the colored square
+	Color color = m_CurrentCloudsColor;
+	if (color.r() == 255 && color.g() == 255 && color.b() == 255 && color.a() == 255)
+		color = Color(51, 103, 153, 255);
+
+	surface()->DrawSetColor(color);
+	surface()->DrawFilledRect(175, 68, 175 + 20, 68 + 20);
+}
+
+//-------------------------------------------------------------------------------------------------------
 // Purpose: Called on key press
 //-------------------------------------------------------------------------------------------------------
 void CAModWeatherPanel::OnKeyCodePressed(KeyCode code)
@@ -467,6 +543,18 @@ void CAModWeatherPanel::OnKeyCodePressed(KeyCode code)
 		delete this;
 }
 
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Called when a color gets selected
+//-------------------------------------------------------------------------------------------------------
+void CAModWeatherPanel::OnColorSelected(KeyValues* data)
+{
+	//set the clouds color
+	m_CurrentCloudsColor = Color(data->GetInt("r"), data->GetInt("g"), data->GetInt("b"), data->GetInt("a"));
+
+	//close the modal if needed
+	delete m_CloudsColorPicker;
+	m_CloudsColorPicker = nullptr;
+}
 
 //------------------------------------------------------------------------------------------
 // Purpose: destructor
@@ -491,8 +579,8 @@ public:
 	CAModSkyboxPanel(Panel* parent);
 
 	//panel functions
-	void OnTick();
 	void OnCommand(const char* pcCommand);
+	void OnTick();
 
 	//destructor
 	~CAModSkyboxPanel();
@@ -505,11 +593,16 @@ private:
 
 	//panel items
 	ComboBox* m_skyComboBox;
-	ImagePanel* m_skyImage;
+	ComboBox* m_filterComboBox;
+	ComboBox* m_intensitiesComboBox;
+	CStretchingImage* m_skyImage;
 	CheckButton* m_FogDisable;
+	CheckButton* m_SunDisableButton;
+
+	//is it daytime
+	bool m_bDaytime;
 
 	//other variables
-	bool m_bPrevSelected = false;
 	bool m_bInit = false;
 };
 
@@ -543,8 +636,8 @@ CAModSkyboxPanel::CAModSkyboxPanel(Panel* parent) : vgui::Frame(parent, "AloneMo
 	vgui::ivgui()->AddTickSignal(GetVPanel(), 100);
 
 	//set the bounds and title of the panel
-	SetBounds(150, 150, 180, 230);
 	SetTitle("Skybox Panel", false);
+	SetSize(250, 432);
 	MoveToCenterOfScreen();
 
 	//load all the skybox's from SkyPanel.txt
@@ -559,50 +652,191 @@ CAModSkyboxPanel::CAModSkyboxPanel(Panel* parent) : vgui::Frame(parent, "AloneMo
 		return;
 	}
 
-	//get the current sky name
-	ConVarRef amod_sky("amod_sky");
+	//check if its daytime
+	m_bDaytime = IsDaytimeEnabled();
 
-	int index = 0, current = 0;
-
-	//before anything make the skybox's combo box so i can add the skybox names to it
-	m_skyComboBox = new ComboBox(this, "m_skyComboBox", 14, false);
-	m_skyComboBox->SetBounds(10, 180, 160, 20);
-
-	FOR_EACH_VALUE(m_SkyboxFile, sub)
+	//look for "day" or "night" key
+	KeyValues* timekey = m_SkyboxFile->FindKey(m_bDaytime ? "day" : "night");
+	if (!timekey)
 	{
-		//add the skybox name
-		m_Skyboxes.AddToTail(sub->GetString());
+		m_SkyboxFile->deleteThis();
+		m_SkyboxFile = nullptr;
 
-		//add the name to the m_skyComboBox
-		m_skyComboBox->AddItem(sub->GetName(), nullptr);
-
-		//if the skyname == amod_sky then set index to current
-		if (!Q_strcmp(amod_sky.GetString(), sub->GetString()))
-			index = current;
-
-		//increment current
-		current++;
+		//send warning
+		ConWarning("Failed To Find \"%s\" key in resource/panels/SkyPanel.txt\n", m_bDaytime ? "day" : "night");
+		return;
 	}
 
-	//active the item
-	m_skyComboBox->ActivateItem(index);
+	//get the current sky name
+	ConVarRef amod_sky(m_bDaytime ? "amod_day_sky" : "amod_night_sky");
+
+	{
+		int index = 0, current = 1;
+
+		//before anything make the skybox's combo box so i can add the skybox names to it
+		m_skyComboBox = new ComboBox(this, "m_skyComboBox", 14, false);
+		m_skyComboBox->SetBounds(10, 282, 230, 20);
+
+		//always add "" as the starting item
+		m_skyComboBox->AddItem("use the maps default skybox", nullptr);
+		m_Skyboxes.AddToTail(m_bDaytime ? "sky_day02_09" : "sky_borealis01");
+
+		//go through each sky and add it
+		const char* amod_sky_value = amod_sky.GetString();
+		FOR_EACH_VALUE(timekey, sub)
+		{
+			//add the name to the m_skyComboBox
+			m_skyComboBox->AddItem(sub->GetName(), nullptr);
+
+			//add the skybox name
+			m_Skyboxes.AddToTail(sub->GetString());
+
+			//if the skyname == amod_sky then set index to current
+			if (amod_sky_value[0] && !Q_strnicmp(amod_sky.GetString(), sub->GetString(), Q_strlen(amod_sky_value)))
+				index = current;
+
+			//increment current
+			current++;
+		}
+
+		//active the item
+		m_skyComboBox->ActivateItem(index);
+
+		//divider under this
+		Divider* div = new Divider(this, "DividerUnderSkybox");
+		div->SetBounds(-2, 310, 300, 1);
+	}
+
+	ConVarRef amod_filter_filename(m_bDaytime ? "amod_epic_filter_day_filename" : "amod_epic_filter_night_filename");
+
+	{
+		//filter text above this
+		Label* FilterText = new Label(this, "FilterText", "");
+		FilterText->SetBounds(5, 318, 240, 50);
+		FilterText->SetText("Post Processing Filter Settings.\nRequires post processing filter enabled");
+		FilterText->SetContentAlignment(Label::Alignment::a_north);
+		FilterText->SetCenterWrap(true);
+
+		//make the custom filter combo box
+		m_filterComboBox = new ComboBox(this, "m_filterComboBox", 14, false);
+		m_filterComboBox->SetBounds(10, 361, 230, 20);
+
+		//always 
+		m_filterComboBox->AddItem("Use the maps default filter", new KeyValues(""));
+
+		//get the stuff
+		int index = 0, current = 1;
+
+		//go through each filter in the scripts/colorcorrection/* directory
+		FileFindHandle_t find;
+		const char* first = filesystem->FindFirst("scripts/colorcorrection/*.raw", &find);
+		while (first)
+		{
+			//check for . and ..
+			if (!Q_stricmp(first, ".") || !Q_stricmp(first, ".."))
+			{
+				first = filesystem->FindNext(find);
+				continue;
+			}
+
+			//check the extention
+			const char* ext = Q_GetFileExtension(first);
+			if (Q_stricmp(ext, "raw"))
+			{
+				first = filesystem->FindNext(find);
+				continue;
+			}
+
+			//add the item
+			const char* cc_string = CFmtStr("scripts/colorcorrection/%s", first);
+			m_filterComboBox->AddItem(first, new KeyValues(cc_string));
+			 
+			//add to combo box
+			if (!Q_stricmp(cc_string, amod_filter_filename.GetString()))
+				index = current;
+
+			first = filesystem->FindNext(find);
+
+			current++;
+		}
+
+		//active the current index
+		m_filterComboBox->ActivateItem(index);
+
+		filesystem->FindClose(find);
+	}
+	
+	ConVarRef amod_filter_intensity(m_bDaytime ? "amod_epic_filter_day_intensity" : "amod_epic_filter_night_intensity");
+
+	{
+		//make the filter intensities combo box
+		m_intensitiesComboBox = new ComboBox(this, "m_intensitiesComboBox", 14, false);
+		m_intensitiesComboBox->SetBounds(10, 383, 230, 20);
+
+		//always 
+		m_intensitiesComboBox->AddItem("Use the maps default intensity", new KeyValues(""));
+		
+		int index = 0, current = 1;
+
+		//start from 0.05. Go up to 1
+		float curr = 0.05;
+		while (curr < 1.05)
+		{
+			//due to float inprecision i have to do a string comparison
+			const char* curr_s = CFmtStr("%.2f", curr);
+			if (!Q_strnicmp(amod_filter_intensity.GetString(), curr_s, Q_strlen(curr_s)))
+				index = current;
+			
+			m_intensitiesComboBox->AddItem(curr_s, new KeyValues(curr_s));
+
+			//add 0.05
+			curr += 0.05;
+			current++;
+		}
+
+		//active the current index
+		m_intensitiesComboBox->ActivateItem(index);
+	}
 
 	//make the fog disable button
 	m_FogDisable = new CheckButton(this, "", "Disable Fog");
-	m_FogDisable->SetBounds(29, 159, 161, 20);
+	m_FogDisable->SetBounds(5, 260, 105, 20);
 	m_FogDisable->SetSelected(amod_fog_disabled.GetBool());
+	
+	//make the sun disable button
+	ConVarRef amod_sun_disable("amod_sun_disable");
+	m_SunDisableButton = new CheckButton(this, "", "Disable The Sun");
+	m_SunDisableButton->SetBounds(115, 260, 135, 20);
+	m_SunDisableButton->SetEnabled(m_bDaytime);
+	m_SunDisableButton->SetSelected(amod_sun_disable.GetBool());
 
-	//get the sky name
-	char buf[218];
-	Q_snprintf(buf, sizeof(buf), "skybox/%s", amod_sky.GetString());
+	{
+		//check for % to change the direction the skybox displays
+		const char* tmp = m_Skyboxes[m_skyComboBox->GetActiveItem()];
+		char curr[128];
+		Q_strncpy(curr, tmp, sizeof(curr));
 
-	m_skyImage = new ImagePanel(this, "m_SkyImage");
-	m_skyImage->SetImage((m_Skyboxes.Size() != 0) ? m_Skyboxes[0] : buf);
-	m_skyImage->SetBounds(10, 30, 160, 130);
+		char* percent = Q_strstr(curr, "%");
+		if (percent)
+		{
+			*percent = '\0';
+			percent++;
+		}
+		else
+			percent = "up";
+
+		//get the sky name
+		char buf[218];
+		Q_snprintf(buf, sizeof(buf), "../skybox/%s%s", curr, percent);
+
+		m_skyImage = new CStretchingImage(this, "m_SkyImage");
+		m_skyImage->SetImage(buf);
+		m_skyImage->SetBounds(10, 30, 230, 230);
+	}
 
 	//make the apply button
-	Button* SetButton = new Button(this, "SetButton", "Set Skybox");
-	SetButton->SetBounds(10, 205, 160, 20);
+	Button* SetButton = new Button(this, "SetButton", "Update Settings");
+	SetButton->SetBounds(10, 407, 230, 20);
 	SetButton->SetCommand(SKYBOX_COMMAND_SET_BUTTON);
 
 	//initalized
@@ -617,16 +851,71 @@ void CAModSkyboxPanel::OnCommand(const char* pcCommand)
 	//check the command
 	if (!Q_strcmp(pcCommand, SKYBOX_COMMAND_SET_BUTTON))
 	{
-		//check the current skybox name
-		ConVar* sv_skyname = cvar->FindVar("sv_skyname");
-		if (sv_skyname)
 		{
-			if (!Q_strcmp(sv_skyname->GetString(), (m_Skyboxes.Size() != 0) ? m_Skyboxes[m_skyComboBox->GetActiveItem()] : "skybox/borealis01"))
+			//disable the sun
+			ConVar* var = cvar->FindVar("amod_sun_disable");
+			if (!var)
 				return;
+
+			var->SetValue(m_SunDisableButton->IsSelected());
+		}
+		
+		{
+			//disable the fog
+			amod_fog_disabled.SetValue(m_FogDisable->IsSelected());
 		}
 
-		//set amod_sky to the current sky
-		engine->ExecuteClientCmd(CFmtStr("amod_sky %s", (m_Skyboxes.Size() != 0) ? m_Skyboxes[m_skyComboBox->GetActiveItem()] : "skybox/borealis01"));
+		{
+			//set the filters filename
+			ConVar* var = cvar->FindVar(m_bDaytime ? "amod_epic_filter_day_filename" : "amod_epic_filter_night_filename");
+			if (!var)
+				return;
+
+			var->SetValue(m_filterComboBox->GetActiveItemUserData()->GetName());
+		}
+
+		{
+			//set the filters intensities
+			ConVar* var = cvar->FindVar(m_bDaytime ? "amod_epic_filter_day_intensity" : "amod_epic_filter_night_intensity");
+			if (!var)
+				return;
+
+			var->SetValue(m_intensitiesComboBox->GetActiveItemUserData()->GetName());
+		}
+
+		{
+			ConVar* var = cvar->FindVar(m_bDaytime ? "amod_day_sky" : "amod_night_sky");
+			if (!var)
+				return;
+
+			//get the string
+			int index = m_skyComboBox->GetActiveItem();
+			const char* set = index == 0 ? "" : m_Skyboxes[index];
+
+			//get 
+			char curr[128];
+			Q_strncpy(curr, set, sizeof(curr));
+
+			//check for '%'
+			char* percent = Q_strstr(curr, "%");
+			if (percent)
+				*percent = '\0';
+
+			//set amod_sky to the current sky
+			var->SetValue(curr);
+		}
+
+		//write the settings
+		Amod_WriteConfig();
+
+		//close this panel
+		//skyboxpanel->Close();
+		return;
+	}
+	else if (!Q_stricmp(pcCommand, "close"))
+	{
+		skyboxpanel->Close();
+		return;
 	}
 
 	BaseClass::OnCommand(pcCommand);
@@ -641,16 +930,26 @@ void CAModSkyboxPanel::OnTick()
 	if (!m_bInit)
 		return;
 
-	//check to see if we need to toggle the fog or not
-	if (m_bPrevSelected != m_FogDisable->IsSelected())
+	//check for % to change the direction the skybox displays
+	const char* tmp = m_Skyboxes[m_skyComboBox->GetActiveItem()];
+	char curr[128];
+	Q_strncpy(curr, tmp, sizeof(curr));
+
+	char* percent = Q_strstr(curr, "%");
+	if (percent)
 	{
-		m_bPrevSelected = m_FogDisable->IsSelected();
-		amod_fog_disabled.SetValue(m_bPrevSelected);
-		engine->ClientCmd_Unrestricted(CFmtStr("amod_fog_disabled %d", m_bPrevSelected));
+		*percent = '\0';
+		percent++;
 	}
+	else
+		percent = "up";
+
+	//get the sky name
+	char buf[218];
+	Q_snprintf(buf, sizeof(buf), "../skybox/%s%s", curr, percent);
 
 	//set the skybox image
-	m_skyImage->SetImage((m_Skyboxes.Size() != 0) ? m_Skyboxes[m_skyComboBox->GetActiveItem()] : "skybox/borealis01");
+	m_skyImage->SetImage(buf);
 }
 
 //------------------------------------------------------------------------------------------
@@ -761,8 +1060,7 @@ private:
 	CheckButton* m_NoSoundscapesCheckButton;
 	CheckButton* m_NoMusicCheckButton;
 	CheckButton* m_MusicTransitionCheckButton;
-	CheckButton* m_DayAfterNovaProspekt;
-	CheckButton* m_DayForRavenholm;
+	CheckButton* m_DayTimeCB;
 	CheckButton* m_CoreTimerCheckButton;
 	CheckButton* m_CitadelTimerCheckButton;
 
@@ -1032,10 +1330,9 @@ void COptionsPanel::Init()
 	OPTIONS_KEYVALUES_FIND(NoSoundscapesCheckButtonKv, "NoSoundscapesCB");
 	OPTIONS_KEYVALUES_FIND(NoMusicCheckButtonKv, "NoMusicCB");
 	OPTIONS_KEYVALUES_FIND(TransitionMusicCheckButtonKv, "TransitionMusicCB");
-	OPTIONS_KEYVALUES_FIND(DayForRavenholmCheckButtonKv, "DayAfterRavCB");
-	OPTIONS_KEYVALUES_FIND(DayAfterNovaProspektCheckButtonKv, "DayAfterNPCBox");
 	OPTIONS_KEYVALUES_FIND(CitadelTimerCheckButtonKv, "CitadelTimerCB");
 	OPTIONS_KEYVALUES_FIND(CoreTimerCheckButtonKv, "CoreTimerCB");
+	OPTIONS_KEYVALUES_FIND(DayTimeCBoxKv, "DayTimeCBox");
 
 	//dividers
 	OPTIONS_KEYVALUES_FIND(Divider1Kv, "SettingsDivider1");
@@ -1290,22 +1587,15 @@ void COptionsPanel::Init()
 
 	OPTIONS_ELEMENT_ADD_TOOLTIP(m_MusicTransitionCheckButton, NoMusicCheckButtonKv);
 
-	//day for ravenholm
-	m_DayForRavenholm = new CheckButton(this, "DayForRavenholm", DayForRavenholmCheckButtonKv->GetString("Text", ""));
-	m_DayForRavenholm->SetBounds(DayForRavenholmCheckButtonKv->GetInt("XPos"), DayForRavenholmCheckButtonKv->GetInt("YPos"), DayForRavenholmCheckButtonKv->GetInt("Wide"), DayForRavenholmCheckButtonKv->GetInt("Tall"));
-
-	OPTIONS_ELEMENT_ADD_TOOLTIP(m_DayForRavenholm, DayForRavenholmCheckButtonKv);
-
 	//day for nova prospekt
-	m_DayAfterNovaProspekt = new CheckButton(this, "DayAfterNovaProspekt", DayAfterNovaProspektCheckButtonKv->GetString("Text", ""));
-	m_DayAfterNovaProspekt->SetBounds(DayAfterNovaProspektCheckButtonKv->GetInt("XPos"), DayAfterNovaProspektCheckButtonKv->GetInt("YPos"), DayAfterNovaProspektCheckButtonKv->GetInt("Wide"), DayAfterNovaProspektCheckButtonKv->GetInt("Tall"));
+	m_DayTimeCB = new CheckButton(this, "DayAfterNovaProspekt", DayTimeCBoxKv->GetString("Text", ""));
+	m_DayTimeCB->SetBounds(DayTimeCBoxKv->GetInt("XPos"), DayTimeCBoxKv->GetInt("YPos"), DayTimeCBoxKv->GetInt("Wide"), DayTimeCBoxKv->GetInt("Tall"));
 
-	OPTIONS_ELEMENT_ADD_TOOLTIP(m_DayAfterNovaProspekt, DayAfterNovaProspektCheckButtonKv);
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_DayTimeCB, DayTimeCBoxKv);
 
 #if !AMOD_DAYTIME_EDITION
 	//set selected if not daytime edition
-	m_DayAfterNovaProspekt->SetSelected(amod_day.GetBool());
-	m_DayForRavenholm->SetSelected(amod_day_ravenholm.GetBool());
+	m_DayTimeCB->SetSelected(amod_day.GetBool());
 #endif
 
 	//citadel timer
@@ -1420,12 +1710,6 @@ void COptionsPanel::OnTick()
 	{
 		m_RollAngleSlider->SetEnabled(m_RollAngleCheckButton->IsSelected());
 		m_NoSoundscapesCheckButton->SetEnabled(!g_NeedSoundscapeEnable);
-
-#if !AMOD_DAYTIME_EDITION
-		//set skybox button for daytime edition
-		if (szMapName)
-			m_SkyboxButton->SetEnabled(Q_strcmp(szMapName, "ep1"));
-#endif
 	}
 }
 
@@ -1477,7 +1761,7 @@ void COptionsPanel::OnCommand(const char* pcCommand)
 			{"amod_filter_brightness_on",				m_FilterOnBrightnessSlider->GetValue(),											nullptr},
 			{"amod_filter_brightness_on_exp",			m_FilterOnExponentSlider->GetValue(),											nullptr},
 			{"amod_filter_brightness_off",				m_FilterOffBrightnessSlider->GetValue(),										nullptr},
-			{"amod_epic_filter",						m_EpicFilterCheckButton->IsSelected(),											nullptr},
+			{"amod_epic_filter",						m_EpicFilterCheckButton->IsSelected(),											nullptr},		//12th index
 
 			//flashlight settings
 			{"r_flashlightfar",							m_FlashlightFarComboBox->GetActiveItem(),										&m_FlashlightFarData},
@@ -1494,21 +1778,20 @@ void COptionsPanel::OnCommand(const char* pcCommand)
 			{"amod_do_core_timer",						m_CoreTimerCheckButton->IsSelected(),											nullptr},
 
 			//ending
-			{"amod_new_ending",							m_EndingComboBox->GetActiveItem(),												nullptr}
+			{"amod_new_ending",							m_EndingComboBox->GetActiveItem(),												nullptr},
+
+			//do this convar last because this can save/load the game
+			{"amod_day",								m_DayTimeCB->IsSelected(),														nullptr}
 		};
 
 		//HACK: these require a hack to work
-		if (amod_day.GetBool() ^ m_DayAfterNovaProspekt->IsSelected())
+		if (amod_day.GetBool() ^ m_DayTimeCB->IsSelected() && m_DayTimeCB->IsSelected())
 		{
-			amod_day.SetValue(m_DayAfterNovaProspekt->IsSelected());
-			engine->ClientCmd_Unrestricted(CFmtStr("amod_day %d", m_DayAfterNovaProspekt->IsSelected()));
-		}
+			//if the daytime is enabled then make sure the user has the filter on. Without it the game looks to dark.
+			m_EpicFilterCheckButton->SetSelected(true);
 
-		//HACK: these require a hack to work
-		if (amod_day_ravenholm.GetBool() ^ m_DayForRavenholm->IsSelected())
-		{
-			amod_day_ravenholm.SetValue(m_DayForRavenholm->IsSelected());
-			engine->ClientCmd_Unrestricted(CFmtStr("amod_day_ravenholm %d", m_DayForRavenholm->IsSelected()));
+			//HACK set WriteConvars[12] (12 = amod_epic_filter index. Change this if you change the index)
+			WriteConvars[12].Value = true;
 		}
 
 		//check the soundscapes to see if thet can be disabled or not
@@ -1530,7 +1813,7 @@ void COptionsPanel::OnCommand(const char* pcCommand)
 		engine->ClientCmd_Unrestricted(CFmtStr("alias tf2 \"mat_monitorgamma %f; mat_monitorgamma_tv_enabled 0; Amod_FilterSet 0; alias Amod_ToggleFilter tf1\"", FilterOffValue));
 
 		//if the filter is on then execute the alias command to apply the new filter values
-		if (gs_FilterIsOn && !(amod_day.GetBool() && IsCityMap(szMapName)))
+		if (gs_FilterIsOn && !IsDaytimeEnabled())
 			engine->ClientCmd_Unrestricted("tf1");
 		else
 			engine->ClientCmd_Unrestricted("tf2");
@@ -1647,6 +1930,20 @@ public:
 	}
 
 	//activates this panel
+	void SetSkyboxButtonEnabled(bool enabled)
+	{
+		if (!m_OptionsPanel || !m_OptionsPanel->m_SkyboxButton)
+			return;
+
+		//set the button's enabled state
+		m_OptionsPanel->m_SkyboxButton->SetEnabled(enabled);
+
+		//close the skybox panel if needed
+		if (!enabled)
+			skyboxpanel->Close();
+	}
+
+	//activates this panel
 	void Activate(void)
 	{
 		if (m_OptionsPanel)
@@ -1654,10 +1951,16 @@ public:
 	}
 	
 	//sets the epic filter button state
-	void SetFilterButtonValue(bool state)
+	void SetFilterButtonValue(bool state, bool setconvar = false)
 	{
 		if (m_OptionsPanel && m_OptionsPanel->m_EpicFilterCheckButton)
+		{
 			m_OptionsPanel->m_EpicFilterCheckButton->SetSelected(state);
+
+			//set the convar value
+			if (setconvar)
+				ConVarRef("amod_epic_filter").SetValue(state);
+		}
 	}
 
 	//options panel
@@ -1679,6 +1982,25 @@ public:
 			m_SkyboxPanel = new CAModSkyboxPanel(pan);
 
 		//activate the panel
+		m_SkyboxPanel->Activate();
+	}
+
+	//reset the m_SkyboxPanel
+	void ResetPanel()
+	{
+		if (!m_SkyboxPanel)
+			return;
+
+		//get current stuff
+		int x, y;
+		m_SkyboxPanel->GetPos(x, y);
+
+		vgui::Panel* currparent = m_SkyboxPanel->GetParent();
+
+		//create new panel
+		m_SkyboxPanel->DeletePanel();
+		m_SkyboxPanel = new CAModSkyboxPanel(currparent);
+		m_SkyboxPanel->SetPos(x, y);
 		m_SkyboxPanel->Activate();
 	}
 

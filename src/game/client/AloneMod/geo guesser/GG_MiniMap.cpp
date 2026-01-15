@@ -11,6 +11,86 @@
 #include "vgui/IInput.h"
 #include "fmtstr.h"
 
+//minimap image class
+static CUtlVector<CStretchingImage::ImageHandle_t*> s_ImageHandles;
+
+//---------------------------------------------------------------------------------
+// Purpose: Destructor for stretching image
+//---------------------------------------------------------------------------------
+CStretchingImage::~CStretchingImage()
+{
+	if (!m_Handle)
+		return;
+
+	if (--m_Handle->refcount <= 0)
+	{
+		vgui::surface()->DeleteTextureByID(m_Handle->id);
+		s_ImageHandles.FindAndRemove(m_Handle);
+		delete m_Handle;
+	}
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: Returns the image bounds for the image
+//---------------------------------------------------------------------------------
+void CStretchingImage::PerformLayout()
+{
+	GetBounds(m_X, m_Y, m_W, m_H); 
+	return BaseClass::PerformLayout();
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: Sets the image
+//---------------------------------------------------------------------------------
+void CStretchingImage::SetImage(const char* filename)
+{
+	filename = CFmtStr("vgui/%s", filename);
+
+	//look for handle
+	for (int i = 0; i < s_ImageHandles.Count(); i++)
+	{
+		if (!Q_stricmp(s_ImageHandles[i]->image, filename))
+		{
+			m_Handle = s_ImageHandles[i];
+			m_Handle->refcount++;
+			return;
+		}
+	}
+
+	//decrement our current image
+	if (m_Handle)
+	{
+		if (--m_Handle->refcount <= 0)
+		{
+			vgui::surface()->DeleteTextureByID(m_Handle->id);
+			s_ImageHandles.FindAndRemove(m_Handle);
+			delete m_Handle;
+			m_Handle = nullptr;
+		}
+	}
+
+	m_Handle = s_ImageHandles[s_ImageHandles.AddToTail(new ImageHandle_t)];
+	m_Handle->id = vgui::surface()->CreateNewTextureID();
+	m_Handle->refcount = 1;
+	vgui::surface()->DrawSetTextureFile(m_Handle->id, filename, false, true);
+	Q_strncpy(m_Handle->image, filename, sizeof(m_Handle->image));
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: Paints the image
+//---------------------------------------------------------------------------------
+void CStretchingImage::Paint()
+{
+	if (!m_Handle)
+		return;
+
+	vgui::surface()->DrawSetColor(255, 255, 255, 255);
+	vgui::surface()->DrawSetTexture(m_Handle->id);
+	vgui::surface()->DrawTexturedRect(0, 0, m_W, m_H);
+	return BaseClass::Paint();
+}
+
+
 //When the panel's size changes. So does the positions of the markers. This is the size i had the panel at
 //when i set the correct markers. Just divide the size of the panel with these and you get the marker offsets
 #define MINIMAP_WIDE 320.0f

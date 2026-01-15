@@ -8,6 +8,8 @@
 #include "vgui_controls/Button.h"
 #include "vgui_controls/Label.h"
 #include "vgui_controls/ComboBox.h"
+#include "AloneMod/IOptionsPanel.h"
+#include "AloneMod/DynamicSky.h"
 
 #if !AMOD_DAYTIME_EDITION
 extern ConVar amod_day;
@@ -137,6 +139,8 @@ CNewGamePanel::CNewGamePanel(vgui::VPANEL parent) : BaseClass(nullptr, "NewGameP
 
 			firstfile = filesystem->FindNext(handle);
 		}
+
+		filesystem->FindClose(handle);
 	}
 
 	//select the current game
@@ -501,42 +505,34 @@ CON_COMMAND(togglenewgamepanel, "Toggles the alone mod new game panel")
 //-----------------------------------------------------------------------
 // Purpose: Alone mod day change callbacks
 //-----------------------------------------------------------------------
-void AmodDayChangeCallback(IConVar* var, const char*, float)
+void AmodDayChangeCallback(IConVar* var, const char* olds, float oldf)
 {
-	//check for daytime
+	//reset the skybox panel
+	skyboxpanel->ResetPanel();
+
+	//check for daytime for the new game panel
 	g_sNewGamePanelInterface.DoDayCheck();
 
-	if (engine->IsInGame() && !engine->IsLevelMainMenuBackground() && IsCityMap(szMapName))
+	//check the old value
+	if (ConVarRef(var).GetBool() == (bool)oldf || !engine->IsConnected())
+		return;
+
+#if USES_DYNAMIC_SKY
+	if (g_PModBase_DynamicSkybox_bUse)
 	{
-		engine->ExecuteClientCmd("save tmp_day001; load tmp_day001");
+		engine->ClientCmd("_amod_day_do");
+		return;
+	}
+#endif
+
+	//reload map if needed
+	if (engine->IsInGame() && engine->IsLevelMainMenuBackground())
+	{
+		engine->ClientCmd(CFmtStr("map_background %s", szMapName));
 	}
 	else
 	{
-		if (engine->IsInGame() && engine->IsLevelMainMenuBackground() && !Q_strcmp(szMapName, "background06_d"))
-			engine->ExecuteClientCmd("map_background background06_d");
-		else if (engine->IsInGame() && engine->IsLevelMainMenuBackground() && !Q_strcmp(szMapName, "background07_d"))
-			engine->ExecuteClientCmd("map_background background06_d");
+		engine->ClientCmd("save __tmpquick01; load __tmpquick01");
 	}
 
-#if !AMOD_DAYTIME_EDITION
-	if (!amod_day.GetBool())
-		engine->ClientCmd_Unrestricted("tf1; alias Amod_ToggleFilter tf2");
-#endif
-}
-
-//-----------------------------------------------------------------------
-// Purpose: Alone mod ravenholm day change callback
-//-----------------------------------------------------------------------
-void AmodDayRavChangeCallback(IConVar* var, const char*, float)
-{
-	//check for daytime
-	g_sNewGamePanelInterface.DoDayCheck();
-
-	if (engine->IsInGame() && !engine->IsLevelMainMenuBackground() && Q_strcmp(szMapName, "d1_town_05_d") && Q_strstr(szMapName, "d1_town_"))
-		engine->ExecuteClientCmd("save tmp_day001; load tmp_day001");
-
-#if !AMOD_DAYTIME_EDITION
-	if (!amod_day.GetBool())
-		engine->ClientCmd_Unrestricted("tf1; alias Amod_ToggleFilter tf2");
-#endif
 }

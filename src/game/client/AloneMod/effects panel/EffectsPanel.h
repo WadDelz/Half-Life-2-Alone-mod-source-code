@@ -26,23 +26,28 @@ class WheelSlider : public vgui::Slider
 	DECLARE_CLASS_SIMPLE(WheelSlider, vgui::Slider);
 public:
 	//constructor
-	WheelSlider(vgui::Panel* parent, const char* name) : BaseClass(parent, name)
+	WheelSlider(vgui::Panel* parent, const char* name, int WheelDelta = 1) : BaseClass(parent, name), m_ScrollDelta(WheelDelta)
 	{
 	}
 
 	//called on mouse wheeled
 	void OnMouseWheeled(int delta)
 	{
-		//check range
+		if (!IsEnabled())
+			return;
+
 		int min, max;
 		GetRange(min, max);
-		
-		if (min > max)
-			delta *= -1;
 
-		SetValue(GetValue() + delta);
-		BaseClass::OnMouseWheeled(delta);
+		int dir = (delta > 0) ? 1 : -1;
+
+		if (min > max)
+			dir *= -1;
+
+		SetValue(GetValue() + dir * m_ScrollDelta);
 	}
+
+	int m_ScrollDelta = 1;
 };
 
 //base page for each effects panel

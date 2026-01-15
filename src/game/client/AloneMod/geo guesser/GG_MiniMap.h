@@ -20,35 +20,38 @@
 #include "GG_MainPanel.h"
 
 //quick image class that streatches the image
-class CStretchingImage : public vgui::ImagePanel
+class CStretchingImage : public vgui::Panel
 {
-	DECLARE_CLASS_SIMPLE(CStretchingImage, ImagePanel);
+	DECLARE_CLASS_SIMPLE(CStretchingImage, Panel);
 public:
-
+	struct ImageHandle_t
+	{
+		char image[512];
+		int id;
+		int refcount;
+	};
+public:
 	CStretchingImage(vgui::Panel* parent, const char* name) : BaseClass(parent, name) { m_X = m_Y = m_W = m_H = 0; }
+	~CStretchingImage();
 
 	//override set bounds func
-	virtual void PerformLayout() { GetBounds(m_X, m_Y, m_W, m_H); return BaseClass::PerformLayout(); }
+	virtual void PerformLayout();
+
+	//image funcs
+	virtual void SetImage(const char* filename);
 
 	//paints the panel
-	virtual void Paint()
-	{
-		vgui::IImage* image = GetImage();
-		if (!image)
-			return;
+	virtual void Paint();
 
-		image->SetPos(m_X, m_Y);
-		image->SetSize(m_W, m_H);
-
-		return BaseClass::Paint();
-	}
-
+	//kb/mouse
 	void OnMousePressed(vgui::MouseCode code) { GetParent()->OnMousePressed(code); };
 	void OnMouseReleased(vgui::MouseCode code) { GetParent()->OnMouseReleased(code); };
 	void OnCursorMoved(int x, int y) { GetParent()->OnCursorMoved(x, y); };
 
 	//x y w and h
 	int m_X, m_Y, m_W, m_H;
+private:
+	ImageHandle_t* m_Handle = nullptr;
 };
 
 

@@ -124,6 +124,7 @@
 #include "sourcevr/isourcevirtualreality.h"
 #include "client_virtualreality.h"
 #include "mumble.h"
+#include "AloneMod/DynamicSky.h"
 
 // NVNT includes
 #include "hud_macros.h"
@@ -1090,6 +1091,54 @@ void ModBase_DeleteBackground()
 	BikBackgroundDebugMsg("Background BIK Video: Deleted Bik Background Data!\n");
 }
 
+#if USES_DYNAMIC_SKY
+
+//-----------------------------------------------------------------------------
+// Purpose: If the dynamic sky system is active then this will be the sv_skyname change callback
+//-----------------------------------------------------------------------------
+static void SvSkynameChangedCallback(IConVar* convar, const char*, float)
+{
+	//ALWAYS reload the skybox's
+	ModBase_UnloadSkys();
+	ModBase_LoadSkys();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: so i dont need to use modbase_dynamic_skybox.GetBool() (and atoi()) for viewrender
+//			everytime i need to render the skybox. do this
+//-----------------------------------------------------------------------------
+static void ModbaseDynamicSkyboxChanged(IConVar* convar, const char*, float)
+{
+	//get the convar reference
+	ConVarRef ref(convar);
+
+	//set the value to the convar's value
+	g_PModBase_DynamicSkybox_bUse = ref.GetBool();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: the angles changed callback for the 'dynaimc skybox'
+//-----------------------------------------------------------------------------
+static void ModbaseDynamicSkyboxAnglesChanged(IConVar* convar, const char*, float)
+{
+	//get the convar reference
+	ConVarRef ref(convar);
+
+	//get the angle
+	QAngle angle;
+	UTIL_StringToVector(angle.Base(), ref.GetString());
+
+	//set the value to the convar's value
+	g_PModBase_DynamicSkybox_Angle = angle;
+}
+
+//dynamic skybox change callback
+ConVar modbase_dynamic_skybox("modbase_dynamic_skybox", "1", FCVAR_NONE, "When set to 1, this allows the sv_skyname convar to change the skybox instantly.", ModbaseDynamicSkyboxChanged);
+ConVar modbase_dynamic_skybox_angles("modbase_dynamic_skybox_angles", "0 0 0", FCVAR_NONE, "The angles of the skybox if modbase_dynamix_skybox is set to 1", ModbaseDynamicSkyboxAnglesChanged);
+
+
+#endif
+
 //-----------------------------------------------------------------------------
 ISourceVirtualReality *g_pSourceVR = NULL;
 
@@ -1273,6 +1322,15 @@ int CHLClient::Init( CreateInterfaceFn appSystemFactory, CreateInterfaceFn physi
 	ModBase_InitBackground();
 
 	modemanager->Init( );
+
+#if USES_DYNAMIC_SKY
+	//set the sv_skyname change callback
+	ConVar* sv_skyname = cvar->FindVar("sv_skyname");
+	if (sv_skyname)
+		sv_skyname->InstallChangeCallback(SvSkynameChangedCallback);
+
+	g_PModBase_DynamicSkybox_bUse = modbase_dynamic_skybox.GetBool();
+#endif
 
 	g_pClientMode->InitViewport();
 
