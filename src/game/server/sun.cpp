@@ -32,6 +32,67 @@ public:
 
 	virtual int UpdateTransmitState();
 
+	//keyvalues
+	bool KeyValue(const char* key, const char* value)
+	{
+		if (!Q_stricmp(key, "angle"))
+		{
+			m_flYaw = atof(value);
+			SetupLightNormalFromProps(GetAbsAngles(), m_flYaw, m_flPitch, m_vDirection.GetForModify());
+			m_vDirection = -m_vDirection.Get();
+			return true;
+		}
+		else if (!Q_stricmp(key, "pitch"))
+		{
+			m_flPitch = atof(value);
+			SetupLightNormalFromProps(GetAbsAngles(), m_flYaw, m_flPitch, m_vDirection.GetForModify());
+			m_vDirection = -m_vDirection.Get();
+			return true;
+		}
+		else if (!Q_stricmp(key, "angles"))
+		{
+			//scan the yaw out of it
+			float tp, tr;
+			sscanf(value, "%f %f %f", &tp, &m_flYaw, &tr);
+
+			m_flPitch = atof(value);
+			SetupLightNormalFromProps(GetAbsAngles(), m_flYaw, m_flPitch, m_vDirection.GetForModify());
+			m_vDirection = -m_vDirection.Get();
+			return true;
+		}
+		else if (!Q_stricmp(key, "color"))
+		{
+			//scan the yaw out of it
+			int r, g, b;
+			sscanf(value, "%d %d %d", &r, &g, &b);
+			SetRenderColor(r, g, b);
+			return true;
+		}
+		else if (!Q_stricmp(key, "size"))
+		{
+			m_nSize = atoi(value);
+			return true;
+		}
+		else if (!Q_stricmp(key, "size"))
+		{
+			m_nOverlaySize = atoi(value);
+			return true;
+		}
+		else if (!Q_stricmp(key, "material"))
+		{
+			m_strMaterial = AllocPooledString(value);
+			m_nMaterial = PrecacheModel(value);
+			return true;
+		}
+		else if (!Q_stricmp(key, "HDRColorScale"))
+		{
+			m_flHDRColorScale = atof(value);
+			return true;
+		}
+
+		return BaseClass::KeyValue(key, value);
+	}
+
 public:
 	CNetworkVector( m_vDirection );
 	

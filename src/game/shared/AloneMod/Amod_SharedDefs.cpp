@@ -186,6 +186,11 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 		//get the clouds color
 		info.NightInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString(night->GetString("CloudsColor", "255 255 255 255"));
 
+		//get the bloom info
+		info.NightInfo.BloomEnabled = gs_DayNightInfoSymbolsTable.AddString(night->GetString("BloomEnabled", "0"));
+		info.NightInfo.BloomScale = gs_DayNightInfoSymbolsTable.AddString(night->GetString("BloomScale", "0"));
+		info.NightInfo.BloomScalarFactor = gs_DayNightInfoSymbolsTable.AddString(night->GetString("BloomScalarFactor", "0"));
+
 		//get the fog info
 		KeyValues* fog = night->FindKey("fog");
 		if (fog)
@@ -205,6 +210,9 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 		info.NightInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString("scripts/colorcorrection/cc_epic_filter.raw");
 		info.NightInfo.FilterIntensity = gs_DayNightInfoSymbolsTable.AddString("0.8");
 		info.NightInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString("255 255 255 255");
+		info.NightInfo.BloomEnabled = gs_DayNightInfoSymbolsTable.AddString("0");
+		info.NightInfo.BloomScale = gs_DayNightInfoSymbolsTable.AddString("0");
+		info.NightInfo.BloomScalarFactor = gs_DayNightInfoSymbolsTable.AddString("0");
 	}
 
 	//get the day info
@@ -220,17 +228,35 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 		//get the clouds color
 		info.DayInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString(day->GetString("CloudsColor", "255 255 255 255"));
 
+		//get the bloom info
+		info.DayInfo.BloomEnabled = gs_DayNightInfoSymbolsTable.AddString(day->GetString("BloomEnabled", "1"));
+		info.DayInfo.BloomScale = gs_DayNightInfoSymbolsTable.AddString(day->GetString("BloomScale", "1"));
+		info.DayInfo.BloomScalarFactor = gs_DayNightInfoSymbolsTable.AddString(day->GetString("BloomScalarFactor", "0.4"));
+
 		//get the sun info
 		KeyValues* sun = day->FindKey("sun");
 		if (sun)
 		{
-			info.DayInfo.SunInfoEnabled = sun->GetBool("enabled", true);
 			FOR_EACH_VALUE(sun, value)
 			{
 				MapTimeInfo_t::DayInfo_t::SunInfo_t& suninfo = info.DayInfo.SunInfo[info.DayInfo.SunInfo.AddToTail()];
 				suninfo.key = gs_DayNightInfoSymbolsTable.AddString(value->GetName());
 				suninfo.value = gs_DayNightInfoSymbolsTable.AddString(value->GetString());
 			}
+			info.DayInfo.SunInfoEnabled = sun->GetBool("enabled", info.DayInfo.SunInfo.Count() > 0);
+
+			//ALWAYS ADD THESE:
+			MapTimeInfo_t::DayInfo_t::SunInfo_t& useangles = info.DayInfo.SunInfo[info.DayInfo.SunInfo.AddToTail()];
+			useangles.key = gs_DayNightInfoSymbolsTable.AddString("use_angles");
+			useangles.value = gs_DayNightInfoSymbolsTable.AddString("1");
+
+			MapTimeInfo_t::DayInfo_t::SunInfo_t& overlaysize = info.DayInfo.SunInfo[info.DayInfo.SunInfo.AddToTail()];
+			overlaysize.key = gs_DayNightInfoSymbolsTable.AddString("overlaysize");
+			overlaysize.value = gs_DayNightInfoSymbolsTable.AddString("-1");
+
+			MapTimeInfo_t::DayInfo_t::SunInfo_t& HDRColorScale = info.DayInfo.SunInfo[info.DayInfo.SunInfo.AddToTail()];
+			HDRColorScale.key = gs_DayNightInfoSymbolsTable.AddString("HDRColorScale");
+			HDRColorScale.value = gs_DayNightInfoSymbolsTable.AddString(".5");
 		}
 
 		//get the fog info
@@ -252,6 +278,9 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 		info.DayInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString("scripts/colorcorrection/cc_daytime.raw");
 		info.DayInfo.FilterIntensity = gs_DayNightInfoSymbolsTable.AddString("0.325");
 		info.DayInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString("255 255 255 255");
+		info.DayInfo.BloomEnabled = gs_DayNightInfoSymbolsTable.AddString("1");
+		info.DayInfo.BloomScale = gs_DayNightInfoSymbolsTable.AddString("1");
+		info.DayInfo.BloomScalarFactor = gs_DayNightInfoSymbolsTable.AddString("0.4");
 	}
 }
 
@@ -261,6 +290,7 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 void InitalizeDayNightInfoFile(const char* file)
 {
 	KeyValuesAD keyvalues(new KeyValues(file));
+	keyvalues->UsesEscapeSequences(true);
 	if (!keyvalues->LoadFromFile(filesystem, file))
 		return;
 
@@ -284,6 +314,14 @@ void InitalizeDayNightInfoFile(const char* file)
 //--------------------------------------------------------------------------------------------
 void InitalizeDayNightInfo(bool reload)
 {
+#ifdef CLIENT_DLL
+	//call open_map_time_properties_editor 1
+	engine->ClientCmd("open_map_time_properties_editor 1");
+
+	void ClearCopiedState();
+	ClearCopiedState();
+#endif
+
 	DayNightInfo.RemoveAll();
 	gs_DayNightInfoSymbolsTable.RemoveAll();
 
@@ -463,6 +501,20 @@ void WriteTimeInfoToKeyvalues(MapTimeInfo_t& info, KeyValues* out)
 
 		} while (false);
 
+		//write bloom settings
+		do
+		{
+			const char* enablebloom[2] = { StringFromMapTimeStringTableIndex(info.DayInfo.BloomEnabled), StringFromMapTimeStringTableIndex(info.NightInfo.BloomEnabled) };
+			const char* bloomscale[2] = { StringFromMapTimeStringTableIndex(info.DayInfo.BloomScale), StringFromMapTimeStringTableIndex(info.NightInfo.BloomScale) };
+			const char* bloomscalar[2] = { StringFromMapTimeStringTableIndex(info.DayInfo.BloomScalarFactor), StringFromMapTimeStringTableIndex(info.NightInfo.BloomScalarFactor) };
+
+			//write the filter
+			times[i]->SetString("BloomEnabled", enablebloom[i]);
+			times[i]->SetString("BloomScale", bloomscale[i]);
+			times[i]->SetString("BloomScalarFactor", bloomscalar[i]);
+
+		} while (false);
+
 		//write clouds fog color
 		do
 		{
@@ -475,9 +527,13 @@ void WriteTimeInfoToKeyvalues(MapTimeInfo_t& info, KeyValues* out)
 	}
 
 	//write the sun info (if there is any)
-	if (info.DayInfo.SunInfoEnabled)
+	if (info.DayInfo.SunInfo.Count() > 0)
 	{
 		KeyValues* sundata = new KeyValues("sun");
+
+		//always add 'enabled' key
+		sundata->SetInt("enabled", info.DayInfo.SunInfoEnabled);
+
 		for (int i = 0; i < info.DayInfo.SunInfo.Count(); i++)
 		{
 			sundata->SetString(StringFromMapTimeStringTableIndex(info.DayInfo.SunInfo[i].key), StringFromMapTimeStringTableIndex(info.DayInfo.SunInfo[i].value));
@@ -510,7 +566,7 @@ void WriteAllTimeInfosToFiles()
 		}
 
 		//save the file
-		file->SaveToFile(filesystem, DayNightInfo[i].filename, "MOD");
+		file->SaveToFile(filesystem, DayNightInfo[i].filename, "MOD", true);
 	}
 }
 
@@ -538,11 +594,17 @@ MapTimeInfo_t& GetMapTimeInfo(const char* mapname)
 	def.DayInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString("scripts/colorcorrection/cc_daytime.raw");
 	def.DayInfo.FilterIntensity = gs_DayNightInfoSymbolsTable.AddString("0.325");
 	def.DayInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString("255 255 255 255");
+	def.DayInfo.BloomEnabled = gs_DayNightInfoSymbolsTable.AddString("1");
+	def.DayInfo.BloomScale = gs_DayNightInfoSymbolsTable.AddString("1");
+	def.DayInfo.BloomScalarFactor = gs_DayNightInfoSymbolsTable.AddString("0.4");
 
 	def.NightInfo.DefaultNightSky = gs_DayNightInfoSymbolsTable.AddString("sky_borealis01");
 	def.NightInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString("scripts/colorcorrection/cc_epic_filter.raw");
 	def.NightInfo.FilterIntensity = gs_DayNightInfoSymbolsTable.AddString("0.8");
 	def.NightInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString("255 255 255 255");
+	def.NightInfo.BloomEnabled = gs_DayNightInfoSymbolsTable.AddString("0");
+	def.NightInfo.BloomScale = gs_DayNightInfoSymbolsTable.AddString("0");
+	def.NightInfo.BloomScalarFactor = gs_DayNightInfoSymbolsTable.AddString("0");
 	
 	return def;
 }
@@ -561,6 +623,70 @@ const char* StringFromMapTimeStringTableIndex(UtlSymId_t id)
 UtlSymId_t StringToMapTimeStringTableIndex(const char* string)
 {
 	return gs_DayNightInfoSymbolsTable.AddString(string);
+}
+
+//--------------------------------------------------------------------------------------------
+// Purpose: Copies time info from 1 instance to another
+//--------------------------------------------------------------------------------------------
+void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool copynight, bool copyday)
+{
+	//night info
+	{
+		//clear current data
+		to.NightInfo.FogInfo.RemoveAll();
+
+		//set new state
+		to.NightInfo.CloudsColor = from.NightInfo.CloudsColor;
+		to.NightInfo.DefaultNightSky = from.NightInfo.DefaultNightSky;
+		to.NightInfo.FilterIntensity = from.NightInfo.FilterIntensity;
+		to.NightInfo.FilterName = from.NightInfo.FilterName;
+		to.NightInfo.FogEnabled = from.NightInfo.FogEnabled;
+		to.NightInfo.BloomEnabled = from.NightInfo.BloomEnabled;
+		to.NightInfo.BloomScale = from.NightInfo.BloomScale;
+		to.NightInfo.BloomScalarFactor = from.NightInfo.BloomScalarFactor;
+
+		//copy the fog states
+		for (int i = 0; i < from.NightInfo.FogInfo.Count(); i++)
+		{
+			MapTimeInfo_t::FogInfo_t& finfo = to.NightInfo.FogInfo[to.NightInfo.FogInfo.AddToTail()];
+			finfo.convar = from.NightInfo.FogInfo[i].convar;
+			finfo.value = from.NightInfo.FogInfo[i].value;
+		}
+	}
+
+	//day info
+	{
+		//clear current data
+		to.DayInfo.FogInfo.RemoveAll();
+		to.DayInfo.SunInfo.RemoveAll();
+
+		//set new state
+		to.DayInfo.CloudsColor = from.DayInfo.CloudsColor;
+		to.DayInfo.DefaultDaySky = from.DayInfo.DefaultDaySky;
+		to.DayInfo.FilterIntensity = from.DayInfo.FilterIntensity;
+		to.DayInfo.FilterName = from.DayInfo.FilterName;
+		to.DayInfo.FogEnabled = from.DayInfo.FogEnabled;
+		to.DayInfo.SunInfoEnabled = from.DayInfo.SunInfoEnabled;
+		to.DayInfo.BloomEnabled = from.DayInfo.BloomEnabled;
+		to.DayInfo.BloomScale = from.DayInfo.BloomScale;
+		to.DayInfo.BloomScalarFactor = from.DayInfo.BloomScalarFactor;
+
+		//copy the fog states
+		for (int i = 0; i < from.DayInfo.FogInfo.Count(); i++)
+		{
+			MapTimeInfo_t::FogInfo_t& finfo = to.DayInfo.FogInfo[to.DayInfo.FogInfo.AddToTail()];
+			finfo.convar = from.DayInfo.FogInfo[i].convar;
+			finfo.value = from.DayInfo.FogInfo[i].value;
+		}
+
+		//copy the sun states
+		for (int i = 0; i < from.DayInfo.SunInfo.Count(); i++)
+		{
+			MapTimeInfo_t::DayInfo_t::SunInfo_t& finfo = to.DayInfo.SunInfo[to.DayInfo.SunInfo.AddToTail()];
+			finfo.key = from.DayInfo.SunInfo[i].key;
+			finfo.value = from.DayInfo.SunInfo[i].value;
+		}
+	}
 }
 
 #ifdef CLIENT_DLL

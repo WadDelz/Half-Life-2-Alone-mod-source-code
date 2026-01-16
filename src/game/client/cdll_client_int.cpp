@@ -1093,16 +1093,136 @@ void ModBase_DeleteBackground()
 
 #if USES_DYNAMIC_SKY
 
+#if USES_DYNAMIC_SKY_NEWFUNC
+
+#pragma warning(push)
+#pragma warning(disable : 4005 4996 4100 4189 4244 4267 4668 4820 4625 4626)
+
+#include <windows.h>
+#include <stdint.h>
+#include <string.h>
+
+//------------------------------------------------------------------------------------
+// Purpose: find a byte pattern inside an executable section of a module
+//------------------------------------------------------------------------------------
+static uint8_t* FindPattern(HMODULE module, const char* pattern, const char* mask)
+{
+	PIMAGE_DOS_HEADER dos = (PIMAGE_DOS_HEADER)module;
+	PIMAGE_NT_HEADERS nt = (PIMAGE_NT_HEADERS)((uint8_t*)module + dos->e_lfanew);
+	PIMAGE_SECTION_HEADER section = IMAGE_FIRST_SECTION(nt);
+
+	for (unsigned int i = 0; i < nt->FileHeader.NumberOfSections; i++)
+	{
+		// only scan executable code
+		if (!(section[i].Characteristics & IMAGE_SCN_MEM_EXECUTE))
+			continue;
+
+		uint8_t* start = (uint8_t*)module + section[i].VirtualAddress;
+		uint32_t size = section[i].Misc.VirtualSize;
+
+		for (uint32_t j = 0; j < size; j++)
+		{
+			bool found = true;
+			for (uint32_t k = 0; mask[k]; k++)
+			{
+				if (mask[k] == 'x' && pattern[k] != *(char*)(start + j + k))
+				{
+					found = false;
+					break;
+				}
+			}
+
+			if (found)
+				return start + j;
+		}
+	}
+
+	return 0;
+}
+
+//------------------------------------------------------------------------------------
+// Purpose: resolve a relative CALL or JMP instruction
+//------------------------------------------------------------------------------------
+static void* ResolveRelative(void* instruction)
+{
+	int32_t rel = *(int32_t*)((uint8_t*)instruction + 1);
+	return (uint8_t*)instruction + 5 + rel;
+}
+
+//------------------------------------------------------------------------------------
+// Purpose: skybox function typedefs
+//------------------------------------------------------------------------------------
+typedef void(__cdecl* R_UnloadSkys_t)(void);
+typedef bool(__cdecl* R_LoadNamedSkys_t)(const char* skyname);
+
+
+//------------------------------------------------------------------------------------
+// Purpose: global function pointers for R_* skybox funcs
+//------------------------------------------------------------------------------------
+static R_UnloadSkys_t g_R_UnloadSkys = 0;
+static R_LoadNamedSkys_t g_R_LoadNamedSkys = 0;
+
+
+//------------------------------------------------------------------------------------
+// Purpose: initialize engine skybox functions.
+//------------------------------------------------------------------------------------
+void InitEngineSkyFunctions()
+{
+	//have we loaded already?
+	if (g_R_UnloadSkys && g_R_LoadNamedSkys)
+		return;
+	
+	//load the engine.dll module
+	HMODULE engine = GetModuleHandleA("engine.dll");
+	if (!engine)
+		return;
+	
+	//R_UnloadSkybox pattern.
+	const char unload_pattern[] =
+		"\x56\xBE\x00\x00\x00\x00\x8B\x0E\x85\xC9\x74\x0B\x8B\x01\xFF\x50\x34";
+	const char unload_mask[] =
+		"xx????xxxxxxxxxxx";
+	
+	//R_LoadSkybox pattern
+	const char load_pattern[] =
+		"\x55\x8B\xEC\x81\xEC\x00\x00\x00\x00\x8B\x0D\x00\x00\x00\x00\x53\x56\x57\x8B\x01";
+	const char load_mask[] =
+		"xxxxx????xx????xxxx";
+	
+	//look for the pattern
+	uint8_t* unload_addr = FindPattern(engine, unload_pattern, unload_mask);
+	uint8_t* load_addr = FindPattern(engine, load_pattern, load_mask);
+	
+	if (unload_addr)
+		g_R_UnloadSkys = (R_UnloadSkys_t)unload_addr;
+
+	if (load_addr)
+		g_R_LoadNamedSkys = (R_LoadNamedSkys_t)load_addr;
+}
+
+#pragma warning(pop)
+#endif
+
 //-----------------------------------------------------------------------------
-// Purpose: If the dynamic sky system is active then this will be the sv_skyname change callback
+// Purpose: The sv_skyname change callback
 //-----------------------------------------------------------------------------
 static void SvSkynameChangedCallback(IConVar* convar, const char*, float)
 {
+#if USES_DYNAMIC_SKY_NEWFUNC
+	InitEngineSkyFunctions();
+	if (g_R_UnloadSkys && g_R_LoadNamedSkys)
+	{
+		g_R_UnloadSkys();
+		g_R_LoadNamedSkys(ConVarRef(convar).GetString());
+	}
+#else
 	//ALWAYS reload the skybox's
 	ModBase_UnloadSkys();
 	ModBase_LoadSkys();
+#endif
 }
 
+#if !USES_DYNAMIC_SKY_NEWFUNC
 //-----------------------------------------------------------------------------
 // Purpose: so i dont need to use modbase_dynamic_skybox.GetBool() (and atoi()) for viewrender
 //			everytime i need to render the skybox. do this
@@ -1133,9 +1253,15 @@ static void ModbaseDynamicSkyboxAnglesChanged(IConVar* convar, const char*, floa
 }
 
 //dynamic skybox change callback
-ConVar modbase_dynamic_skybox("modbase_dynamic_skybox", "1", FCVAR_NONE, "When set to 1, this allows the sv_skyname convar to change the skybox instantly.", ModbaseDynamicSkyboxChanged);
 ConVar modbase_dynamic_skybox_angles("modbase_dynamic_skybox_angles", "0 0 0", FCVAR_NONE, "The angles of the skybox if modbase_dynamix_skybox is set to 1", ModbaseDynamicSkyboxAnglesChanged);
+#endif
 
+#if !USES_DYNAMIC_SKY_NEWFUNC
+//we always need this for the server
+ConVar modbase_dynamic_skybox("modbase_dynamic_skybox", "1", FCVAR_HIDDEN, "When set to 1, this allows the sv_skyname convar to change the skybox instantly.", ModbaseDynamicSkyboxChanged);
+#else
+ConVar modbase_dynamic_skybox("modbase_dynamic_skybox", "1", FCVAR_HIDDEN);
+#endif
 
 #endif
 
@@ -1329,7 +1455,11 @@ int CHLClient::Init( CreateInterfaceFn appSystemFactory, CreateInterfaceFn physi
 	if (sv_skyname)
 		sv_skyname->InstallChangeCallback(SvSkynameChangedCallback);
 
+#if USES_DYNAMIC_SKY_NEWFUNC
+	g_PModBase_DynamicSkybox_bUse = true;
+#else
 	g_PModBase_DynamicSkybox_bUse = modbase_dynamic_skybox.GetBool();
+#endif
 #endif
 
 	g_pClientMode->InitViewport();

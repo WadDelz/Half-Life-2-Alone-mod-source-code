@@ -45,6 +45,9 @@ public:
 			dir *= -1;
 
 		SetValue(GetValue() + dir * m_ScrollDelta);
+		SendSliderDragStartMessage();
+		SendSliderDragEndMessage();
+		SendSliderMovedMessage();
 	}
 
 	int m_ScrollDelta = 1;

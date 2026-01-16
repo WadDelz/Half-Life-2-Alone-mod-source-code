@@ -11,6 +11,10 @@
 //------------------------------------------------------------------------------------------
 void Amod_WriteConfig()
 {
+	//cvar must be not null
+	if (!cvar)
+		return;
+
 	//here is a list of all the commands to write to the cfg
 	static const char* s_CommandsToWrite[] = {
 		"amod_viewbob_enabled",						//viewbob

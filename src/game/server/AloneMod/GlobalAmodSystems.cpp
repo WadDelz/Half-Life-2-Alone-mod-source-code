@@ -295,6 +295,8 @@ void AmodSunChangeCallback(IConVar* var, const char*, float)
 	}
 }
 
+static ConVar amod_ep2_bg_brush_color_day("amod_ep2_bg_brush_color_day", "255 255 255", 0, "The color the _bg_brush (skybox trees) will be for the episodes if amod_day is enabled.");
+static ConVar amod_ep2_bg_brush_color_night("amod_ep2_bg_brush_color_night", "41 41 41", 0, "The color the _bg_brush (skybox trees) will be for the episodes if amod_day is not enabled.");
 
 //alone mod auto game system for epic filter and day/night system
 class CAmodAutoGameSystem : public CAutoGameSystem
@@ -308,18 +310,19 @@ public:
 
 		bool daytime = IsDaytimeEnabled();
 
-		//enable bloom for daytime maps
-		if (daytime)
-		{
-			clientengine->ClientCmd("mat_force_bloom 1");
-			clientengine->ClientCmd("mat_bloomscale 1");
-			clientengine->ClientCmd("mat_bloom_scalefactor_scalar 0.4");
-		}
-		else
-			clientengine->ClientCmd("mat_force_bloom 0");
-
-		//reset the fog vars var
+		//reset all the vars that can get set
+		clientengine->ClientCmd_Unrestricted("mat_force_bloom 0");
 		clientengine->ClientCmd_Unrestricted("fog_override 0");
+		clientengine->ClientCmd_Unrestricted("fog_enable -1");
+		clientengine->ClientCmd_Unrestricted("fog_enableskybox -1");
+		clientengine->ClientCmd_Unrestricted("fog_color -1 -1 -1");
+		clientengine->ClientCmd_Unrestricted("fog_colorskybox -1 -1 -1");
+		clientengine->ClientCmd_Unrestricted("fog_start -1");
+		clientengine->ClientCmd_Unrestricted("fog_end -1");
+		clientengine->ClientCmd_Unrestricted("fog_startskybox -1");
+		clientengine->ClientCmd_Unrestricted("fog_endskybox -1");
+		clientengine->ClientCmd_Unrestricted("fog_maxdensity -1");
+		clientengine->ClientCmd_Unrestricted("fog_maxdensityskybox -1");
 		clientengine->ClientCmd_Unrestricted("r_pixelfog 1");
 		clientengine->ClientCmd_Unrestricted("r_farz -1");
 
@@ -329,6 +332,20 @@ public:
 
 		//get the time info
 		MapTimeInfo_t& info = GetMapTimeInfo(V_GetFileName(gpGlobals->mapname.ToCStr()));
+
+		//enable bloom
+		if (daytime)
+		{
+			clientengine->ClientCmd(CFmtStr("mat_force_bloom %s", StringFromMapTimeStringTableIndex(info.DayInfo.BloomEnabled)));
+			clientengine->ClientCmd(CFmtStr("mat_bloomscale %s", StringFromMapTimeStringTableIndex(info.DayInfo.BloomScale)));
+			clientengine->ClientCmd(CFmtStr("mat_bloom_scalefactor_scalar %s", StringFromMapTimeStringTableIndex(info.DayInfo.BloomScalarFactor)));
+		}
+		else
+		{
+			clientengine->ClientCmd(CFmtStr("mat_force_bloom %s", StringFromMapTimeStringTableIndex(info.NightInfo.BloomEnabled)));
+			clientengine->ClientCmd(CFmtStr("mat_bloomscale %s", StringFromMapTimeStringTableIndex(info.NightInfo.BloomScale)));
+			clientengine->ClientCmd(CFmtStr("mat_bloom_scalefactor_scalar %s", StringFromMapTimeStringTableIndex(info.NightInfo.BloomScalarFactor)));
+		}
 
 		//get the current sky name
 		const char* skyname = "";
@@ -419,51 +436,94 @@ public:
 		//set the sun for the daytime info
 		SetSunForDaytime(info);
 
-		//find the clouds brush
-		CBaseEntity* pEntity = gEntList.FindEntityByName(nullptr, "brush_clouds");
-		if (!pEntity)
-			return;
-
-		//enable or disable
-		if (amod_clouds.GetBool())
-			pEntity->AcceptInput("enable", nullptr, nullptr, variant_t{}, 0);
-		else
-			pEntity->AcceptInput("disable", nullptr, nullptr, variant_t{}, 0);
-
-		//set the clouds color
-		int icolor[4];
-
-		//convert alpha
-		if (amod_clouds_color_override.GetBool())
+		do
 		{
-			//get the color
-			UTIL_StringToIntArray(icolor, 4, amod_clouds_color.GetString());
-			float a = icolor[3] / 255.0f;
-			icolor[0] = (int)((float)icolor[0] * a);
-			icolor[1] = (int)((float)icolor[1] * a);
-			icolor[2] = (int)((float)icolor[2] * a);
-		}
-		else
+			//find the clouds brush
+			CBaseEntity* pEntity = gEntList.FindEntityByName(nullptr, "brush_clouds");
+			if (!pEntity)
+				break;
+
+			//enable or disable
+			if (amod_clouds.GetBool())
+				pEntity->AcceptInput("enable", nullptr, nullptr, variant_t{}, 0);
+			else
+				pEntity->AcceptInput("disable", nullptr, nullptr, variant_t{}, 0);
+
+			//set the clouds color
+			int icolor[4];
+
+			//convert alpha
+			if (amod_clouds_color_override.GetBool())
+			{
+				//get the color
+				UTIL_StringToIntArray(icolor, 4, amod_clouds_color.GetString());
+				float a = icolor[3] / 255.0f;
+				icolor[0] = (int)((float)icolor[0] * a);
+				icolor[1] = (int)((float)icolor[1] * a);
+				icolor[2] = (int)((float)icolor[2] * a);
+			}
+			else
+			{
+				//get the string
+				const char* color = StringFromMapTimeStringTableIndex(IsDaytimeEnabled() ? info.DayInfo.CloudsColor : info.NightInfo.CloudsColor);
+
+				//get the color now
+				UTIL_StringToIntArray(icolor, 4, color);
+				float a = icolor[3] / 255.0f;
+				icolor[0] = (int)((float)icolor[0] * a);
+				icolor[1] = (int)((float)icolor[1] * a);
+				icolor[2] = (int)((float)icolor[2] * a);
+			}
+
+			pEntity->SetRenderColor(icolor[0], icolor[1], icolor[2]);
+		} while (false);
+
+		//enable/disable the _brush_night for the bottom of the episodes skybox
+		do
 		{
-			//get the string
-			const char* color = StringFromMapTimeStringTableIndex(IsDaytimeEnabled() ? info.DayInfo.CloudsColor : info.NightInfo.CloudsColor);
+			//find the _brush_night
+			CBaseEntity* pEntity = gEntList.FindEntityByName(nullptr, "_brush_night");
+			if (!pEntity)
+				break;
 
-			//get the color now
-			UTIL_StringToIntArray(icolor, 4, color);
-			float a = icolor[3] / 255.0f;
-			icolor[0] = (int)((float)icolor[0] * a);
-			icolor[1] = (int)((float)icolor[1] * a);
-			icolor[2] = (int)((float)icolor[2] * a);
-		}
+			//enable or disable
+			if (IsDaytimeEnabled())
+				pEntity->AcceptInput("disable", nullptr, nullptr, variant_t{}, 0);
+			else
+				pEntity->AcceptInput("enable", nullptr, nullptr, variant_t{}, 0);
+		} while (false);
 
-		pEntity->SetRenderColor(icolor[0], icolor[1], icolor[2]);
+		//sets the _brush_bg for episode 2
+		do
+		{
+			//find the _brush_bg for episode 2
+			CBaseEntity* pEntity = gEntList.FindEntityByName(nullptr, "_brush_bg");
+			while (pEntity)
+			{
+				//enable or disable
+				if (IsDaytimeEnabled())
+				{
+					int array[3];
+					UTIL_StringToIntArray(array, 3, amod_ep2_bg_brush_color_day.GetString());
+					pEntity->SetRenderColor(array[0], array[1], array[2]);
+				}
+				else
+				{
+					int array[3];
+					UTIL_StringToIntArray(array, 3, amod_ep2_bg_brush_color_night.GetString());
+					pEntity->SetRenderColor(array[0], array[1], array[2]);
+				}
+
+				pEntity = gEntList.FindEntityByName(pEntity, "_brush_bg");
+			}
+		} while (false);
 	}
 };
 static CAmodAutoGameSystem g_AmodAutoGameSystem;
 
 
-//updates the daytime if dynamic skyboxes are being used
-CON_COMMAND(_amod_day_do, "")
+//resets the time system
+CON_COMMAND_F(_amod_day_do, "", FCVAR_HIDDEN)
 {
 	g_AmodAutoGameSystem.LevelInitPreEntity();
 	g_AmodAutoGameSystem.LevelInitPostEntity();
@@ -652,4 +712,60 @@ void CAmodCoreTimer::InputShowCoreTime(inputdata_t& input)
 	int ctime = (int)(pPlayer->m_fCoreTimerTime - gpGlobals->curtime);
 	Q_snprintf(buf, sizeof(buf), "%d:%02d Minutes Till Core Collapse", (int)(ctime / 60), (int)((int)ctime % 60));
 	UTIL_HudHintText(pPlayer, buf);
+}
+
+
+//-----------------------------------------------------------------------------------------------------------
+// Purpose: Map properties editor sun command to create or destroy it
+//-----------------------------------------------------------------------------------------------------------
+CON_COMMAND_F(_amod_mapedit_server_sun, "", FCVAR_HIDDEN)
+{
+	//delete or create?
+	bool create = atoi(args.Arg(1)) != 0;
+
+	if (create)
+	{
+		CBaseEntity* pSun = gEntList.FindEntityByClassname(nullptr, "env_sun");
+		if (pSun)
+			return;
+
+		pSun = CreateEntityByName("env_sun");
+		pSun->Precache();
+		DispatchSpawn(pSun);
+		pSun->Activate();
+	}
+	else
+	{
+		CBaseEntity* pSun = gEntList.FindEntityByClassname(nullptr, "env_sun");
+		if (pSun)
+			UTIL_Remove(pSun);
+	}
+}
+
+float OppositeAngle(float angle)
+{
+	float opposite = angle + 180.0f;
+	if (opposite >= 360.0f)
+		opposite -= 360.0f;
+	else if (opposite < 0.0f)
+		opposite += 360.0f;
+	return opposite;
+}
+
+//-----------------------------------------------------------------------------------------------------------
+// Purpose: Map properties editor sun command to set its angle to the players eyes
+//-----------------------------------------------------------------------------------------------------------
+CON_COMMAND_F(_amod_mapedit_server_sun_keyvalue, "", FCVAR_HIDDEN)
+{
+	//look for the player
+	CBasePlayer* pPlayer = UTIL_GetLocalPlayer();
+	if (!pPlayer)
+		return;
+
+	//get the sun
+	CBaseEntity* pSun = gEntList.FindEntityByClassname(nullptr, "env_sun");
+	if (!pSun)
+		return;
+
+	pSun->KeyValue(args.Arg(1), args.Arg(2));
 }

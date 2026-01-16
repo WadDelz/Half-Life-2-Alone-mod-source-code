@@ -40,6 +40,11 @@ struct MapTimeInfo_t
 
 		//optional clouds color
 		UtlSymId_t CloudsColor;
+
+		//bloom
+		UtlSymId_t BloomEnabled;
+		UtlSymId_t BloomScale;
+		UtlSymId_t BloomScalarFactor;
 	};
 	
 	//day info
@@ -68,6 +73,11 @@ struct MapTimeInfo_t
 
 		//optional clouds color
 		UtlSymId_t CloudsColor;
+
+		//bloom
+		UtlSymId_t BloomEnabled;
+		UtlSymId_t BloomScale;
+		UtlSymId_t BloomScalarFactor;
 	};
 
 	char mapname[128];		//mapname (e.g d2_coast_01_d). do NOT keep the / of a map name (like bonus_maps/d1_trainstation_01_snowey).
@@ -96,6 +106,9 @@ UtlSymId_t StringToMapTimeStringTableIndex(const char* string);
 //writes the time info to the keyvalues
 void WriteTimeInfoToKeyvalues(MapTimeInfo_t& info, KeyValues* out);
 void WriteAllTimeInfosToFiles();
+
+//copy fuincs
+void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool copynight = true, bool copyday = true);
 
 //Returns if the current map is invalid for the day/night sky change
 bool IsInvalidChangeMap(const char* map);

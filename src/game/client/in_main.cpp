@@ -61,7 +61,7 @@ static int in_cancel = 0;
 
 ConVar cl_anglespeedkey( "cl_anglespeedkey", "0.67", 0 );
 ConVar cl_yawspeed( "cl_yawspeed", "75", FCVAR_NONE, "Client yaw speed.", true, -100000, true, 100000 );
-ConVar cl_pitchspeed( "cl_pitchspeed", "75", FCVAR_NONE, "Client pitch speed.", true, -100000, true, 100000 );
+ConVar cl_pitchspeed( "cl_pitchspeed", "100", FCVAR_NONE, "Client pitch speed.", true, -100000, true, 100000 );
 ConVar cl_pitchdown( "cl_pitchdown", "89", FCVAR_CHEAT );
 ConVar cl_pitchup( "cl_pitchup", "89", FCVAR_CHEAT );
 #if defined( CSTRIKE_DLL )
@@ -716,8 +716,8 @@ void CInput::AdjustYaw( float speed, QAngle& viewangles )
 {
 	if ( !(in_strafe.state & 1) )
 	{
-		viewangles[YAW] -= speed * (cl_yawspeed.GetFloat() * ConVarRef("sensitivity").GetFloat()) * KeyState(&in_right);
-		viewangles[YAW] += speed * (cl_yawspeed.GetFloat() * ConVarRef("sensitivity").GetFloat()) * KeyState(&in_left);
+		viewangles[YAW] -= speed * cl_yawspeed.GetFloat() * KeyState(&in_right);
+		viewangles[YAW] += speed * cl_yawspeed.GetFloat() * KeyState(&in_left);
 	}
 
 	// thirdperson platformer mode
@@ -754,15 +754,15 @@ void CInput::AdjustPitch( float speed, QAngle& viewangles )
 		if ( in_klook.state & 1 )
 		{
 			view->StopPitchDrift ();
-			viewangles[PITCH] -= speed * (cl_pitchspeed.GetFloat() * ConVarRef("sensitivity").GetFloat()) * KeyState(&in_forward);
-			viewangles[PITCH] += speed * (cl_pitchspeed.GetFloat() * ConVarRef("sensitivity").GetFloat()) * KeyState(&in_back);
+			viewangles[PITCH] -= speed * cl_pitchspeed.GetFloat() * KeyState(&in_forward);
+			viewangles[PITCH] += speed * cl_pitchspeed.GetFloat() * KeyState(&in_back);
 		}
 
 		up		= KeyState ( &in_lookup );
 		down	= KeyState ( &in_lookdown );
 		
-		viewangles[PITCH] -= speed * (cl_pitchspeed.GetFloat() * ConVarRef("sensitivity").GetFloat()) * up;
-		viewangles[PITCH] += speed * (cl_pitchspeed.GetFloat() * ConVarRef("sensitivity").GetFloat()) * down;
+		viewangles[PITCH] -= speed * cl_pitchspeed.GetFloat() * up;
+		viewangles[PITCH] += speed * cl_pitchspeed.GetFloat() * down;
 
 		if ( up || down )
 		{

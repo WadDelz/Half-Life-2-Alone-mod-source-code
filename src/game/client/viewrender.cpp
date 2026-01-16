@@ -1354,12 +1354,12 @@ void CViewRender::ViewDrawScene(bool bDrew3dSkybox, SkyboxVisibility_t nSkyboxVi
 		SetClearColorToFogColor();
 	}
 
-#ifdef USES_DYNAMIC_SKY
+#if DRAW_USES_DYNAMIC_SKY
 	bool drawSkybox = g_PModBase_DynamicSkybox_bUse ? false : r_skybox.GetBool();
 #else
 	bool drawSkybox = r_skybox.GetBool();
 #endif
-	if (bDrew3dSkybox || (nSkyboxVisible == SKYBOX_NOT_VISIBLE))
+	if (bDrew3dSkybox || (nSkyboxVisible == SKYBOX_NOT_VISIBLE))	
 	{
 		drawSkybox = false;
 	}
@@ -1462,11 +1462,18 @@ static void GetFogColor(fogparams_t* pFogParams, float* pColor)
 		return;
 
 	const char* fogColorString = fog_color.GetString();
+	bool bdo = true;
 	if (fog_override.GetInt() && fogColorString)
 	{
-		sscanf(fogColorString, "%f%f%f", pColor, pColor + 1, pColor + 2);
+		bdo = false;
+		if (sscanf(fogColorString, "%f %f %f", &pColor[0], &pColor[1], &pColor[2]) == 3)
+		{
+			if (pColor[0] == -1.0f && pColor[1] == -1.0f && pColor[2] == -1.0f)
+				bdo = true;
+		}
 	}
-	else
+	
+	if (bdo)
 	{
 		float flPrimaryColor[3] = { pFogParams->colorPrimary.GetR(), pFogParams->colorPrimary.GetG(), pFogParams->colorPrimary.GetB() };
 		float flSecondaryColor[3] = { pFogParams->colorSecondary.GetR(), pFogParams->colorSecondary.GetG(), pFogParams->colorSecondary.GetB() };
@@ -1659,11 +1666,18 @@ static void GetSkyboxFogColor(float* pColor)
 	CPlayerLocalData* local = &pbp->m_Local;
 
 	const char* fogColorString = fog_colorskybox.GetString();
+	bool bDo = true;
 	if (fog_override.GetInt() && fogColorString)
 	{
-		sscanf(fogColorString, "%f%f%f", pColor, pColor + 1, pColor + 2);
+		bDo = false;
+		if (sscanf(fogColorString, "%f %f %f", &pColor[0], &pColor[1], &pColor[2]) == 3)
+		{
+			if (pColor[0] == -1.0f && pColor[1] == -1.0f && pColor[2] == -1.0f)
+				bDo = true;
+		}
 	}
-	else
+	
+	if (bDo)
 	{
 		if (local->m_skybox3d.fog.blend)
 		{
@@ -5118,7 +5132,7 @@ void CSkyboxView::DrawInternal(view_id_t iSkyBoxViewID, bool bInvokePreAndPostRe
 
 	g_pClientShadowMgr->ComputeShadowTextures((*this), m_pWorldListInfo->m_LeafCount, m_pWorldListInfo->m_pLeafList);
 
-#ifdef USES_DYNAMIC_SKY
+#if DRAW_USES_DYNAMIC_SKY
 	if (g_PModBase_DynamicSkybox_bUse)
 		ModBase_DrawSkyBox(view->GetZFar());
 #endif
@@ -5169,7 +5183,7 @@ bool CSkyboxView::Setup(const CViewSetup& view, int* pClearFlags, SkyboxVisibili
 
 	if (!m_pSky3dParams)
 	{
-#ifdef USES_DYNAMIC_SKY
+#if DRAW_USES_DYNAMIC_SKY
 		//modbase
 		if (g_PModBase_DynamicSkybox_bUse)
 			ModBase_DrawSkyBox(view.zFar);
@@ -5185,7 +5199,7 @@ bool CSkyboxView::Setup(const CViewSetup& view, int* pClearFlags, SkyboxVisibili
 	*pClearFlags |= VIEW_CLEAR_DEPTH; // Need to clear depth after rednering the skybox
 
 	m_DrawFlags = DF_RENDER_UNDERWATER | DF_RENDER_ABOVEWATER | DF_RENDER_WATER;
-#ifdef USES_DYNAMIC_SKY
+#if DRAW_USES_DYNAMIC_SKY
 	if (r_skybox.GetBool() && !g_PModBase_DynamicSkybox_bUse) //modbase
 #else
 	if (r_skybox.GetBool()) //modbase

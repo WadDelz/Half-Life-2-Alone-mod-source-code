@@ -241,6 +241,8 @@ void VGui_CreateGlobalPanels( void )
 #endif
 }
 
+void DeleteMapPropertiesPanel();
+
 void VGui_Shutdown()
 {
 	g_SoundscapeMaker->Destroy();
@@ -251,6 +253,7 @@ void VGui_Shutdown()
 	optionspanel->Destroy();
 	newgamepanel->Destroy();
 	g_EffectsPanelInterface->Destroy();
+	DeleteMapPropertiesPanel();
 
 	VGUI_DestroyClientDLLRootPanel();
 
