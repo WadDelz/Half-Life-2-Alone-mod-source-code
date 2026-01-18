@@ -35,6 +35,7 @@ public:
 	//keyvalues
 	bool KeyValue(const char* key, const char* value)
 	{
+		//angles
 		if (!Q_stricmp(key, "angle"))
 		{
 			m_flYaw = atof(value);
@@ -55,35 +56,50 @@ public:
 			float tp, tr;
 			sscanf(value, "%f %f %f", &tp, &m_flYaw, &tr);
 
-			m_flPitch = atof(value);
 			SetupLightNormalFromProps(GetAbsAngles(), m_flYaw, m_flPitch, m_vDirection.GetForModify());
 			m_vDirection = -m_vDirection.Get();
 			return true;
 		}
-		else if (!Q_stricmp(key, "color"))
+
+		//color
+		else if (!Q_stricmp(key, "overlaycolor"))
 		{
 			//scan the yaw out of it
 			int r, g, b;
 			sscanf(value, "%d %d %d", &r, &g, &b);
-			SetRenderColor(r, g, b);
+			m_clrOverlay.GetForModify().r = r;
+			m_clrOverlay.GetForModify().g = g;
+			m_clrOverlay.GetForModify().b = b;
 			return true;
 		}
+
+		//size
 		else if (!Q_stricmp(key, "size"))
 		{
 			m_nSize = atoi(value);
 			return true;
 		}
-		else if (!Q_stricmp(key, "size"))
+		else if (!Q_stricmp(key, "overlaysize"))
 		{
 			m_nOverlaySize = atoi(value);
 			return true;
 		}
+
+		//material
 		else if (!Q_stricmp(key, "material"))
 		{
 			m_strMaterial = AllocPooledString(value);
 			m_nMaterial = PrecacheModel(value);
 			return true;
 		}
+		else if (!Q_stricmp(key, "overlaymaterial"))
+		{
+			m_strOverlayMaterial = AllocPooledString(value);
+			m_nOverlayMaterial = PrecacheModel(value);
+			return true;
+		}
+
+		//hdr color scale
 		else if (!Q_stricmp(key, "HDRColorScale"))
 		{
 			m_flHDRColorScale = atof(value);

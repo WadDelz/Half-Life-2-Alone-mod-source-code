@@ -1,5 +1,8 @@
 //HOLY FUCK IM FINALLY DONE (i fucking hope so) I HAVBE BEEN DOING THIS FOR THE LAST 8 HOURS AND NOW IM FINALLY DONE
 //IT HAS TAKEN OVER 3 DAYS YIPPE
+
+
+//This comment above was from over a year ago. Turned out i wasnt done. No more yippe
 #include "cbase.h"
 #include <vgui/IVGui.h>
 #include <vgui_controls/Frame.h>
@@ -1108,6 +1111,8 @@ COptionsPanel::COptionsPanel(vgui::VPANEL parent)
 	SetMoveable(true);
 	SetVisible(true);
 
+	SetRoundedCorners(0);
+
 	//load the scheme settings
 	SetScheme(vgui::scheme()->LoadSchemeFromFile("resource/SourceScheme.res", "SourceScheme"));
 
@@ -1133,9 +1138,9 @@ COptionsPanel::COptionsPanel(vgui::VPANEL parent)
 	float FilterExponentValue = GetFilterOnExponentValue(m_FilterOnExponent);
 	float FilterOffValue = GetFilterOffValue(m_FilterOffValue);
 
-	//set the monitor gamma values for the filter
+	//set the monitor gamma values for the filter.
+	engine->ClientCmd_Unrestricted(CFmtStr("mat_monitorgamma %f", FilterOffValue));
 	engine->ClientCmd_Unrestricted(CFmtStr("mat_monitorgamma_tv_exp %f", FilterExponentValue));
-	engine->ClientCmd_Unrestricted(CFmtStr("mat_monitorgamma %f", FilterOnValue));
 
 	//alias the toggle filter commands
 	engine->ClientCmd_Unrestricted(CFmtStr("alias tf1 \"mat_monitorgamma %f; mat_monitorgamma_tv_enabled 1; Amod_FilterSet 1; alias Amod_ToggleFilter tf2\"", FilterOnValue));			//when the filter is set off

@@ -479,44 +479,38 @@ public:
 		} while (false);
 
 		//enable/disable the _brush_night for the bottom of the episodes skybox
-		do
+		CBaseEntity* pEntity = gEntList.FindEntityByName(nullptr, "_brush_night");
+		while (pEntity)
 		{
-			//find the _brush_night
-			CBaseEntity* pEntity = gEntList.FindEntityByName(nullptr, "_brush_night");
-			if (!pEntity)
-				break;
-
 			//enable or disable
 			if (IsDaytimeEnabled())
 				pEntity->AcceptInput("disable", nullptr, nullptr, variant_t{}, 0);
 			else
 				pEntity->AcceptInput("enable", nullptr, nullptr, variant_t{}, 0);
-		} while (false);
+
+			pEntity = gEntList.FindEntityByName(pEntity, "_brush_night");
+		}
 
 		//sets the _brush_bg for episode 2
-		do
+		pEntity = gEntList.FindEntityByName(nullptr, "_brush_bg");
+		while (pEntity)
 		{
-			//find the _brush_bg for episode 2
-			CBaseEntity* pEntity = gEntList.FindEntityByName(nullptr, "_brush_bg");
-			while (pEntity)
+			//enable or disable
+			if (IsDaytimeEnabled())
 			{
-				//enable or disable
-				if (IsDaytimeEnabled())
-				{
-					int array[3];
-					UTIL_StringToIntArray(array, 3, amod_ep2_bg_brush_color_day.GetString());
-					pEntity->SetRenderColor(array[0], array[1], array[2]);
-				}
-				else
-				{
-					int array[3];
-					UTIL_StringToIntArray(array, 3, amod_ep2_bg_brush_color_night.GetString());
-					pEntity->SetRenderColor(array[0], array[1], array[2]);
-				}
-
-				pEntity = gEntList.FindEntityByName(pEntity, "_brush_bg");
+				int array[3];
+				UTIL_StringToIntArray(array, 3, amod_ep2_bg_brush_color_day.GetString());
+				pEntity->SetRenderColor(array[0], array[1], array[2]);
 			}
-		} while (false);
+			else
+			{
+				int array[3];
+				UTIL_StringToIntArray(array, 3, amod_ep2_bg_brush_color_night.GetString());
+				pEntity->SetRenderColor(array[0], array[1], array[2]);
+			}
+
+			pEntity = gEntList.FindEntityByName(pEntity, "_brush_bg");
+		}
 	}
 };
 static CAmodAutoGameSystem g_AmodAutoGameSystem;

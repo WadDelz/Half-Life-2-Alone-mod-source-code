@@ -34,9 +34,10 @@ struct GameListInfo_t
 	CUtlVector<DayInfo_t> m_DayInfo;
 };
 
-#define COMMAND_CHAPTER_1 "LoadChapter1"
-#define COMMAND_CHAPTER_2 "LoadChapter2"
-#define COMMAND_CHAPTER_3 "LoadChapter3"
+#define COMMAND_CHAPTER_PREFIX "LoadChapter"
+#define COMMAND_CHAPTER_1 COMMAND_CHAPTER_PREFIX "1"
+#define COMMAND_CHAPTER_2 COMMAND_CHAPTER_PREFIX "2"
+#define COMMAND_CHAPTER_3 COMMAND_CHAPTER_PREFIX "3"
 #define COMMAND_PREV "PrevChapter"
 #define COMMAND_NEXT "NextChapter"
 
@@ -52,6 +53,7 @@ public:
 
 	//initalizes the elements
 	void InitElements();
+	void InitThemesComboBox();		//init the themes combo box
 
 	//map functions
 	void LoadNewGameInfo(const char* filename);
@@ -81,8 +83,11 @@ private:
 	vgui::Button* m_NextButton;
 	vgui::Button* m_PrevButton;
 
-	//make the game combo box
+	//game combo box
 	vgui::ComboBox* m_GameComboBox;
+
+	//the themes combo box
+	vgui::ComboBox* m_ThemesComboBox;
 };
 
 //-----------------------------------------------------------------------
@@ -108,7 +113,7 @@ CNewGamePanel::CNewGamePanel(vgui::VPANEL parent) : BaseClass(nullptr, "NewGameP
 
 	//set title
 	SetTitle("Chapter Select", false);
-	SetSize(520, 190);
+	SetSize(520, 215);
 	MoveToCenterOfScreen();
 
 	//init the elements
@@ -119,9 +124,9 @@ CNewGamePanel::CNewGamePanel(vgui::VPANEL parent) : BaseClass(nullptr, "NewGameP
 	m_CurrentSelectedGameInfo = nullptr;
 
 	//load all the new game lists in the games/* folder BUT always load resource/gamelist.txt first
-	{
-		LoadNewGameInfo("resource/gamelist.txt");
+	LoadNewGameInfo("resource/gamelist.txt");
 
+	{
 		FileFindHandle_t handle;
 		const char* firstfile = filesystem->FindFirst("resource/games/*.txt", &handle);
 		while (firstfile)
@@ -201,18 +206,82 @@ void CNewGamePanel::InitElements()
 
 	//create the next and previous button
 	m_PrevButton = new vgui::Button(this, "PreviousButton", "Previous");
-	m_PrevButton->SetBounds(10, 160, 80, 25);
+	m_PrevButton->SetBounds(10, 185, 80, 25);
 	m_PrevButton->SetCommand(COMMAND_PREV);
 	m_PrevButton->SetEnabled(false);
 
 	m_NextButton = new vgui::Button(this, "NextButton", "Next");
-	m_NextButton->SetBounds(430, 160, 80, 25);
+	m_NextButton->SetBounds(430, 185, 80, 25);
 	m_NextButton->SetCommand(COMMAND_NEXT);
 	m_NextButton->SetEnabled(false);
 
 	//make the game combo box
 	m_GameComboBox = new vgui::ComboBox(this, "GameComboBox", 10, false);
 	m_GameComboBox->SetBounds(100, 160, 320, 25);
+
+	//make the themes combo box
+	m_ThemesComboBox = new vgui::ComboBox(this, "ThemesComboBox", 10, false);
+	m_ThemesComboBox->SetBounds(100, 185, 320, 25);
+
+	InitThemesComboBox();
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Initalizes the themes combo box
+//-----------------------------------------------------------------------
+void CNewGamePanel::InitThemesComboBox()
+{
+	//get the active item
+	char oldtext[128];
+	m_ThemesComboBox->GetText(oldtext, sizeof(oldtext));
+
+	//clear the combo box
+	m_ThemesComboBox->RemoveAll();
+
+	//ALWAYS load the default theme
+	m_ThemesComboBox->AddItem("THEME: Default", new KeyValues("resource/time_info"));
+
+	//active item
+	int index = 0, curr = 1;
+
+	//go through all files in the time_info/* directory and gather each folder
+	FileFindHandle_t handle;
+	const char* firstfile = filesystem->FindFirst("resource/time_info/*", &handle);
+	while (firstfile)
+	{
+		//dont read the . filenames
+		if (!Q_stricmp(firstfile, ".") || !Q_stricmp(firstfile, ".."))
+		{
+			firstfile = filesystem->FindNext(handle);
+			continue;
+		}
+
+		//must be a directory.
+		if (!filesystem->FindIsDirectory(handle))
+		{
+			firstfile = filesystem->FindNext(handle);
+			continue;
+		}
+
+		//ignore _IGNORE directory
+		if (!Q_stricmp(firstfile, "_IGNORE"))
+		{
+			firstfile = filesystem->FindNext(handle);
+			continue;
+		}
+
+		//check the text with the previous text
+		const char* text = CFmtStr("THEME: %s", firstfile);
+		if (!Q_stricmp(oldtext, text))
+			index = curr;
+
+		//add the item
+		m_ThemesComboBox->AddItem(text, new KeyValues(CFmtStr("resource/time_info/%s", firstfile)));
+		firstfile = filesystem->FindNext(handle);
+		curr++;
+	}
+
+	m_ThemesComboBox->ActivateItem(index);
 }
 
 //-----------------------------------------------------------------------
@@ -220,30 +289,11 @@ void CNewGamePanel::InitElements()
 //-----------------------------------------------------------------------
 void CNewGamePanel::LoadNewGameInfo(const char* filename)
 {
-	//load the HL2_AloneMod_english.txt
-	KeyValues* AloneModEnglish = new  KeyValues("AloneModEnglish");
-	if (!AloneModEnglish->LoadFromFile(filesystem, "resource/HL2_AloneMod_english.txt", "MOD"))
-	{
-		ConWarning("Error: Failed to load the 'resource/HL2_AloneMod_english.txt' for the new game panel!\n%s\n", filename);
-		AloneModEnglish->deleteThis();
-		return;
-	}
-
-	//get the tokens
-	KeyValues* tokens = AloneModEnglish->FindKey("Tokens");
-	if (!tokens)
-	{
-		ConWarning("Error: Failed to find the 'Tokens' key for 'resource/HL2_AloneMod_english.txt' for the new game panel!\n%s\n", filename);
-		AloneModEnglish->deleteThis();
-		return;
-	}
-
 	//load the file
 	KeyValues* gamelist = new KeyValues("gamelist");
 	if (!gamelist->LoadFromFile(filesystem, filename, "MOD"))
 	{
 		ConWarning("Error: Failed to load the gamelist for the new game panel!\n%s\n", filename);
-		AloneModEnglish->deleteThis();
 		gamelist->deleteThis();
 		return;
 	}
@@ -251,6 +301,25 @@ void CNewGamePanel::LoadNewGameInfo(const char* filename)
 	//go through each subkey
 	FOR_EACH_TRUE_SUBKEY(gamelist, game)
 	{
+		//load the resource file. I could call this before the for loop but cant be bothered changing it. This runs once on startup so it shouldnt be an issue
+		const char* resource = game->GetString("resource", "resource/HL2_AloneMod_english.txt");
+		KeyValues* AloneModEnglish = new  KeyValues("AloneModEnglish");
+		if (!AloneModEnglish->LoadFromFile(filesystem, resource, "MOD"))
+		{
+			ConWarning("Error: Failed to load the '%s' file for the new game panel!\n%s->%s\n", resource, filename, game->GetName());
+			AloneModEnglish->deleteThis();
+			continue;
+		}
+
+		//get the tokens
+		KeyValues* tokens = AloneModEnglish->FindKey("Tokens");
+		if (!tokens)
+		{
+			ConWarning("Error: Failed to find the 'Tokens' key for %s for the new game panel!\n%s\n", filename);
+			AloneModEnglish->deleteThis();
+			continue;
+		}
+
 		//check for default
 		if (game->GetBool("Default") && m_SelectedGameIndex == -1)
 			m_SelectedGameIndex = m_GameInfo.Count();
@@ -274,7 +343,10 @@ void CNewGamePanel::LoadNewGameInfo(const char* filename)
 		//get the day info
 		KeyValues* day = game->FindKey("DayInfo");
 		if (!day)
+		{
+			AloneModEnglish->deleteThis();
 			continue;
+		}
 
 		FOR_EACH_TRUE_SUBKEY(day, days)
 		{
@@ -289,6 +361,9 @@ void CNewGamePanel::LoadNewGameInfo(const char* filename)
 			dayinfo.max = days->GetInt("EndChapter");
 			dayinfo.convar = convar;
 		}
+
+		//delete the alone mod resource config
+		AloneModEnglish->deleteThis();
 	}
 
 	//check our index
@@ -303,7 +378,6 @@ void CNewGamePanel::LoadNewGameInfo(const char* filename)
 		m_GameComboBox->AddItem(CFmtStr("Game: %s", m_GameInfo[i].name), nullptr);
 
 	//delete the configs
-	AloneModEnglish->deleteThis();
 	gamelist->deleteThis();
 }
 
@@ -365,7 +439,7 @@ void CNewGamePanel::SelectPage(int page)
 		m_ChapterButtons[i]->SetText(CFmtStr("Load Chapter %d", realindex));
 
 		//check for daytime
-		bool did = false;
+		const char* sDayTime = "";
 		for (int j = 0; j < m_CurrentSelectedGameInfo->m_DayInfo.Count(); j++)
 		{
 			//check the info
@@ -373,14 +447,24 @@ void CNewGamePanel::SelectPage(int page)
 			
 			if (info.convar->GetBool() && (realindex >= info.min && realindex <= info.max))
 			{
-				m_ChapterImages[i]->SetImage(CFmtStr("chapters/%s/chapter%d_day", m_CurrentSelectedGameInfo->prefix, realindex));
-				did = true;
+				sDayTime = "_day";
 				break;
 			}
 		}
-		
-		if (!did)
-			m_ChapterImages[i]->SetImage(CFmtStr("chapters/%s/chapter%d", m_CurrentSelectedGameInfo->prefix, realindex));
+
+		//see if an image exists with the chapters/(FE)/%s/chapters%d%s name where (FE) is just V_GetFileName(m_ThemesComboBox->GetActiveItemUserData()->GetName()).
+		char buf[512] = { 0 };
+
+		if (m_ThemesComboBox->GetActiveItem() != 0)
+			Q_snprintf(buf, sizeof(buf), "chapters/%s/%s/chapter%d%s", V_GetFileName(m_ThemesComboBox->GetActiveItemUserData()->GetName()), m_CurrentSelectedGameInfo->prefix, realindex, sDayTime);
+
+		if (m_ThemesComboBox->GetActiveItem() == 0 || IsErrorMaterial(materials->FindMaterial(CFmtStr("vgui/%s", buf), TEXTURE_GROUP_VGUI, false)))
+		{
+			//resort to default filepath
+			Q_snprintf(buf, sizeof(buf), "chapters/default/%s/chapter%d%s", m_CurrentSelectedGameInfo->prefix, realindex, sDayTime);
+		}
+
+		m_ChapterImages[i]->SetImage(buf);
 
 		//set visibility
 		m_ChapterNames[i]->SetVisible(true);
@@ -414,19 +498,20 @@ void CNewGamePanel::OnCommand(const char* pszCommand)
 		SelectPage(m_CurrentSelectedGameInfo->CurrentChapterIndex - 1);
 		return;
 	}
-	else if (!Q_stricmp(pszCommand, COMMAND_CHAPTER_1))
+	
+	//check for COMMAND_CHAPTER_PREFIX
+	else if (!Q_strnicmp(pszCommand, COMMAND_CHAPTER_PREFIX, Q_strlen(COMMAND_CHAPTER_PREFIX)))
 	{
-		engine->ClientCmd(CFmtStr("exec %s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentSelectedGameInfo->CurrentChapterIndex * 3) + 1));
+		//load the theme
+		extern ConVar amod_timeinfo_load_directory;
+		amod_timeinfo_load_directory.SetValue(m_ThemesComboBox->GetActiveItemUserData()->GetName());
+		engine->ClientCmd("amod_timeinfo_reset_noreload");
+		
+		int index = Q_atoi(pszCommand + Q_strlen(COMMAND_CHAPTER_PREFIX));
+		engine->ClientCmd(CFmtStr("exec \"%s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentSelectedGameInfo->CurrentChapterIndex * 3) + index));
+		return;
 	}
-	else if (!Q_stricmp(pszCommand, COMMAND_CHAPTER_2))
-	{
-		engine->ClientCmd(CFmtStr("exec %s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentSelectedGameInfo->CurrentChapterIndex * 3) + 2));
-	}
-	else if (!Q_stricmp(pszCommand, COMMAND_CHAPTER_3))
-	{
-		engine->ClientCmd(CFmtStr("exec %s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentSelectedGameInfo->CurrentChapterIndex * 3) + 3));
-	}
-
+	
 	BaseClass::OnCommand(pszCommand);
 }
 
@@ -436,11 +521,24 @@ void CNewGamePanel::OnCommand(const char* pszCommand)
 void CNewGamePanel::OnTextChanged(KeyValues* kv)
 {
 	//check the panel
-	if (kv->GetPtr("Panel") != m_GameComboBox)
+	if (kv->GetPtr("Panel") == m_GameComboBox)
+	{
+		ActivateGame(m_GameComboBox->GetActiveItem());
 		return;
+	}
+
+	//check for the themes combo box. This is because if we change the theme. There is a chance
+	//the theme uses its own custom chapter images.
+	else if (kv->GetPtr("Panel") == m_ThemesComboBox)
+	{
+		//select the active page
+		if (m_CurrentSelectedGameInfo)
+			SelectPage(m_CurrentSelectedGameInfo->CurrentChapterIndex);
+
+		return;
+	}
 
 	//select the new game
-	ActivateGame(m_GameComboBox->GetActiveItem());
 }
 
 
@@ -468,6 +566,9 @@ public:
 		{
 			m_NewGamePanel->Activate();
 			m_NewGamePanel->MoveToCenterOfScreen();
+
+			//reset the themes combo box
+			m_NewGamePanel->InitThemesComboBox();
 		}
 	}
 
