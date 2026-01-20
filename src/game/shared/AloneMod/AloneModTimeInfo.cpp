@@ -282,6 +282,11 @@ CON_COMMAND_F(_amod_daytimeinfo_reset, "", FCVAR_HIDDEN)
 
 	//get and set the info
 	MapTimeInfo_t& info = DayNightInfo[_file].base[_map];
+
+	//clear the current fog/sun info then reload the info
+	info.DayInfo.FogInfo.RemoveAll();
+	info.DayInfo.SunInfo.RemoveAll();
+	info.NightInfo.FogInfo.RemoveAll();
 	InitalizeDayNightInfoFileInternally(file, info);
 }
 #else

@@ -14,7 +14,6 @@ extern IVEngineClient* clientengine;
 //change callbacks
 void AmodSkyCallback(IConVar* var, const char*, float);
 void AmodEpicFilterCallback(IConVar* var, const char*, float);
-void AmodEpicFilterChangedDataCallback(IConVar* var, const char*, float);
 void AmodCloudsChangeCallback(IConVar* var, const char*, float);
 void AmodSunChangeCallback(IConVar* var, const char*, float);
 
@@ -25,10 +24,10 @@ ConVar amod_day_sky("amod_day_sky", "", 0, "", AmodSkyCallback);
 
 //epic filter
 ConVar amod_epic_filter("amod_epic_filter", "0", 0, "", AmodEpicFilterCallback);
-ConVar amod_epic_filter_night_filename("amod_epic_filter_night_filename", "", 0, "", AmodEpicFilterChangedDataCallback);
-ConVar amod_epic_filter_night_intensity("amod_epic_filter_night_intensity", "", 0, "", AmodEpicFilterChangedDataCallback);
-ConVar amod_epic_filter_day_filename("amod_epic_filter_day_filename", "", 0, "", AmodEpicFilterChangedDataCallback);
-ConVar amod_epic_filter_day_intensity("amod_epic_filter_day_intensity", "", 0, "", AmodEpicFilterChangedDataCallback);
+ConVar amod_epic_filter_night_filename("amod_epic_filter_night_filename", "", 0, "", AmodEpicFilterCallback);
+ConVar amod_epic_filter_night_intensity("amod_epic_filter_night_intensity", "", 0, "", AmodEpicFilterCallback);
+ConVar amod_epic_filter_day_filename("amod_epic_filter_day_filename", "", 0, "", AmodEpicFilterCallback);
+ConVar amod_epic_filter_day_intensity("amod_epic_filter_day_intensity", "", 0, "", AmodEpicFilterCallback);
 
 //alone mod clouds convar
 ConVar amod_clouds("amod_clouds", "0", 0, "", AmodCloudsChangeCallback);
@@ -323,6 +322,15 @@ public:
 		clientengine->ClientCmd_Unrestricted("fog_endskybox -1");
 		clientengine->ClientCmd_Unrestricted("fog_maxdensity -1");
 		clientengine->ClientCmd_Unrestricted("fog_maxdensityskybox -1");
+
+		clientengine->ClientCmd_Unrestricted("fog_blend -1");
+		clientengine->ClientCmd_Unrestricted("fog_blendangle -1");
+		clientengine->ClientCmd_Unrestricted("fog_blendcolor -1 -1 -1");
+
+		clientengine->ClientCmd_Unrestricted("fog_blendskybox -1");
+		clientengine->ClientCmd_Unrestricted("fog_blendangleskybox -1");
+		clientengine->ClientCmd_Unrestricted("fog_blendcolorskybox -1 -1 -1");
+
 		clientengine->ClientCmd_Unrestricted("r_pixelfog 1");
 		clientengine->ClientCmd_Unrestricted("r_farz -1");
 
@@ -520,19 +528,6 @@ static CAmodAutoGameSystem g_AmodAutoGameSystem;
 CON_COMMAND_F(_amod_day_do, "", FCVAR_HIDDEN)
 {
 	g_AmodAutoGameSystem.LevelInitPreEntity();
-	g_AmodAutoGameSystem.LevelInitPostEntity();
-}
-
-
-//--------------------------------------------------------------------------------------------
-// Purpose: Changes the data for the epic filter
-//--------------------------------------------------------------------------------------------
-void AmodEpicFilterChangedDataCallback(IConVar* var, const char*, float)
-{
-	if (!clientengine->IsConnected())
-		return;
-
-	//hack: call this to update the filter
 	g_AmodAutoGameSystem.LevelInitPostEntity();
 }
 

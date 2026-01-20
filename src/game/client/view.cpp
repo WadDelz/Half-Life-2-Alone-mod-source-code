@@ -654,7 +654,9 @@ float CViewRender::GetZFar()
 {
 	// Initialize view structure with default values
 	float farZ;
-	if ( r_farz.GetFloat() < 1 )
+
+	extern ConVar fog_override;
+	if ( r_farz.GetFloat() < 1 || !fog_override.GetBool())
 	{
 		// Use the far Z from the map's parameters.
 		farZ = r_mapextents.GetFloat() * 1.73205080757f;

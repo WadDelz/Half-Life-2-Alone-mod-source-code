@@ -57,6 +57,7 @@
 //alone mod stuff
 #include "AloneMod/AmodCvars.h"
 #include "AloneMod/DynamicSky.h"
+#include "debugoverlay_shared.h"
 
 #ifdef PORTAL
 //#include "C_Portal_Player.h"
@@ -130,8 +131,8 @@ ConVar r_worldlistcache("r_worldlistcache", "1");
 //-----------------------------------------------------------------------------
 // Convars related to fog color
 //-----------------------------------------------------------------------------
-static ConVar fog_override("fog_override", "0", FCVAR_CHEAT);
 // set any of these to use the maps fog
+ConVar fog_override("fog_override", "0", FCVAR_CHEAT);
 static ConVar fog_start("fog_start", "-1", FCVAR_CHEAT);
 static ConVar fog_end("fog_end", "-1", FCVAR_CHEAT);
 static ConVar fog_color("fog_color", "-1 -1 -1", FCVAR_CHEAT);
@@ -143,6 +144,14 @@ static ConVar fog_colorskybox("fog_colorskybox", "-1 -1 -1", FCVAR_CHEAT);
 static ConVar fog_enableskybox("fog_enableskybox", "1", FCVAR_CHEAT);
 static ConVar fog_maxdensity("fog_maxdensity", "-1", FCVAR_CHEAT);
 
+//alone mod
+static ConVar fog_blend("fog_blend", "-1", FCVAR_CHEAT);
+static ConVar fog_blendangle("fog_blendangle", "-1", FCVAR_CHEAT);
+static ConVar fog_blendcolor("fog_blendcolor", "-1 -1 -1", FCVAR_CHEAT);
+
+static ConVar fog_blendskybox("fog_blendskybox", "-1", FCVAR_CHEAT);
+static ConVar fog_blendangleskybox("fog_blendangleskybox", "-1", FCVAR_CHEAT);
+static ConVar fog_blendcolorskybox("fog_blendcolorskybox", "-1 -1 -1", FCVAR_CHEAT);
 
 //-----------------------------------------------------------------------------
 // Water-related convars
@@ -1461,52 +1470,122 @@ static void GetFogColor(fogparams_t* pFogParams, float* pColor)
 	if (!pbp || !pFogParams)
 		return;
 
-	const char* fogColorString = fog_color.GetString();
-	bool bdo = true;
-	if (fog_override.GetInt() && fogColorString)
+	float flPrimaryColor[3] = { -1, -1, -1 };
+	float flSecondaryColor[3] = { -1, -1, -1 };
+
 	{
-		bdo = false;
-		if (sscanf(fogColorString, "%f %f %f", &pColor[0], &pColor[1], &pColor[2]) == 3)
+		//check for the fog_color convar
+		const char* fogColorString = fog_color.GetString();
+		if (fog_override.GetBool() && fogColorString)
 		{
-			if (pColor[0] == -1.0f && pColor[1] == -1.0f && pColor[2] == -1.0f)
-				bdo = true;
+			//suck the values out
+			if (sscanf(fogColorString, "%f %f %f", &flPrimaryColor[0], &flPrimaryColor[1], &flPrimaryColor[2]) < 3)
+			{
+				//if we got less then 3 floats then init them to -1
+				flPrimaryColor[0] = -1;
+				flPrimaryColor[1] = -1;
+				flPrimaryColor[2] = -1;
+			}
+		}
+
+		//set our vars to the default if needed
+		if (flPrimaryColor[0] == -1 && flPrimaryColor[1] == -1 && flPrimaryColor[2] == -1)
+		{
+			flPrimaryColor[0] = pFogParams->colorPrimary.GetR();
+			flPrimaryColor[1] = pFogParams->colorPrimary.GetG();
+			flPrimaryColor[2] = pFogParams->colorPrimary.GetB();
 		}
 	}
-	
-	if (bdo)
-	{
-		float flPrimaryColor[3] = { pFogParams->colorPrimary.GetR(), pFogParams->colorPrimary.GetG(), pFogParams->colorPrimary.GetB() };
-		float flSecondaryColor[3] = { pFogParams->colorSecondary.GetR(), pFogParams->colorSecondary.GetG(), pFogParams->colorSecondary.GetB() };
 
+	{
+		//check for the fog_blendcolor convar
+		const char* fogBlendColorString = fog_blendcolor.GetString();
+		if (fog_override.GetBool() && fogBlendColorString)
+		{
+			//suck the values out
+			if (sscanf(fogBlendColorString, "%f %f %f", &flSecondaryColor[0], &flSecondaryColor[1], &flSecondaryColor[2]) < 3)
+			{
+				//if we got less then 3 floats then init them to -1
+				flSecondaryColor[0] = -1;
+				flSecondaryColor[1] = -1;
+				flSecondaryColor[2] = -1;
+			}
+		}
+	
+		//set our vars to the default if needed
+		if (flSecondaryColor[0] == -1 && flSecondaryColor[1] == -1 && flSecondaryColor[2] == -1)
+		{
+			flSecondaryColor[0] = pFogParams->colorSecondary.GetR();
+			flSecondaryColor[1] = pFogParams->colorSecondary.GetG();
+			flSecondaryColor[2] = pFogParams->colorSecondary.GetB();
+		}
+	}
+
+	//dont do this if fog_override is enabled
+	if (!fog_override.GetBool())
 		GetFogColorTransition(pFogParams, flPrimaryColor, flSecondaryColor);
 
-		if (pFogParams->blend)
+	//should we blend?
+	bool blend = pFogParams->blend;
+	if (fog_override.GetBool() && fog_blend.GetInt() != -1)
+		blend = fog_blend.GetBool();
+
+	if (blend)
+	{
+		Vector dir = pFogParams->dirPrimary;
+
+		//set the blend angle
+		if (fog_override.GetBool() && fog_blendangle.GetFloat() != -1)
 		{
-			//
-			// Blend between two fog colors based on viewing angle.
-			// The secondary fog color is at 180 degrees to the primary fog color.
-			//
-			Vector forward;
-			pbp->EyeVectors(&forward, NULL, NULL);
-
-			Vector vNormalized = pFogParams->dirPrimary;
-			VectorNormalize(vNormalized);
-			pFogParams->dirPrimary = vNormalized;
-
-			float flBlendFactor = 0.5 * forward.Dot(pFogParams->dirPrimary) + 0.5;
-
-			// FIXME: convert to linear colorspace
-			pColor[0] = flPrimaryColor[0] * flBlendFactor + flSecondaryColor[0] * (1 - flBlendFactor);
-			pColor[1] = flPrimaryColor[1] * flBlendFactor + flSecondaryColor[1] * (1 - flBlendFactor);
-			pColor[2] = flPrimaryColor[2] * flBlendFactor + flSecondaryColor[2] * (1 - flBlendFactor);
+			QAngle ang;
+			ang.Init(0, fog_blendangle.GetFloat(), 0);
+			AngleVectors(ang, &dir);	
+			VectorNormalize(dir);
 		}
-		else
+
+		//
+		// Blend between two fog colors based on viewing angle.
+		// The secondary fog color is at 180 degrees to the primary fog color.
+		//
+		Vector forward;
+		pbp->EyeVectors(&forward, NULL, NULL);
+		VectorNormalize(forward);
+
+		Vector vNormalized = dir;
+		VectorNormalize(vNormalized);
+		dir = vNormalized;
+
+		//get and clamp the blend factor
+		float flBlendFactor = 0.5 * forward.Dot(dir) + 0.5;
+		//flBlendFactor = clamp<float>(flBlendFactor, 0.0f, 1.0f);
+
+		// FIXME: convert to linear colorspace
+		pColor[0] = flPrimaryColor[0] * flBlendFactor + flSecondaryColor[0] * (1 - flBlendFactor);
+		pColor[1] = flPrimaryColor[1] * flBlendFactor + flSecondaryColor[1] * (1 - flBlendFactor);
+		pColor[2] = flPrimaryColor[2] * flBlendFactor + flSecondaryColor[2] * (1 - flBlendFactor);
+
+		//draw a debug overlay if needed
+		extern const bool IsMapPropertiesPanelOpen();
+		if (IsMapPropertiesPanelOpen())
 		{
-			pColor[0] = flPrimaryColor[0];
-			pColor[1] = flPrimaryColor[1];
-			pColor[2] = flPrimaryColor[2];
+			//get the text positions
+			Vector eyePos = pbp->EyePosition();
+			Vector primaryPos = eyePos + dir * 64.0f;
+			Vector secondaryPos = eyePos - dir * 64.0f;
+
+			//show the text
+			NDebugOverlay::Text(primaryPos, "PRIMARY FOG POSITION", false, 0.01);
+			NDebugOverlay::Text(secondaryPos, "SECONDARY FOG POSITION", false, 0.01);
 		}
+
 	}
+	else
+	{
+		pColor[0] = flPrimaryColor[0];
+		pColor[1] = flPrimaryColor[1];
+		pColor[2] = flPrimaryColor[2];
+	}
+	
 
 	VectorScale(pColor, 1.0f / 255.0f, pColor);
 }
@@ -1643,13 +1722,11 @@ static float GetFogMaxDensity(fogparams_t* pFogParams)
 
 	if (fog_override.GetInt())
 	{
-		if (fog_maxdensity.GetFloat() == -1.0f)
-			return pFogParams->maxdensity;
-		else
+		if (fog_maxdensity.GetFloat() != -1.0f)
 			return fog_maxdensity.GetFloat();
 	}
-	else
-		return pFogParams->maxdensity;
+	
+	return pFogParams->maxdensity;
 }
 
 
@@ -1664,48 +1741,127 @@ static void GetSkyboxFogColor(float* pColor)
 		return;
 	}
 	CPlayerLocalData* local = &pbp->m_Local;
+	sky3dparams_t::NetworkVar_fog* pFogParams = &local->m_skybox3d.fog;
 
-	const char* fogColorString = fog_colorskybox.GetString();
-	bool bDo = true;
-	if (fog_override.GetInt() && fogColorString)
+	float flPrimaryColor[3] = { -1, -1, -1 };
+	float flSecondaryColor[3] = { -1, -1, -1 };
+
 	{
-		bDo = false;
-		if (sscanf(fogColorString, "%f %f %f", &pColor[0], &pColor[1], &pColor[2]) == 3)
+		//check for the fog_color convar
+		const char* fogColorString = fog_colorskybox.GetString();
+		if (fog_override.GetBool() && fogColorString)
 		{
-			if (pColor[0] == -1.0f && pColor[1] == -1.0f && pColor[2] == -1.0f)
-				bDo = true;
+			//suck the values out
+			if (sscanf(fogColorString, "%f %f %f", &flPrimaryColor[0], &flPrimaryColor[1], &flPrimaryColor[2]) < 3)
+			{
+				//if we got less then 3 floats then init them to -1
+				flPrimaryColor[0] = -1;
+				flPrimaryColor[1] = -1;
+				flPrimaryColor[2] = -1;
+			}
+		}
+
+		//set our vars to the default if needed
+		if (flPrimaryColor[0] == -1 && flPrimaryColor[1] == -1 && flPrimaryColor[2] == -1)
+		{
+			flPrimaryColor[0] = pFogParams->colorPrimary.GetR();
+			flPrimaryColor[1] = pFogParams->colorPrimary.GetG();
+			flPrimaryColor[2] = pFogParams->colorPrimary.GetB();
 		}
 	}
-	
-	if (bDo)
+
 	{
-		if (local->m_skybox3d.fog.blend)
+		//check for the fog_blendcolorskybox convar
+		const char* fogBlendColorString = fog_blendcolorskybox.GetString();
+		if (fog_override.GetBool() && fogBlendColorString)
 		{
-			//
-			// Blend between two fog colors based on viewing angle.
-			// The secondary fog color is at 180 degrees to the primary fog color.
-			//
-			Vector forward;
-			pbp->EyeVectors(&forward, NULL, NULL);
-
-			Vector vNormalized = local->m_skybox3d.fog.dirPrimary;
-			VectorNormalize(vNormalized);
-			local->m_skybox3d.fog.dirPrimary = vNormalized;
-
-			float flBlendFactor = 0.5 * forward.Dot(local->m_skybox3d.fog.dirPrimary) + 0.5;
-
-			// FIXME: convert to linear colorspace
-			pColor[0] = local->m_skybox3d.fog.colorPrimary.GetR() * flBlendFactor + local->m_skybox3d.fog.colorSecondary.GetR() * (1 - flBlendFactor);
-			pColor[1] = local->m_skybox3d.fog.colorPrimary.GetG() * flBlendFactor + local->m_skybox3d.fog.colorSecondary.GetG() * (1 - flBlendFactor);
-			pColor[2] = local->m_skybox3d.fog.colorPrimary.GetB() * flBlendFactor + local->m_skybox3d.fog.colorSecondary.GetB() * (1 - flBlendFactor);
+			//suck the values out
+			if (sscanf(fogBlendColorString, "%f %f %f", &flSecondaryColor[0], &flSecondaryColor[1], &flSecondaryColor[2]) < 3)
+			{
+				//if we got less then 3 floats then init them to -1
+				flSecondaryColor[0] = -1;
+				flSecondaryColor[1] = -1;
+				flSecondaryColor[2] = -1;
+			}
 		}
-		else
+
+		//set our vars to the default if needed
+		if (flSecondaryColor[0] == -1 && flSecondaryColor[1] == -1 && flSecondaryColor[2] == -1)
 		{
-			pColor[0] = local->m_skybox3d.fog.colorPrimary.GetR();
-			pColor[1] = local->m_skybox3d.fog.colorPrimary.GetG();
-			pColor[2] = local->m_skybox3d.fog.colorPrimary.GetB();
+			flSecondaryColor[0] = pFogParams->colorSecondary.GetR();
+			flSecondaryColor[1] = pFogParams->colorSecondary.GetG();
+			flSecondaryColor[2] = pFogParams->colorSecondary.GetB();
 		}
 	}
+
+	//dont do this if fog_override is enabled
+	if (!fog_override.GetBool())
+		GetFogColorTransition(pFogParams, flPrimaryColor, flSecondaryColor);
+
+	//should we blend?
+	bool blend = pFogParams->blend;
+	if (fog_override.GetBool() && fog_blendskybox.GetInt() != -1)
+		blend = fog_blendskybox.GetBool();
+
+	//do the blend
+	if (blend)
+	{
+		Vector dir = pFogParams->dirPrimary;
+
+		//check fog_blendangleskybox
+		if (fog_override.GetBool() && fog_blendangleskybox.GetFloat() != -1)
+		{
+			QAngle ang;
+			ang.Init(0, fog_blendangleskybox.GetFloat(), 0);
+			AngleVectors(ang, &dir);
+			VectorNormalize(dir);
+		}
+
+		//
+		// Blend between two fog colors based on viewing angle.
+		// The secondary fog color is at 180 degrees to the primary fog color.
+		//
+		Vector forward;
+		pbp->EyeVectors(&forward, NULL, NULL);
+
+		Vector vNormalized = dir;
+		VectorNormalize(vNormalized);
+		dir = vNormalized;
+
+		//get and clamp the blend factor
+		float flBlendFactor = 0.5 * forward.Dot(dir) + 0.5;
+		//flBlendFactor = clamp<float>(flBlendFactor, 0.0f, 1.0f);
+
+		// FIXME: convert to linear colorspace
+		pColor[0] = flPrimaryColor[0] * flBlendFactor + flSecondaryColor[0] * (1 - flBlendFactor);
+		pColor[1] = flPrimaryColor[1] * flBlendFactor + flSecondaryColor[1] * (1 - flBlendFactor);
+		pColor[2] = flPrimaryColor[2] * flBlendFactor + flSecondaryColor[2] * (1 - flBlendFactor);
+
+		//draw a debug overlay if needed
+		extern const bool IsMapPropertiesPanelOpen();
+		if (IsMapPropertiesPanelOpen())
+		{
+			//get the positions
+			Vector eyePos = pbp->EyePosition();
+			Vector primaryPos = eyePos + dir * 64.0f;
+			Vector secondaryPos = eyePos - dir * 64.0f;
+
+			//move up 
+			primaryPos += Vector(0, 0, 2);
+			secondaryPos += Vector(0, 0, 2);
+
+			//show the text
+			NDebugOverlay::Text(primaryPos, "PRIMARY FOG POSITION", false, 0.01);
+			NDebugOverlay::Text(secondaryPos, "SECONDARY FOG POSITION", false, 0.01);
+		}
+	}
+	else
+	{
+		pColor[0] = flPrimaryColor[0];
+		pColor[1] = flPrimaryColor[1];
+		pColor[2] = flPrimaryColor[2];
+	}
+
 
 	VectorScale(pColor, 1.0f / 255.0f, pColor);
 }

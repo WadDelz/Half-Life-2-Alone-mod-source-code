@@ -1519,6 +1519,19 @@ int CHLClient::Init( CreateInterfaceFn appSystemFactory, CreateInterfaceFn physi
 	HookHapticMessages(); // Always hook the messages
 #endif
 
+	//check steamapicontext->SteamUser()
+	if (!steamapicontext || !steamapicontext->SteamApps())
+	{
+		Error("Steam must be running in order for this mod to work!");
+		return false;
+	}
+
+	if (!steamapicontext->SteamApps()->BIsSubscribedApp(220))
+	{
+		Error("You must own a copy of half-life 2 in order for this mod to run!");
+		return false;
+	}
+
 	return true;
 }
 

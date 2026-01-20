@@ -27,18 +27,6 @@
 
 using namespace vgui;
 
-//------------------------------------------------------------------------------------------
-// Purpose: Returns the proportionate scaled value
-//------------------------------------------------------------------------------------------
-int GetProportionateScaledValue(int value, int currentDimension, int baseDimension)
-{
-	if (baseDimension <= 0)
-		return value;
-
-	double scale = (double)currentDimension / (double)baseDimension;
-	return (int)((double)value * scale + 0.5); // round to nearest int
-}
-
 //----------------------------------------------------------------------------------------------------
 // Purpose: Finds the string from the fog info array
 //----------------------------------------------------------------------------------------------------
@@ -175,119 +163,817 @@ bool FindMapPath(const char* base, const char* find, char* output, int outputsiz
 
 
 
+//max undo steps
+#define MAX_UNDO_STEPS 32
 
-//right click button
-class CMapPropertiesPanelButton : public Button
+//undo struct
+struct UndoStep_t
 {
-	DECLARE_CLASS_SIMPLE(CMapPropertiesPanelButton, Button);
+	//step type
+	enum class StepType_e { Step_SetCheckButton, Step_SetColor, Step_SetSlider };
+	StepType_e m_CurrentStepType;
+
+	//data
+	union
+	{
+		//slider
+		struct
+		{
+			Slider* m_SetSlider;
+			int m_GetValue;
+		} SliderData;
+
+		//color
+		struct
+		{
+			unsigned char m_GetColor[4];
+			unsigned char m_PreviousColor[4];
+			Color* m_SetColor;
+		} ColorData;
+
+		//check button
+		struct
+		{
+			CheckButton* m_SetCheckButton;
+			bool m_SetCheckButtonValue;
+		} ButtonData;
+	} m_Data;
+};
+
+//undo stuff
+static UndoStep_t s_UndoSteps[MAX_UNDO_STEPS];
+static int s_CurrentUndoStep = 0; // next position for undo
+static int s_UndoStepsCount = 0;   // total valid steps
+static bool s_NeedSave = false;
+
+//-----------------------------------------------------------------------------
+// Purpose: internal step set func
+//-----------------------------------------------------------------------------
+static void AddUndoStep(UndoStep_t::StepType_e type, const UndoStep_t& data)
+{
+	// truncate redo steps if we added after undo
+	if (s_CurrentUndoStep < s_UndoStepsCount)
+		s_UndoStepsCount = s_CurrentUndoStep;
+
+	// shift if full
+	if (s_CurrentUndoStep >= MAX_UNDO_STEPS)
+	{
+		memmove(s_UndoSteps, s_UndoSteps + 1, sizeof(s_UndoSteps) - sizeof(UndoStep_t));
+		s_CurrentUndoStep = MAX_UNDO_STEPS - 1;
+		s_UndoStepsCount = MAX_UNDO_STEPS - 1;
+	}
+
+	UndoStep_t& step = s_UndoSteps[s_CurrentUndoStep];
+	step.m_CurrentStepType = type;
+
+	switch (type)
+	{
+	case UndoStep_t::StepType_e::Step_SetSlider:
+		step.m_Data.SliderData = data.m_Data.SliderData;
+		break;
+	case UndoStep_t::StepType_e::Step_SetColor:
+		step.m_Data.ColorData = data.m_Data.ColorData;
+		break;
+	case UndoStep_t::StepType_e::Step_SetCheckButton:
+		step.m_Data.ButtonData = data.m_Data.ButtonData;
+		break;
+	}
+
+	s_CurrentUndoStep++;
+	if (s_UndoStepsCount < s_CurrentUndoStep)
+		s_UndoStepsCount = s_CurrentUndoStep;
+
+	//set our s_NeedSave
+	s_NeedSave = true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: add an undo step for a slider value
+//-----------------------------------------------------------------------------
+void AddUndo_SetSlider(Slider* slider, int previousValue)
+{
+	UndoStep_t data;
+	data.m_Data.SliderData.m_SetSlider = slider;
+	data.m_Data.SliderData.m_GetValue = previousValue;
+	AddUndoStep(UndoStep_t::StepType_e::Step_SetSlider, data);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: add an undo step for a color change
+//-----------------------------------------------------------------------------
+void AddUndo_SetColor(Color* setColor, const unsigned char previouscolor[4])
+{
+	UndoStep_t data;
+	data.m_Data.ColorData.m_SetColor = setColor;
+	memcpy(data.m_Data.ColorData.m_GetColor, previouscolor, 4);
+	memset(data.m_Data.ColorData.m_PreviousColor, 0, sizeof(unsigned char) * 4);
+	AddUndoStep(UndoStep_t::StepType_e::Step_SetColor, data);
+}
+
+//HACK HACK VERY EVIL HACK (not really): 
+//when we set the check buttons value for the UndoStep_Apply function. That calls the 'CheckButtonChecked' action signal.
+//That then adds another check button undo step onto the undo steps. So prevent this
+static bool g_bCurrentlyInSuperEvilCheckButtonHack = false;
+
+//-----------------------------------------------------------------------------
+// Purpose: add an undo step for a checkbutton
+//-----------------------------------------------------------------------------
+void AddUndo_SetCheckButton(CheckButton* button, bool previousValue)
+{
+	if (g_bCurrentlyInSuperEvilCheckButtonHack)
+	{
+		g_bCurrentlyInSuperEvilCheckButtonHack = false;
+		return;
+	}
+
+	UndoStep_t data;
+	data.m_Data.ButtonData.m_SetCheckButton = button;
+	data.m_Data.ButtonData.m_SetCheckButtonValue = previousValue;
+	AddUndoStep(UndoStep_t::StepType_e::Step_SetCheckButton, data);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: applies an undo or redo step
+//-----------------------------------------------------------------------------
+void UndoStep_Apply(bool undo)
+{
+	int pos = undo ? s_CurrentUndoStep - 1 : s_CurrentUndoStep;
+	if (pos < 0 || pos >= s_UndoStepsCount)
+		return;
+
+	UndoStep_t& step = s_UndoSteps[pos];
+
+	switch (step.m_CurrentStepType)
+	{
+	case UndoStep_t::StepType_e::Step_SetSlider:
+	{
+		Slider* slider = step.m_Data.SliderData.m_SetSlider;
+		if (!slider) break;
+
+		int temp = slider->GetValue();
+		slider->SetValue(step.m_Data.SliderData.m_GetValue);
+		step.m_Data.SliderData.m_GetValue = temp;
+		break;
+	}
+	case UndoStep_t::StepType_e::Step_SetColor:
+	{
+		Color* target = step.m_Data.ColorData.m_SetColor;
+		if (!target) break;
+
+		unsigned char temp[4];
+
+		if (undo)
+		{
+			// store current color for redo
+			temp[0] = target->r();
+			temp[1] = target->g();
+			temp[2] = target->b();
+			temp[3] = target->a();
+
+			// apply undo color
+			target->SetColor(step.m_Data.ColorData.m_GetColor[0],
+				step.m_Data.ColorData.m_GetColor[1],
+				step.m_Data.ColorData.m_GetColor[2],
+				step.m_Data.ColorData.m_GetColor[3]);
+
+			// store current color for redo
+			memcpy(step.m_Data.ColorData.m_PreviousColor, temp, 4);
+		}
+		else
+		{
+			// store current color for undo
+			temp[0] = target->r();
+			temp[1] = target->g();
+			temp[2] = target->b();
+			temp[3] = target->a();
+
+			// apply redo color
+			target->SetColor(step.m_Data.ColorData.m_PreviousColor[0],
+				step.m_Data.ColorData.m_PreviousColor[1],
+				step.m_Data.ColorData.m_PreviousColor[2],
+				step.m_Data.ColorData.m_PreviousColor[3]);
+
+			// store current color for undo
+			memcpy(step.m_Data.ColorData.m_GetColor, temp, 4);
+		}
+		break;
+	}
+
+	case UndoStep_t::StepType_e::Step_SetCheckButton:
+	{
+		CheckButton* button = step.m_Data.ButtonData.m_SetCheckButton;
+		if (!button) break;
+
+		bool temp = button->IsSelected();
+
+		//HACK:
+		g_bCurrentlyInSuperEvilCheckButtonHack = true;
+		button->SetSelected(step.m_Data.ButtonData.m_SetCheckButtonValue);
+		step.m_Data.ButtonData.m_SetCheckButtonValue = temp;
+		break;
+	}
+	}
+
+	if (undo)
+		s_CurrentUndoStep--;
+	else
+		s_CurrentUndoStep++;
+
+	//set our s_NeedSave
+	s_NeedSave = true;
+}
+
+
+
+
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Number only text entry
+//----------------------------------------------------------------------------------------------------
+class CNumberTextEntry : public TextEntry
+{
+	DECLARE_CLASS_SIMPLE(CNumberTextEntry, TextEntry)
 public:
-	CMapPropertiesPanelButton(Panel* parent, const char* name, const char* text) : BaseClass(parent, name, text) {}
+	CNumberTextEntry(Panel* parent, const char* name) : BaseClass(parent, name) {}
 
-	virtual void OnMouseReleased(MouseCode code) 
-	{ 
-		if (code == MouseCode::MOUSE_RIGHT) 
-			PostActionSignal(new KeyValues("ChildRightClicked"));
+	//only allow a-z A-Z 0-9 _ - + :
+	void OnKeyTyped(wchar_t code) override
+	{
+		if (code < '0' || code > '9')
+		{
+			surface()->PlaySound("resource/warning.wav");
+			return;
+		}
 
-		BaseClass::OnMouseReleased(code);
+		BaseClass::OnKeyTyped(code);
 	}
 };
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Set the exact value of a slider panel
+//----------------------------------------------------------------------------------------------------
+class CSetSliderValuePanel : public Frame
+{
+	DECLARE_CLASS_SIMPLE(CSetSliderValuePanel, Frame);
+public:
+	CSetSliderValuePanel(Panel* parent, const char* name, const char* text);
+	~CSetSliderValuePanel();
+
+	//command funcs
+	void OnCommand(const char* pszCommand);
+private:
+	//save text entry
+	CNumberTextEntry* m_TextEntry;
+};
+
+//singleton
+static CSetSliderValuePanel* gs_SetExactValueSliderPanel = nullptr;
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Save to folder panel
+//----------------------------------------------------------------------------------------------------
+CSetSliderValuePanel::CSetSliderValuePanel(Panel* parent, const char* name, const char* text) : BaseClass(parent, name)
+{
+	SetParent(parent);
+	SetKeyBoardInputEnabled(true);
+	SetMouseInputEnabled(true);
+	SetVisible(true);
+	SetEnabled(true);
+	SetSizeable(false);
+	SetDeleteSelfOnClose(true);
+	SetFadeEffectDisableOverride(true);
+	SetMoveable(false);
+	SetTitleBarVisible(true);
+	SetCloseButtonVisible(false);
+	SetMinimizeButtonVisible(false);
+	SetMaximizeButtonVisible(false);
+	SetSize(300, 85);
+	MoveToCenterOfScreen();
+	Activate();
+
+	//create the text entry
+	m_TextEntry = new CNumberTextEntry(this, "NumberTextEntry");
+	m_TextEntry->SetBounds(5, 25, 290, 25);
+	m_TextEntry->SetMaximumCharCount(6);
+	m_TextEntry->SetText(text);
+
+	//create the Save and Cancel button
+	Button* m_SaveButton = new Button(this, "SetButton", "Set Value");
+	m_SaveButton->SetBounds(5, 55, 142, 25);
+	m_SaveButton->SetCommand("Set");
+
+	Button* m_CancelButton = new Button(this, "CancelButton", "Cancel");
+	m_CancelButton->SetBounds(152, 55, 142, 25);
+	m_CancelButton->SetCommand("Close");
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called on command
+//----------------------------------------------------------------------------------------------------
+void CSetSliderValuePanel::OnCommand(const char* pszCommand)
+{
+	//check for save
+	if (!Q_stricmp(pszCommand, "Set"))
+	{
+		//get the text
+		char buf[512];
+		m_TextEntry->GetText(buf, sizeof(buf));
+
+		//post the message
+		PostActionSignal(new KeyValues("SetExactValue", "Value", atoi(buf)));
+
+		//close this
+		Close();
+		return;
+	}
+
+	BaseClass::OnCommand(pszCommand);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: destructor
+//----------------------------------------------------------------------------------------------------
+CSetSliderValuePanel::~CSetSliderValuePanel()
+{
+	gs_SetExactValueSliderPanel = nullptr;
+}
+
+
+
+
+
+
+
+
+//current coppied value
+static int g_bHasValueCoppied = INT_MAX;
 
 //right click slider
 class CMapPropertiesPanelSlider : public WheelSlider
 {
 	DECLARE_CLASS_SIMPLE(CMapPropertiesPanelSlider, WheelSlider);
+
 public:
-	CMapPropertiesPanelSlider(Panel* parent, const char* name, int wheeldelta = 1) : BaseClass(parent, name, wheeldelta) {}
+	CMapPropertiesPanelSlider(Panel* parent, const char* name, int wheeldelta = 1);
 
-	virtual void OnMouseReleased(MouseCode code) 
-	{ 
-		if (code == MouseCode::MOUSE_RIGHT) 
-		{
-			PostActionSignal(new KeyValues("ChildRightClicked"));
-			return;
-		}
+	virtual void OnMouseReleased(MouseCode code);
+	virtual void OnMousePressed(MouseCode code);
+	virtual void OnMouseWheeled(int delta);
 
-		BaseClass::OnMouseReleased(code);
-	}
+	virtual void OnCommand(const char* pszCommand);
 
-	virtual int GetMin()
-	{
-		int min, _;
-		GetRange(min, _);
-		return min;
-	}
+	virtual int GetMin();
+	virtual int GetMax();
 
-	virtual int GetMax()
-	{
-		int _, max;
-		GetRange(_, max);
-		return max;
-	}
-	
-	virtual void OnMousePressed(MouseCode code) 
-	{ 
-		if (code != MouseCode::MOUSE_RIGHT) 
-			BaseClass::OnMousePressed(code);
-	}
+	//called when the exact slider value is set from the panel
+	MESSAGE_FUNC_PARAMS(OnSetExactValue, "SetExactValue", kv);
+private:
+	//previous value before the mouse button was presseed down
+	int m_PreviousValue = 0;
 };
 
-
-
-
-
-
-
-
-
-//map properties panel
-class CMapPropertiesPanel : public Frame
+//----------------------------------------------------------------------------------------------------
+// Purpose: Constructor for the map properties panel slider
+//----------------------------------------------------------------------------------------------------
+CMapPropertiesPanelSlider::CMapPropertiesPanelSlider(Panel* parent, const char* name, int wheeldelta)
+	: BaseClass(parent, name, wheeldelta)
 {
-	DECLARE_CLASS_SIMPLE(CMapPropertiesPanel, Frame)
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called when the mouse is wheeled
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSlider::OnMouseWheeled(int delta)
+{
+	if (!IsEnabled())
+		return;
+
+	//do the mouse wheel
+	int previous = GetValue();
+	BaseClass::OnMouseWheeled(delta);
+
+	//add an undo step if needed
+	if (previous != GetValue())
+		AddUndo_SetSlider(this, previous);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called when a mouse button is pressed
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSlider::OnMousePressed(MouseCode code)
+{
+	//check for the right mouse button
+	if (code == MouseCode::MOUSE_RIGHT)
+		return;
+
+	//check for left mouse button
+	if (code == MouseCode::MOUSE_LEFT && IsEnabled())
+		m_PreviousValue = GetValue();
+
+	BaseClass::OnMousePressed(code);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called when a mouse button is released
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSlider::OnMouseReleased(MouseCode code)
+{
+	if (code == MouseCode::MOUSE_RIGHT && IsEnabled())
+	{
+		//get cursor pos
+		int x, y;
+		vgui::surface()->SurfaceGetCursorPos(x, y);
+
+		//make a popup prompting the user to copy or paste OR set the exact value
+		Menu* menu = new Menu(this, "CopyMenu");
+		menu->AddMenuItem("Set", "Set exact value", "SetExactValue", this);
+		menu->AddSeparator();
+		menu->AddMenuItem("CopyToClipboard", "Copy", "Copy", this);
+
+		//check if we have a value coppied
+		if (g_bHasValueCoppied != INT_MAX)
+			menu->AddMenuItem("PasteFromClipboard", "Paste", "Paste", this);
+
+		menu->SetBounds(x, y, 200, 50);
+		menu->SetVisible(true);
+		return;
+	}
+
+	//check for left mouse button
+	if (code == MouseCode::MOUSE_LEFT && IsEnabled())
+	{
+		AddUndo_SetSlider(this, m_PreviousValue);
+	}
+
+	BaseClass::OnMouseReleased(code);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called on command
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSlider::OnCommand(const char* pszCommand)
+{
+	//check for copy or paste
+	if (!Q_stricmp(pszCommand, "Copy"))
+	{
+		g_bHasValueCoppied = GetValue();
+	}
+	else if (!Q_stricmp(pszCommand, "Paste"))
+	{
+		SetValue(g_bHasValueCoppied);
+	}
+	else if (!Q_stricmp(pszCommand, "SetExactValue"))
+	{
+		//open the save dialog
+		if (gs_SetExactValueSliderPanel)
+			gs_SetExactValueSliderPanel->DeletePanel();
+
+		gs_SetExactValueSliderPanel = new CSetSliderValuePanel(this, "SetValuePanel", CFmtStr("%d", GetValue()));
+		gs_SetExactValueSliderPanel->DoModal();
+		gs_SetExactValueSliderPanel->AddActionSignalTarget(this);
+		gs_SetExactValueSliderPanel->Activate();
+		gs_SetExactValueSliderPanel->SetTitle(CFmtStr("%s: Set Slider Value", GetName()), true);
+		return;
+	}
+
+	//call the base func
+	BaseClass::OnCommand(pszCommand);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Returns the minimum value of the slider
+//----------------------------------------------------------------------------------------------------
+int CMapPropertiesPanelSlider::GetMin()
+{
+	int min, _;
+	GetRange(min, _);
+	return min;
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Returns the maximum value of the slider
+//----------------------------------------------------------------------------------------------------
+int CMapPropertiesPanelSlider::GetMax()
+{
+	int _, max;
+	GetRange(_, max);
+	return max;
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Sets the value of the slider from the panel
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSlider::OnSetExactValue(KeyValues* data)
+{
+	SetValue(data->GetInt("Value"));
+}
+
+
+
+
+
+
+
+//current coppied color
+static bool s_bHasCoppiedColor;
+static Color s_CurrentCoppiedColor;
+
+//right click button
+class CMapPropertiesPanelButton : public Button
+{
+	DECLARE_CLASS_SIMPLE(CMapPropertiesPanelButton, Button);
+
 public:
-	CMapPropertiesPanel(Panel* parent);
-	~CMapPropertiesPanel();
+	CMapPropertiesPanelButton(Panel* parent, const char* name, const char* text);
 
-	//paint/tick
-	void Paint();
-	void OnThink();
-	void OnClose();
-	void OnCommand(const char* pszCommand);
+	virtual void OnMouseReleased(MouseCode code);
 	
-	//loads the settings into the panel
-	void PerformLayout();
-	void ApplySettingsToPanel(KeyValues* subkey, Panel* panel);
+	//called on command
+	virtual void OnCommand(const char* pszCommand);
 
-	//keyboard/mouse
-	void OnKeyCodePressed(KeyCode code);
-	void OnKeyCodeReleased(KeyCode code);
-	void OnMousePressed(KeyCode code);
-
-	//called when the color picker picks a color
-	MESSAGE_FUNC_PARAMS(OnColorSelected, "ColorSelected", data);
-	MESSAGE_FUNC_PARAMS(OnTextChanged, "TextChanged", data);
-	MESSAGE_FUNC_PARAMS(OnSliderMoved, "SliderMoved", data);
-
-	//init funcs
-	void Init(MapTimeInfo_t& info, bool IsNightPage);
-	void GetData(MapTimeInfo_t& info);
-	void FormatImage(const char* input, char* output, int outside);
+	//attach functions
+	virtual void SetAttatchedColor(Color* color) { m_AttachedColor = color; };
 private:
-	//original panel size for scaling
-	int m_OriginalWidth, m_OriginalHeight;
+	//color attached to this
+	Color* m_AttachedColor = nullptr;
+};
 
+//----------------------------------------------------------------------------------------------------
+// Purpose: Constructor for the map properties panel button
+//----------------------------------------------------------------------------------------------------
+CMapPropertiesPanelButton::CMapPropertiesPanelButton(Panel* parent, const char* name, const char* text)
+	: BaseClass(parent, name, text)
+{
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called when a mouse button is released
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelButton::OnMouseReleased(MouseCode code)
+{
+	if (code == MouseCode::MOUSE_RIGHT && IsEnabled())
+	{
+		//get cursor pos
+		int x, y;
+		vgui::surface()->SurfaceGetCursorPos(x, y);
+
+		//make a popup prompting the user to copy or paste
+		Menu* menu = new Menu(this, "CopyMenu");
+		menu->AddMenuItem("CopyToClipboard", "Copy", "Copy", this);
+
+		//check if we have a value coppied
+		if (s_bHasCoppiedColor)
+			menu->AddMenuItem("PasteFromClipboard", "Paste", "Paste", this);
+
+		menu->SetBounds(x, y, 200, 50);
+		menu->SetVisible(true);
+		return;
+	}
+
+	BaseClass::OnMouseReleased(code);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called on command
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelButton::OnCommand(const char* pszCommand)
+{
+	//check for copy or paste
+	if (!Q_stricmp(pszCommand, "Copy"))
+	{
+		//check for our color
+		if (m_AttachedColor)
+			s_CurrentCoppiedColor = *m_AttachedColor;
+
+		s_bHasCoppiedColor = true;
+	}
+	else if (!Q_stricmp(pszCommand, "Paste"))
+	{
+		//check for our color
+		if (m_AttachedColor)
+			*m_AttachedColor = s_CurrentCoppiedColor;
+
+		s_bHasCoppiedColor = true;
+	}
+
+	//call the base func
+	BaseClass::OnCommand(pszCommand);
+}
+
+
+
+
+
+
+
+
+
+
+//map properties panel page base
+class CMapPropertiesPanelPageBase : public PropertyPage
+{
+	DECLARE_CLASS_SIMPLE(CMapPropertiesPanelPageBase, PropertyPage)
+public:
+	CMapPropertiesPanelPageBase(Panel* parent, const char* name, const char* keyvaluesfile);
+	~CMapPropertiesPanelPageBase();
+
+	//format functions
+	virtual void ApplySettingsToPanel(KeyValues* subkey, Panel* panel);
+	virtual void PerformLayout();
+	virtual void Update() = 0 {};
+
+	//color selected
+	MESSAGE_FUNC_PARAMS(OnColorSelected, "ColorSelected", data) {};
+	MESSAGE_FUNC_PARAMS(OnCheckButtonChecked, "CheckButtonChecked", data);
+protected:
 	//keyvalues file
 	KeyValues* m_KeyValuesFile = nullptr;
-
-	//current color selector mode
-	enum ColorSelectorMode {Color_Fog, Color_SkyboxFog, Color_Clouds, Color_Sun, Color_SunOverlay} m_ColorSelectorMode;
-	CColorPicker* m_ColorPicker;
 
 	//list of sliders + dividers
 	CUtlVector<Label*> m_Labels;
 	CUtlVector<Divider*> m_Dividers;
+};
 
-	//fog settings
+//----------------------------------------------------------------------------------------------------
+// Purpose: Constructor for map properties main page
+//----------------------------------------------------------------------------------------------------
+CMapPropertiesPanelPageBase::CMapPropertiesPanelPageBase(Panel* parent, const char* name, const char* keyvaluesfile) : BaseClass(parent, name)
+{
+	//init our keyvalues and attempt to load our file
+	m_KeyValuesFile = new KeyValues("PropertiesPanelDialog");
+	if (!m_KeyValuesFile->LoadFromFile(filesystem, keyvaluesfile, "MOD"))
+	{
+		ConWarning("Error: Failed to load page: \"%s\"\n", keyvaluesfile);
+		return;
+	}
+
+	//create our dividers
+	KeyValues* dividers = m_KeyValuesFile->FindKey("Dividers");
+	if (dividers)
+	{
+		FOR_EACH_TRUE_SUBKEY(dividers, divider)
+		{
+			//make the divider
+			ApplySettingsToPanel(divider, (m_Dividers[m_Dividers.AddToTail(new Divider(this, divider->GetName()))]));
+		}
+	}
+
+	//create our labels
+	KeyValues* labels = m_KeyValuesFile->FindKey("Labels");
+	if (labels)
+	{
+		FOR_EACH_TRUE_SUBKEY(labels, label)
+		{
+			//make the divider
+			ApplySettingsToPanel(label, (m_Labels[m_Labels.AddToTail(new Label(this, label->GetName(), ""))]));
+		}
+	}
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Destructor for map properties main page
+//----------------------------------------------------------------------------------------------------
+CMapPropertiesPanelPageBase::~CMapPropertiesPanelPageBase()
+{
+	//delete our keyvalues
+	if (m_KeyValuesFile)
+		m_KeyValuesFile->deleteThis();
+	
+	m_KeyValuesFile = nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Performs the layout for this panel
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelPageBase::PerformLayout()
+{
+	BaseClass::PerformLayout();
+
+	//check for m_KeyValuesFile
+	if (!m_KeyValuesFile)
+		return;
+
+	//set our parents parents size (property sheet -> property panel)
+	Panel* parent = GetParent();
+	if (parent && parent->GetParent())
+	{
+		parent->GetParent()->SetSize(m_KeyValuesFile->GetInt("wide", parent->GetWide()), m_KeyValuesFile->GetInt("tall", parent->GetTall()));
+	}
+
+	//set our divider + label positions
+	KeyValues* dividers = m_KeyValuesFile->FindKey("Dividers");
+	for (int i = 0; i < m_Dividers.Count(); i++)
+	{
+		ApplySettingsToPanel(dividers->FindKey(m_Dividers[i]->GetName()), m_Dividers[i]);
+	}
+
+	KeyValues* labels = m_KeyValuesFile->FindKey("Labels");
+	for (int i = 0; i < m_Labels.Count(); i++)
+	{
+		ApplySettingsToPanel(labels->FindKey(m_Labels[i]->GetName()), m_Labels[i]);
+	}
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Called when a check button is checked
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelPageBase::OnCheckButtonChecked(KeyValues* subkey)
+{
+	AddUndo_SetCheckButton((CheckButton*)subkey->GetPtr("panel"), !((CheckButton*)subkey->GetPtr("panel"))->IsSelected());
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Applies settings to the Panel* from the keyvalues*
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelPageBase::ApplySettingsToPanel(KeyValues* subkey, Panel* panel)
+{
+	//check for subkey and panel
+	if (!subkey || !panel)
+		return;
+
+	//set bounds
+	int x = subkey->GetInt("x");
+	int y = subkey->GetInt("y");
+	int w = subkey->GetInt("w");
+	int h = subkey->GetInt("h");
+	panel->SetBounds(x, y, w, h);
+
+	//check for zpos
+	KeyValues* zpos = subkey->FindKey("zpos");
+	if (zpos)
+		panel->SetZPos(zpos->GetInt());
+
+	//check for slider
+	Slider* slider = dynamic_cast<Slider*>(panel);
+	if (slider)
+	{
+		slider->SetRange(subkey->GetInt("min"), subkey->GetInt("max"));
+	}
+
+	//check for label
+	Label* label = dynamic_cast<Label*>(panel);
+	if (label)
+	{
+		label->SetText(subkey->GetString("text"));
+		label->SetContentAlignment((Label::Alignment)AnimationController::LookupAlignment(subkey->GetString("alignment", "a_west")));
+	}
+
+	//check for image
+	ImagePanel* Image = dynamic_cast<ImagePanel*>(panel);
+	if (Image)
+	{
+		int r, g, b, a;
+		sscanf(subkey->GetString("fillcolor", "255 255 255 255"), "%d %d %d %d", &r, &g, &b, &a);
+		Image->SetFillColor(Color(r, g, b, a));
+	}
+}
+
+
+
+
+
+
+
+
+
+
+#define COMMAND_CHANGE_FOG_COLOR "SetFogColor"
+#define COMMAND_CHANGE_FOG_SKYBOX_COLOR "SetFogSkyboxColor"
+#define COMMAND_CHANGE_FOG_BLEND_COLOR "SetFogBlendColor"
+#define COMMAND_CHANGE_FOG_SKYBOX_BLEND_COLOR "SetFogSkyboxBlendColor"
+
+//fog page
+class CMapPropertiesPanelFogPage : public CMapPropertiesPanelPageBase
+{
+	DECLARE_CLASS_SIMPLE(CMapPropertiesPanelFogPage, CMapPropertiesPanelPageBase);
+public:
+	CMapPropertiesPanelFogPage(Panel* parent, const char* name);
+
+	virtual void PerformLayout();
+	virtual void Paint();
+	virtual void Update();
+	virtual void OnCommand(const char* pszCommand);
+
+	//init funcs
+	virtual void InitFogInfo(MapTimeInfo_t& info, bool IsNightPage);
+	virtual void GetFogInfo(MapTimeInfo_t& info);
+
+	MESSAGE_FUNC_PARAMS(OnColorSelected, "ColorSelected", data);
 private:
+	bool m_bNightTimeMode = false;
+
 	//override fog
 	CheckButton* m_OverrideFogButton;
 
@@ -343,6 +1029,783 @@ private:
 	CMapPropertiesPanelSlider* m_FogSkyboxDensitySlider;
 	Label* m_FogSkyboxDensityValueLabel;
 	CheckButton* m_FogSkyboxDensityOverride;
+	
+	//farz clipping plane
+	CMapPropertiesPanelSlider* m_FarzClippingPlaneSlider;
+	Label* m_FarzClippingPlaneLabel;
+	CheckButton* m_FarzClippingPlaneOverride;
+
+
+
+	//enable fog blend
+	CheckButton* m_EnableFogBlendCheckButton;
+	CheckButton* m_OverrideFogBlendCheckButton;
+
+	//fog blend color
+	CMapPropertiesPanelButton* m_FogBlendColorButton;
+	CheckButton* m_FogBlendColorOverride;
+	Color m_FogBlendColor;
+	Rect_t m_FogBlendColorDrawRect;
+
+	//fog blend angle
+	CMapPropertiesPanelSlider* m_FogBlendAngleSlider;
+	Label* m_FogBlendAngleLabel;
+	CheckButton* m_FogBlendAngleOverride;
+
+
+
+	//enable skybox fog blend
+	CheckButton* m_EnableFogBlendSkyboxCheckButton;
+	CheckButton* m_OverrideFogBlendSkyboxCheckButton;
+
+	//fog blend color
+	CMapPropertiesPanelButton* m_FogBlendSkyboxColorButton;
+	CheckButton* m_FogBlendSkyboxColorOverride;
+	Color m_FogBlendSkyboxColor;
+	Rect_t m_FogBlendSkyboxColorDrawRect;
+
+	//fog blend angle
+	CMapPropertiesPanelSlider* m_FogBlendSkyboxAngleSlider;
+	Label* m_FogBlendSkyboxAngleLabel;
+	CheckButton* m_FogBlendSkyboxAngleOverride;
+
+	//current color selector mode
+	enum ColorSelectorMode { Color_Fog, Color_SkyboxFog, Color_BlendFog, Color_BlendSkyboxFog } m_ColorSelectorMode;
+	CColorPicker* m_ColorPicker;
+};
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Constructor for the map properties fog page
+//-------------------------------------------------------------------------------------------------------
+CMapPropertiesPanelFogPage::CMapPropertiesPanelFogPage(Panel* parent, const char* name) : BaseClass(parent, name, "resource/panels/MapPropertiesEditor/FogPage.res")
+{
+	//override button
+	m_OverrideFogButton = new CheckButton(this, "FogOverrideCheckButton", "");
+
+	//enable pixel fog
+	m_EnablePixelFogButton = new CheckButton(this, "EnablePixelFogButton", "");
+
+	//enable fog
+	m_EnableFogCheckButton = new CheckButton(this, "FogEnableCheckButton", "");
+	m_OverrideEnableFogCheckButton = new CheckButton(this, "OverrideFogEnableCheckButton", "");
+
+	//enable skybox fog
+	m_EnableSkyboxFogCheckButton = new CheckButton(this, "FogEnableSkyboxCheckButton", "");
+	m_OverrideEnableSkyboxFogCheckButton = new CheckButton(this, "OverrideFogEnableSkyboxCheckButton", "");
+
+	//fog color
+	m_FogColorButton = new CMapPropertiesPanelButton(this, "FogColorButton", "");
+	m_FogColorOverride = new CheckButton(this, "FogColorOverrideButton", "");
+	m_FogColorButton->SetCommand(COMMAND_CHANGE_FOG_COLOR);
+	m_FogColorButton->SetAttatchedColor(&m_FogColor);
+	m_FogColor.SetColor(255, 255, 255, 255);
+
+	//fog skybox color
+	m_FogSkyboxColorButton = new CMapPropertiesPanelButton(this, "FogSkyboxColorButton", "");
+	m_FogSkyboxColorOverride = new CheckButton(this, "FogSkyboxColorOverrideButton", "");
+	m_FogSkyboxColorButton->SetCommand(COMMAND_CHANGE_FOG_SKYBOX_COLOR);
+	m_FogSkyboxColorButton->SetAttatchedColor(&m_FogSkyboxColor);
+	m_FogSkyboxColor.SetColor(255, 255, 255, 255);
+
+	//fog start
+	m_FogStartSlider = new CMapPropertiesPanelSlider(this, "FogStartSlider", 150);
+	m_FogStartValueLabel = new Label(this, "FogStartSlider", "");
+	m_FogStartOverride = new CheckButton(this, "FogStartOverride", "");
+
+	//fog end
+	m_FogEndSlider = new CMapPropertiesPanelSlider(this, "FogEndSlider", 150);
+	m_FogEndValueLabel = new Label(this, "FogEndSlider", "");
+	m_FogEndOverride = new CheckButton(this, "FogEndOverride", "");
+
+	//fog start skybox
+	m_FogStartSkyboxSlider = new CMapPropertiesPanelSlider(this, "FogStartSkyboxSlider", 150);
+	m_FogStartSkyboxValueLabel = new Label(this, "FogStartSkyboxSlider", "");
+	m_FogStartSkyboxOverride = new CheckButton(this, "FogStartSkyboxOverride", "");
+
+	//fog end skybox
+	m_FogEndSkyboxSlider = new CMapPropertiesPanelSlider(this, "FogEndSkyboxSlider", 150);
+	m_FogEndSkyboxValueLabel = new Label(this, "FogEndSkyboxSlider", "");
+	m_FogEndSkyboxOverride = new CheckButton(this, "FogEndSkyboxOverride", "");
+
+	//fog density
+	m_FogDensitySlider = new CMapPropertiesPanelSlider(this, "FogDensitySlider");
+	m_FogDensityValueLabel = new Label(this, "FogDensitySlider", "");
+	m_FogDensityOverride = new CheckButton(this, "FogDensityOverride", "");
+
+	//fog density skybox
+	m_FogSkyboxDensitySlider = new CMapPropertiesPanelSlider(this, "FogSkyboxDensitySlider");
+	m_FogSkyboxDensityValueLabel = new Label(this, "FogSkyboxDensitySlider", "");
+	m_FogSkyboxDensityOverride = new CheckButton(this, "FogSkyboxDensityOverride", "");
+	
+	//farz
+	m_FarzClippingPlaneSlider = new CMapPropertiesPanelSlider(this, "FarzSlider");
+	m_FarzClippingPlaneLabel = new Label(this, "FarzLabel", "");
+	m_FarzClippingPlaneOverride = new CheckButton(this, "FarzOverride", "");
+
+	//enable fog blend
+	m_EnableFogBlendCheckButton = new CheckButton(this, "EnableFogBlendCheckButton", "");
+	m_OverrideFogBlendCheckButton = new CheckButton(this, "OverrideFogBlendCheckButton", "");
+
+	//fog blend color
+	m_FogBlendColorButton = new CMapPropertiesPanelButton(this, "FogBlendColorButton", "");
+	m_FogBlendColorOverride = new CheckButton(this, "FogBlendColorOverrideButton", "");
+	m_FogBlendColorButton->SetCommand(COMMAND_CHANGE_FOG_BLEND_COLOR);
+	m_FogBlendColorButton->SetAttatchedColor(&m_FogBlendColor);
+	m_FogBlendColor.SetColor(255, 255, 255, 255);
+
+	//fog blend angle
+	m_FogBlendAngleSlider = new CMapPropertiesPanelSlider(this, "FogBlendAngleSlider");
+	m_FogBlendAngleLabel = new Label(this, "FogBlendAngleLabel", "");
+	m_FogBlendAngleOverride = new CheckButton(this, "FogBlendAngleOverride", "");
+
+
+	//enable fog skybox blend
+	m_EnableFogBlendSkyboxCheckButton = new CheckButton(this, "EnableFogBlendSkyboxCheckButton", "");
+	m_OverrideFogBlendSkyboxCheckButton = new CheckButton(this, "OverrideFogBlendSkyboxCheckButton", "");
+
+	//fog blend skybox color
+	m_FogBlendSkyboxColorButton = new CMapPropertiesPanelButton(this, "FogBlendSkyboxColorButton", "");
+	m_FogBlendSkyboxColorOverride = new CheckButton(this, "FogBlendSkyboxColorOverrideButton", "");
+	m_FogBlendSkyboxColorButton->SetCommand(COMMAND_CHANGE_FOG_SKYBOX_BLEND_COLOR);
+	m_FogBlendSkyboxColorButton->SetAttatchedColor(&m_FogBlendSkyboxColor);
+	m_FogBlendSkyboxColor.SetColor(255, 255, 255, 255);
+
+	//fog blend skybox angle
+	m_FogBlendSkyboxAngleSlider = new CMapPropertiesPanelSlider(this, "FogBlendSkyboxAngleSlider");
+	m_FogBlendSkyboxAngleLabel = new Label(this, "FogBlendSkyboxAngleLabel", "");
+	m_FogBlendSkyboxAngleOverride = new CheckButton(this, "FogBlendSkyboxAngleOverride", "");
+
+	//perform layout to set the range sliders and such
+	PerformLayout();
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Performs layout for this page
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelFogPage::PerformLayout()
+{
+	BaseClass::PerformLayout();
+
+	//override button
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogOverrideCheckButton"), m_OverrideFogButton);
+
+	//enable pixel fog
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("EnablePixelFogButton"), m_EnablePixelFogButton);
+
+	//enable fog
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEnableCheckButton"), m_EnableFogCheckButton);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("OverrideFogEnableCheckButton"), m_OverrideEnableFogCheckButton);
+
+	//enable skybox fog
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEnableSkyboxCheckButton"), m_EnableSkyboxFogCheckButton);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("OverrideFogEnableSkyboxCheckButton"), m_OverrideEnableSkyboxFogCheckButton);
+
+	//fog color
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogColorButton"), m_FogColorButton);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogColorOverrideButton"), m_FogColorOverride);
+	sscanf(m_KeyValuesFile->GetString("FogColorRect"), "%d %d %d %d", &m_FogColorDrawRect.x, &m_FogColorDrawRect.y, &m_FogColorDrawRect.width, &m_FogColorDrawRect.height);
+
+	//fog skybox color
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogSkyboxColorButton"), m_FogSkyboxColorButton);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogSkyboxColorOverrideButton"), m_FogSkyboxColorOverride);
+	sscanf(m_KeyValuesFile->GetString("FogSkyboxColorRect"), "%d %d %d %d", &m_FogSkyboxColorDrawRect.x, &m_FogSkyboxColorDrawRect.y, &m_FogSkyboxColorDrawRect.width, &m_FogSkyboxColorDrawRect.height);
+
+	//fog start
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogStartSlider"), m_FogStartSlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogStartValueLabel"), m_FogStartValueLabel);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogStartOverride"), m_FogStartOverride);
+
+	//fog end
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEndSlider"), m_FogEndSlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEndValueLabel"), m_FogEndValueLabel);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEndOverride"), m_FogEndOverride);
+
+	//fog start skybox
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogStartSkyboxSlider"), m_FogStartSkyboxSlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogStartSkyboxValueLabel"), m_FogStartSkyboxValueLabel);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogStartSkyboxOverride"), m_FogStartSkyboxOverride);
+
+	//fog end skybox
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEndSkyboxSlider"), m_FogEndSkyboxSlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEndSkyboxValueLabel"), m_FogEndSkyboxValueLabel);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEndSkyboxOverride"), m_FogEndSkyboxOverride);
+
+	//fog density
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogDensitySlider"), m_FogDensitySlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogDensityValueLabel"), m_FogDensityValueLabel);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogDensityOverride"), m_FogDensityOverride);
+
+	//fog density skybox
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogSkyboxDensitySlider"), m_FogSkyboxDensitySlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogSkyboxDensityValueLabel"), m_FogSkyboxDensityValueLabel);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogSkyboxDensityOverride"), m_FogSkyboxDensityOverride);
+
+	//farz clipping plane
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FarzSlider"), m_FarzClippingPlaneSlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FarzValueLabel"), m_FarzClippingPlaneLabel);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FarzOverride"), m_FarzClippingPlaneOverride);
+
+	//fog blend
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogBlendEnabled"), m_EnableFogBlendCheckButton);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("OverrideFogBlendEnabled"), m_OverrideFogBlendCheckButton);
+
+	//fog blend color
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogBlendColorButton"), m_FogBlendColorButton);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogBlendColorOverrideButton"), m_FogBlendColorOverride);
+	sscanf(m_KeyValuesFile->GetString("FogBlendColorRect"), "%d %d %d %d", &m_FogBlendColorDrawRect.x, &m_FogBlendColorDrawRect.y, &m_FogBlendColorDrawRect.width, &m_FogBlendColorDrawRect.height);
+
+	//fog blend angle
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogBlendAngleSlider"), m_FogBlendAngleSlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogBlendAngleLabel"), m_FogBlendAngleLabel);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogBlendAngleOverrideButton"), m_FogBlendAngleOverride);
+
+
+	//fog skybox blend
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogSkyboxBlendEnabled"), m_EnableFogBlendSkyboxCheckButton);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("OverrideFogSkyboxBlendEnabled"), m_OverrideFogBlendSkyboxCheckButton);
+
+	//fog skybox blend color
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogBlendSkyboxColorButton"), m_FogBlendSkyboxColorButton);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogBlendSkyboxColorOverrideButton"), m_FogBlendSkyboxColorOverride);
+	sscanf(m_KeyValuesFile->GetString("FogSkyboxBlendColorRect"), "%d %d %d %d", &m_FogBlendSkyboxColorDrawRect.x, &m_FogBlendSkyboxColorDrawRect.y, &m_FogBlendSkyboxColorDrawRect.width, &m_FogBlendSkyboxColorDrawRect.height);
+
+	//fog skybox blend angle
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogBlendSkyboxAngleSlider"), m_FogBlendSkyboxAngleSlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogBlendSkyboxAngleLabel"), m_FogBlendSkyboxAngleLabel);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogBlendSkyboxAngleOverrideButton"), m_FogBlendSkyboxAngleOverride);
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Called on panel think
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelFogPage::Update()
+{
+	//get the convars
+	static ConVar* r_pixelfog = cvar->FindVar("r_pixelfog");
+	static ConVar* fog_override = cvar->FindVar("fog_override");
+	static ConVar* fog_enable = cvar->FindVar("fog_enable");
+	static ConVar* fog_enableskybox = cvar->FindVar("fog_enableskybox");
+	static ConVar* fog_color = cvar->FindVar("fog_color");
+	static ConVar* fog_colorskybox = cvar->FindVar("fog_colorskybox");
+	static ConVar* fog_start = cvar->FindVar("fog_start");
+	static ConVar* fog_end = cvar->FindVar("fog_end");
+	static ConVar* fog_startskybox = cvar->FindVar("fog_startskybox");
+	static ConVar* fog_endskybox = cvar->FindVar("fog_endskybox");
+	static ConVar* fog_maxdensity = cvar->FindVar("fog_maxdensity");
+	static ConVar* fog_maxdensityskybox = cvar->FindVar("fog_maxdensityskybox");
+	static ConVar* r_farz = cvar->FindVar("r_farz");
+	static ConVar* fog_blend = cvar->FindVar("fog_blend");
+	static ConVar* fog_blendcolor = cvar->FindVar("fog_blendcolor");
+	static ConVar* fog_blendangle = cvar->FindVar("fog_blendangle");
+	static ConVar* fog_blendskybox = cvar->FindVar("fog_blendskybox");
+	static ConVar* fog_blendcolorskybox = cvar->FindVar("fog_blendcolorskybox");
+	static ConVar* fog_blendangleskybox = cvar->FindVar("fog_blendangleskybox");
+
+	//do we override
+	bool _override = m_OverrideFogButton->IsSelected();
+
+	//do we allow for overriding the blend?
+	bool _overrideblend = _override && m_OverrideFogBlendCheckButton->IsSelected();
+
+	//do we allow for overriding the skybox blend?
+	bool _overrideskyboxblend = _override && m_OverrideFogBlendSkyboxCheckButton->IsSelected();
+
+	//convars
+	{
+		//fog override
+		fog_override->SetValue(_override);
+
+		//fog enabled
+		fog_enable->SetValue(!_override || !m_OverrideEnableFogCheckButton->IsSelected() ? -1 : m_EnableFogCheckButton->IsSelected());
+		fog_enableskybox->SetValue(!_override || !m_OverrideEnableSkyboxFogCheckButton->IsSelected() ? -1 : m_EnableSkyboxFogCheckButton->IsSelected());
+
+		//pixel fog
+		r_pixelfog->SetValue(_override && !m_EnablePixelFogButton->IsSelected() ? false : true);
+
+		//fog colors
+		fog_color->SetValue(!_override || !m_FogColorOverride->IsSelected() ? "-1 -1 -1" : CFmtStr("%d %d %d", m_FogColor.r(), m_FogColor.g(), m_FogColor.b()));
+		fog_colorskybox->SetValue(!_override || !m_FogSkyboxColorOverride->IsSelected() ? "-1 -1 -1" : CFmtStr("%d %d %d", m_FogSkyboxColor.r(), m_FogSkyboxColor.g(), m_FogSkyboxColor.b()));
+
+		//fog distances
+		fog_start->SetValue(!_override || !m_FogStartOverride->IsSelected() ? -1 : m_FogStartSlider->GetValue());
+		fog_end->SetValue(!_override || !m_FogEndOverride->IsSelected() ? -1 : m_FogEndSlider->GetValue());
+
+		//fog skybox distances
+		fog_startskybox->SetValue(!_override || !m_FogStartSkyboxOverride->IsSelected() ? -1 : m_FogStartSkyboxSlider->GetValue());
+		fog_endskybox->SetValue(!_override || !m_FogEndSkyboxOverride->IsSelected() ? -1 : m_FogEndSkyboxSlider->GetValue());
+
+		//fog density
+		fog_maxdensity->SetValue(!_override || !m_FogDensityOverride->IsSelected() ? -1 : (float)m_FogDensitySlider->GetValue() / m_FogDensitySlider->GetMax());
+		fog_maxdensityskybox->SetValue(!_override || !m_FogSkyboxDensityOverride->IsSelected() ? -1 : (float)m_FogSkyboxDensitySlider->GetValue() / m_FogSkyboxDensitySlider->GetMax());
+
+		//farz
+		r_farz->SetValue(!_override || !m_FarzClippingPlaneOverride->IsSelected() ? -1 : m_FarzClippingPlaneSlider->GetValue());
+
+		//fog blend
+		fog_blend->SetValue(_overrideblend && m_EnableFogBlendCheckButton->IsSelected());
+
+		//fog blend colors
+		fog_blendcolor->SetValue(!_overrideblend || !m_FogBlendColorOverride->IsSelected() ? "-1 -1 -1" : CFmtStr("%d %d %d", m_FogBlendColor.r(), m_FogBlendColor.g(), m_FogBlendColor.b()));
+
+		//fog blend angle
+		fog_blendangle->SetValue(!_overrideblend || !m_FogBlendAngleOverride->IsSelected() ? -1 : m_FogBlendAngleSlider->GetValue());
+
+
+		//fog skybox blend
+		fog_blendskybox->SetValue(_overrideskyboxblend && m_EnableFogBlendSkyboxCheckButton->IsSelected());
+
+		//fog skybox blend colors
+		fog_blendcolorskybox->SetValue(!_overrideskyboxblend || !m_FogBlendSkyboxColorOverride->IsSelected() ? "-1 -1 -1" : CFmtStr("%d %d %d", m_FogBlendSkyboxColor.r(), m_FogBlendSkyboxColor.g(), m_FogBlendSkyboxColor.b()));
+
+		//fog skybox blend angle
+		fog_blendangleskybox->SetValue(!_overrideskyboxblend || !m_FogBlendSkyboxAngleOverride->IsSelected() ? -1 : m_FogBlendSkyboxAngleSlider->GetValue());
+	}
+
+	//enable the items
+	{
+		//fog enable
+		m_OverrideEnableFogCheckButton->SetEnabled(_override);
+		m_OverrideEnableSkyboxFogCheckButton->SetEnabled(_override);
+		m_EnableFogCheckButton->SetEnabled(_override && m_OverrideEnableFogCheckButton->IsSelected());
+		m_EnableSkyboxFogCheckButton->SetEnabled(_override && m_OverrideEnableSkyboxFogCheckButton->IsSelected());
+
+		//pixel fog
+		m_EnablePixelFogButton->SetEnabled(_override);
+
+		//enable the color buttons
+		m_FogColorButton->SetEnabled(_override && m_FogColorOverride->IsSelected());
+		m_FogSkyboxColorButton->SetEnabled(_override && m_FogSkyboxColorOverride->IsSelected());
+		m_FogSkyboxColorOverride->SetEnabled(_override);
+		m_FogColorOverride->SetEnabled(_override);
+
+		//fog distances
+		m_FogStartSlider->SetEnabled(_override && m_FogStartOverride->IsSelected());
+		m_FogEndSlider->SetEnabled(_override && m_FogEndOverride->IsSelected());
+		m_FogStartOverride->SetEnabled(_override);
+		m_FogEndOverride->SetEnabled(_override);
+
+		//fog skybox distances
+		m_FogStartSkyboxSlider->SetEnabled(_override && m_FogStartSkyboxOverride->IsSelected());
+		m_FogEndSkyboxSlider->SetEnabled(_override && m_FogEndSkyboxOverride->IsSelected());
+		m_FogStartSkyboxOverride->SetEnabled(_override);
+		m_FogEndSkyboxOverride->SetEnabled(_override);
+
+		//density
+		m_FogDensityOverride->SetEnabled(_override);
+		m_FogSkyboxDensityOverride->SetEnabled(_override);
+		m_FogDensitySlider->SetEnabled(_override && m_FogDensityOverride->IsSelected());
+		m_FogSkyboxDensitySlider->SetEnabled(_override && m_FogSkyboxDensityOverride->IsSelected());
+
+		//farz
+		m_FarzClippingPlaneOverride->SetEnabled(_override);
+		m_FarzClippingPlaneSlider->SetEnabled(_override && m_FarzClippingPlaneOverride->IsSelected());
+
+		//fog blend
+		m_OverrideFogBlendCheckButton->SetEnabled(_override);
+		m_EnableFogBlendCheckButton->SetEnabled(_override && m_OverrideFogBlendCheckButton->IsSelected());
+
+		//fog blend colors
+		m_FogBlendColorOverride->SetEnabled(_overrideblend);
+		m_FogBlendColorButton->SetEnabled(_overrideblend && m_FogBlendColorOverride->IsSelected());
+
+		//fog blend angle
+		m_FogBlendAngleOverride->SetEnabled(_overrideblend);
+		m_FogBlendAngleSlider->SetEnabled(_overrideblend && m_FogBlendAngleOverride->IsSelected());
+
+
+		//fog skybox blend
+		m_OverrideFogBlendSkyboxCheckButton->SetEnabled(_override);
+		m_EnableFogBlendSkyboxCheckButton->SetEnabled(_override && m_OverrideFogBlendSkyboxCheckButton->IsSelected());
+
+		//fog blend colors
+		m_FogBlendSkyboxColorOverride->SetEnabled(_overrideskyboxblend);
+		m_FogBlendSkyboxColorButton->SetEnabled(_overrideskyboxblend&& m_FogBlendSkyboxColorOverride->IsSelected());
+
+		//fog blend angle
+		m_FogBlendSkyboxAngleOverride->SetEnabled(_overrideskyboxblend);
+		m_FogBlendSkyboxAngleSlider->SetEnabled(_overrideskyboxblend&& m_FogBlendSkyboxAngleOverride->IsSelected());
+	}
+
+	//set the texts
+	{
+		//distances
+		m_FogStartValueLabel->SetText(CFmtStr("%d", fog_start->GetInt()));
+		m_FogEndValueLabel->SetText(CFmtStr("%d", fog_end->GetInt()));
+
+		//skybox distances
+		m_FogStartSkyboxValueLabel->SetText(CFmtStr("%d", fog_startskybox->GetInt()));
+		m_FogEndSkyboxValueLabel->SetText(CFmtStr("%d", fog_endskybox->GetInt()));
+
+		//densities
+		m_FogDensityValueLabel->SetText(CFmtStr("%f", fog_maxdensity->GetFloat()));
+		m_FogSkyboxDensityValueLabel->SetText(CFmtStr("%f", fog_maxdensityskybox->GetFloat()));
+
+		//clipping planes
+		m_FarzClippingPlaneLabel->SetText(CFmtStr("%d", r_farz->GetInt()));
+
+		//fog blend angle
+		m_FogBlendAngleLabel->SetText(CFmtStr("%d", fog_blendangle->GetInt()));
+
+		//fog skybox angle
+		m_FogBlendSkyboxAngleLabel->SetText(CFmtStr("%d", fog_blendangleskybox->GetInt()));
+	}
+
+	BaseClass::Update();
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Paints this page
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelFogPage::Paint()
+{
+	BaseClass::Paint();
+
+	//draw the colors
+	surface()->DrawSetColor(m_FogColor);
+	surface()->DrawFilledRect(m_FogColorDrawRect.x, m_FogColorDrawRect.y, m_FogColorDrawRect.x + m_FogColorDrawRect.width, m_FogColorDrawRect.y + m_FogColorDrawRect.height);
+
+	//draw the colors
+	surface()->DrawSetColor(m_FogSkyboxColor);
+	surface()->DrawFilledRect(m_FogSkyboxColorDrawRect.x, m_FogSkyboxColorDrawRect.y, m_FogSkyboxColorDrawRect.x + m_FogSkyboxColorDrawRect.width, m_FogSkyboxColorDrawRect.y + m_FogSkyboxColorDrawRect.height);
+
+	//draw the colors
+	surface()->DrawSetColor(m_FogBlendColor);
+	surface()->DrawFilledRect(m_FogBlendColorDrawRect.x, m_FogBlendColorDrawRect.y, m_FogBlendColorDrawRect.x + m_FogBlendColorDrawRect.width, m_FogBlendColorDrawRect.y + m_FogBlendColorDrawRect.height);
+
+	//draw the colors
+	surface()->DrawSetColor(m_FogBlendSkyboxColor);
+	surface()->DrawFilledRect(m_FogBlendSkyboxColorDrawRect.x, m_FogBlendSkyboxColorDrawRect.y, m_FogBlendSkyboxColorDrawRect.x + m_FogBlendSkyboxColorDrawRect.width, m_FogBlendSkyboxColorDrawRect.y + m_FogBlendSkyboxColorDrawRect.height);
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Called on command
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelFogPage::OnCommand(const char* pszCommand)
+{
+	//check for fog color command
+	if (!Q_stricmp(pszCommand, COMMAND_CHANGE_FOG_COLOR))
+	{
+		//create the fog color dialog
+		m_ColorPicker = new CColorPicker(GetVPanel());
+		m_ColorPicker->SetTitle("Set Fog Color", true);
+		m_ColorPicker->SetUsesAlpha(false);
+		m_ColorPicker->SetColor(m_FogColor);
+		m_ColorPicker->DoModal();
+
+		m_ColorSelectorMode = ColorSelectorMode::Color_Fog;
+	}
+
+	//check for fog color skybox command
+	else if (!Q_stricmp(pszCommand, COMMAND_CHANGE_FOG_SKYBOX_COLOR))
+	{
+		//create the skybox fog color dialog
+		m_ColorPicker = new CColorPicker(GetVPanel());
+		m_ColorPicker->SetTitle("Set Skybox Fog Color", true);
+		m_ColorPicker->SetUsesAlpha(false);
+		m_ColorPicker->SetColor(m_FogSkyboxColor);
+		m_ColorPicker->DoModal();
+
+		m_ColorSelectorMode = ColorSelectorMode::Color_SkyboxFog;
+	}
+	
+	//check for fog blend color command
+	else if (!Q_stricmp(pszCommand, COMMAND_CHANGE_FOG_BLEND_COLOR))
+	{
+		//create the skybox fog color dialog
+		m_ColorPicker = new CColorPicker(GetVPanel());
+		m_ColorPicker->SetTitle("Set Fog Blend Color", true);
+		m_ColorPicker->SetUsesAlpha(false);
+		m_ColorPicker->SetColor(m_FogBlendColor);
+		m_ColorPicker->DoModal();
+
+		m_ColorSelectorMode = ColorSelectorMode::Color_BlendFog;
+	}
+
+	//check for fog blend skybox color command
+	else if (!Q_stricmp(pszCommand, COMMAND_CHANGE_FOG_SKYBOX_BLEND_COLOR))
+	{
+		//create the skybox fog color dialog
+		m_ColorPicker = new CColorPicker(GetVPanel());
+		m_ColorPicker->SetTitle("Set Fog Blend Color", true);
+		m_ColorPicker->SetUsesAlpha(false);
+		m_ColorPicker->SetColor(m_FogBlendColor);
+		m_ColorPicker->DoModal();
+
+		m_ColorSelectorMode = ColorSelectorMode::Color_BlendSkyboxFog;
+	}
+
+	BaseClass::OnCommand(pszCommand);
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Called when a color gets selected
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelFogPage::OnColorSelected(KeyValues* data)
+{
+	Color color(data->GetInt("r"), data->GetInt("g"), data->GetInt("b"), data->GetInt("a"));;
+	switch (m_ColorSelectorMode)
+	{
+	case ColorSelectorMode::Color_Fog:
+		//add an undo step
+		AddUndo_SetColor(&m_FogColor, m_FogColor._color);
+
+		m_FogColor = color;
+		break;
+	case ColorSelectorMode::Color_SkyboxFog:
+		//add an undo step
+		AddUndo_SetColor(&m_FogColor, m_FogSkyboxColor._color);
+
+		m_FogSkyboxColor = color;
+		break;
+	case ColorSelectorMode::Color_BlendFog:
+		//add an undo step
+		AddUndo_SetColor(&m_FogColor, m_FogBlendColor._color);
+
+		m_FogBlendColor = color;
+		break;
+	case ColorSelectorMode::Color_BlendSkyboxFog:
+		//add an undo step
+		AddUndo_SetColor(&m_FogColor, m_FogBlendSkyboxColor._color);
+
+		m_FogBlendSkyboxColor = color;
+		break;
+	}
+
+	//close the color picker
+	m_ColorPicker->Close();
+	m_ColorPicker = nullptr;
+
+	//call base func
+	BaseClass::OnColorSelected(data);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Initalizes the fog info
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelFogPage::InitFogInfo(MapTimeInfo_t& info, bool IsNightPage)
+{
+	m_bNightTimeMode = IsNightPage;
+
+	//get the array
+	CUtlVector<MapTimeInfo_t::FogInfo_t>& fog_array = IsNightPage ? info.NightInfo.FogInfo : info.DayInfo.FogInfo;
+
+	//init the fog check buttons
+	{
+		//get the enabled states
+		int enabled = atoi(FindFogInfoFromArray(fog_array, "fog_enable", "-1"));
+		int enabled_skybox = atoi(FindFogInfoFromArray(fog_array, "fog_enableskybox", "-1"));
+
+		//override btton
+		m_OverrideFogButton->SetSelected(IsNightPage ? info.NightInfo.FogEnabled : info.DayInfo.FogEnabled);
+
+		//pixel fog
+		m_EnablePixelFogButton->SetSelected(atoi(FindFogInfoFromArray(fog_array, "r_pixelfog", "1")) != 0);
+
+		//enabled fog
+		m_OverrideEnableFogCheckButton->SetSelected(enabled >= 0);
+		m_EnableFogCheckButton->SetSelected(enabled > 0);
+
+		//enabled skybox fog
+		m_OverrideEnableSkyboxFogCheckButton->SetSelected(enabled_skybox >= 0);
+		m_EnableSkyboxFogCheckButton->SetSelected(enabled_skybox > 0);
+	}
+
+	//init the fog sliders
+	{
+		//get the vars
+		int fog_start = atoi(FindFogInfoFromArray(fog_array, "fog_start", "-1"));
+		int fog_end = atoi(FindFogInfoFromArray(fog_array, "fog_end", "-1"));
+		int fog_startskybox = atoi(FindFogInfoFromArray(fog_array, "fog_startskybox", "-1"));
+		int fog_endskybox = atoi(FindFogInfoFromArray(fog_array, "fog_endskybox", "-1"));
+		float fog_maxdensity = atof(FindFogInfoFromArray(fog_array, "fog_maxdensity", "-1"));
+		float fog_maxdensityskybox = atof(FindFogInfoFromArray(fog_array, "fog_maxdensityskybox", "-1"));
+		int r_farz = atoi(FindFogInfoFromArray(fog_array, "r_farz", "-1"));
+		int fog_blend = atoi(FindFogInfoFromArray(fog_array, "fog_blend", "-1"));
+		int fog_blendangle = atoi(FindFogInfoFromArray(fog_array, "fog_blendangle", "-1"));
+		int fog_blendskybox = atoi(FindFogInfoFromArray(fog_array, "fog_blendskybox", "-1"));
+		int fog_blendangleskybox = atoi(FindFogInfoFromArray(fog_array, "fog_blendangleskybox", "-1"));
+
+		//distances
+		m_FogStartOverride->SetSelected(fog_start != -1);
+		m_FogEndOverride->SetSelected(fog_end != -1);
+		m_FogStartSlider->SetValue(fog_start);
+		m_FogEndSlider->SetValue(fog_end);
+
+		//skybox distances
+		m_FogStartSkyboxOverride->SetSelected(fog_startskybox != -1);
+		m_FogEndSkyboxOverride->SetSelected(fog_endskybox != -1);
+		m_FogStartSkyboxSlider->SetValue(fog_startskybox);
+		m_FogEndSkyboxSlider->SetValue(fog_endskybox);
+
+		//fog densities
+		m_FogDensityOverride->SetSelected(fog_maxdensity >= 0);
+		m_FogSkyboxDensityOverride->SetSelected(fog_maxdensityskybox >= 0);
+		m_FogDensitySlider->SetValue((float)fog_maxdensity * m_FogDensitySlider->GetMax());
+		m_FogSkyboxDensitySlider->SetValue((float)fog_maxdensityskybox * m_FogSkyboxDensitySlider->GetMax());
+
+		//fog clipping plane
+		m_FarzClippingPlaneOverride->SetSelected(r_farz != -1);
+		m_FarzClippingPlaneSlider->SetValue(r_farz);
+
+		//fog blend
+		m_EnableFogBlendCheckButton->SetSelected(fog_blend > 0);
+		m_OverrideFogBlendCheckButton->SetSelected(fog_blend != -1);
+
+		//fog blend angle
+		m_FogBlendAngleOverride->SetSelected(fog_blendangle != -1);
+		m_FogBlendAngleSlider->SetValue(fog_blendangle);
+
+
+		//fog skybox blend
+		m_EnableFogBlendSkyboxCheckButton->SetSelected(fog_blendskybox > 0);
+		m_OverrideFogBlendSkyboxCheckButton->SetSelected(fog_blendskybox != -1);
+
+		//fog blend angle
+		m_FogBlendSkyboxAngleOverride->SetSelected(fog_blendangleskybox != -1);
+		m_FogBlendSkyboxAngleSlider->SetValue(fog_blendangleskybox);
+	}
+
+	//init the fog color buttons
+	{
+		//get the rgbs
+		int r, g, b;
+
+		//get the fog color
+		sscanf(FindFogInfoFromArray(fog_array, "fog_color", "-1 -1 -1"), "%d %d %d", &r, &g, &b);
+		m_FogColorOverride->SetSelected(r != -1 && g != -1 && b != -1);
+		m_FogColor.SetColor(r, g, b, 255);
+
+		//get the skybox fog color
+		sscanf(FindFogInfoFromArray(fog_array, "fog_colorskybox", "-1 -1 -1"), "%d %d %d", &r, &g, &b);
+		m_FogSkyboxColorOverride->SetSelected(r != -1 && g != -1 && b != -1);
+		m_FogSkyboxColor.SetColor(r, g, b, 255);
+
+		//get the fog blend color
+		sscanf(FindFogInfoFromArray(fog_array, "fog_blendcolor", "-1 -1 -1"), "%d %d %d", &r, &g, &b);
+		m_FogBlendColorOverride->SetSelected(r != -1 && g != -1 && b != -1);
+		m_FogBlendColor.SetColor(r, g, b, 255);
+	}
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Gets the fog info
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelFogPage::GetFogInfo(MapTimeInfo_t& info)
+{
+	//set the fog info
+	do
+	{
+		//get and always clear the fog info
+		CUtlVector<MapTimeInfo_t::FogInfo_t>& fog_array = m_bNightTimeMode ? info.NightInfo.FogInfo : info.DayInfo.FogInfo;
+
+		//set the enabled state
+		(m_bNightTimeMode ? info.NightInfo.FogEnabled : info.DayInfo.FogEnabled) = m_OverrideFogButton->IsSelected();
+
+		//if the fog isnt enabled then just return
+		if (!m_OverrideFogButton->IsSelected())
+		{
+			AddOrUpdateFogInfoInArray(fog_array, "fog_override", "0");
+			break;
+		}
+
+		//set the info
+		MapTimeInfo_t::FogInfo_t FogInfos[19] = {
+			//pixel fog
+			{	StringToMapTimeStringTableIndex("r_pixelfog"),				StringToMapTimeStringTableIndex(CFmtStr("%d", m_OverrideFogButton->IsSelected() ? m_EnablePixelFogButton->IsSelected() : 1))},
+
+			//fog override
+			{	StringToMapTimeStringTableIndex("fog_override"),			StringToMapTimeStringTableIndex(CFmtStr("%d", m_OverrideFogButton->IsSelected())) },
+
+			//fog enabled states
+			{	StringToMapTimeStringTableIndex("fog_enable"),				StringToMapTimeStringTableIndex(!m_OverrideEnableFogCheckButton->IsSelected() ?											"-1" :				CFmtStr("%d", m_EnableFogCheckButton->IsSelected())) },
+			{	StringToMapTimeStringTableIndex("fog_enableskybox"),		StringToMapTimeStringTableIndex(!m_OverrideEnableSkyboxFogCheckButton->IsSelected() ?									"-1" :				CFmtStr("%d", m_EnableSkyboxFogCheckButton->IsSelected())) },
+
+			//fog distanes
+			{	StringToMapTimeStringTableIndex("fog_start"),				StringToMapTimeStringTableIndex(!m_FogStartOverride->IsSelected() ?														"-1" :				CFmtStr("%d", m_FogStartSlider->GetValue())) },
+			{	StringToMapTimeStringTableIndex("fog_end"),					StringToMapTimeStringTableIndex(!m_FogEndOverride->IsSelected() ?														"-1" :				CFmtStr("%d", m_FogEndSlider->GetValue())) },
+
+			//fog skybox distances
+			{	StringToMapTimeStringTableIndex("fog_startskybox"),			StringToMapTimeStringTableIndex(!m_FogStartSkyboxOverride->IsSelected() ?												"-1" :				CFmtStr("%d", m_FogStartSkyboxSlider->GetValue())) },
+			{	StringToMapTimeStringTableIndex("fog_endskybox"),			StringToMapTimeStringTableIndex(!m_FogEndSkyboxOverride->IsSelected() ?													"-1" :				CFmtStr("%d", m_FogEndSkyboxSlider->GetValue())) },
+
+			//fog densities
+			{	StringToMapTimeStringTableIndex("fog_maxdensity"),			StringToMapTimeStringTableIndex(!m_FogDensityOverride->IsSelected() ?													"-1" :				CFmtStr("%.2f", (float)m_FogDensitySlider->GetValue() / m_FogDensitySlider->GetMax())) },
+			{	StringToMapTimeStringTableIndex("fog_maxdensityskybox"),	StringToMapTimeStringTableIndex(!m_FogSkyboxDensityOverride->IsSelected() ?												"-1" :				CFmtStr("%.2f", (float)m_FogSkyboxDensitySlider->GetValue() / m_FogSkyboxDensitySlider->GetMax())) },
+			
+			//fog colors
+			{	StringToMapTimeStringTableIndex("fog_color"),				StringToMapTimeStringTableIndex(!m_FogColorOverride->IsSelected() ?														"-1 -1 -1" :		CFmtStr("%d %d %d", m_FogColor.r(), m_FogColor.g(), m_FogColor.b())) },
+			{	StringToMapTimeStringTableIndex("fog_colorskybox"),			StringToMapTimeStringTableIndex(!m_FogSkyboxColorOverride->IsSelected() ?												"-1 -1 -1" :		CFmtStr("%d %d %d", m_FogSkyboxColor.r(), m_FogSkyboxColor.g(), m_FogSkyboxColor.b())) },
+
+			//farz clipping plane
+			{	StringToMapTimeStringTableIndex("r_farz"),					StringToMapTimeStringTableIndex(!m_FarzClippingPlaneOverride->IsSelected() ?											"-1" :				CFmtStr("%d", m_FarzClippingPlaneSlider->GetValue())) },
+
+			//fog blend
+			{	StringToMapTimeStringTableIndex("fog_blend"),				StringToMapTimeStringTableIndex(!m_OverrideFogBlendCheckButton->IsSelected() ?											"-1" :				CFmtStr("%d", m_EnableFogBlendCheckButton->IsSelected())) },
+
+			//fog blend color
+			{	StringToMapTimeStringTableIndex("fog_blendcolor"),			StringToMapTimeStringTableIndex(!m_FogBlendColorOverride->IsSelected() ?												"-1 -1 -1" :		CFmtStr("%d %d %d", m_FogBlendColor.r(), m_FogBlendColor.g(), m_FogBlendColor.b())) },
+
+			//fog blend angle
+			{	StringToMapTimeStringTableIndex("fog_blendangle"),			StringToMapTimeStringTableIndex(!m_FogBlendAngleOverride->IsSelected() ?												"-1" :				CFmtStr("%d", m_FogBlendAngleSlider->GetValue())) },
+
+			//fog skybox blend
+			{	StringToMapTimeStringTableIndex("fog_blendskybox"),			StringToMapTimeStringTableIndex(!m_OverrideFogBlendSkyboxCheckButton->IsSelected() ?									"-1" :				CFmtStr("%d", m_EnableFogBlendSkyboxCheckButton->IsSelected())) },
+
+			//fog skybox blend color
+			{	StringToMapTimeStringTableIndex("fog_blendcolorskybox"),	StringToMapTimeStringTableIndex(!m_FogBlendSkyboxColorOverride->IsSelected() ?											"-1 -1 -1" :		CFmtStr("%d %d %d", m_FogBlendSkyboxColor.r(), m_FogBlendSkyboxColor.g(), m_FogBlendSkyboxColor.b())) },
+
+			//fog skybox blend angle
+			{	StringToMapTimeStringTableIndex("fog_blendangleskybox"),	StringToMapTimeStringTableIndex(!m_FogBlendSkyboxAngleOverride->IsSelected() ?											"-1" :				CFmtStr("%d", m_FogBlendSkyboxAngleSlider->GetValue())) },
+		};
+
+		//add to the array
+		for (int i = 0; i < SIZE_OF_ARRAY(FogInfos); i++)
+		{
+			//i used to have it so i would clear the fog array then add all the FogInfos[i] to them. BUT i realized
+			//you could possibly add any other convar into this array. These convars wouldnt show up in the panel BUT
+			//would still be in the info. So what we are going to do is not clear the fog infos but instead modify
+			//the already existing ones.
+			AddOrUpdateFogInfoInArray(fog_array, FogInfos[i].convar, FogInfos[i].value);
+		}
+	} while (false);
+}
+
+
+
+
+
+
+
+//divisor for bloom scalar
+#define BLOOM_SCALAR_DIVISOR 100
+#define COMMAND_CHANGE_CLOUDS_COLOR "ChangeCloudColors"
+
+//skybox + filters page
+class CMapPropertiesPanelSkyboxFiltersPage : public CMapPropertiesPanelPageBase
+{
+	DECLARE_CLASS_SIMPLE(CMapPropertiesPanelSkyboxFiltersPage, CMapPropertiesPanelPageBase);
+public:
+	CMapPropertiesPanelSkyboxFiltersPage(Panel* parent, const char* name);
+
+	virtual void PerformLayout();
+	virtual void Paint();
+	virtual void Update();
+	virtual void OnCommand(const char* pszCommand);
+
+	//init funcs
+	virtual void FormatImage(const char* input, char* output, int outsize);
+	virtual void InitSkyboxAndFilter(MapTimeInfo_t& info, bool IsNightPage);
+	virtual void GetSkyboxFilterInfo(MapTimeInfo_t& info);
+
+	MESSAGE_FUNC_PARAMS(OnTextChanged, "TextChanged", data);
+	MESSAGE_FUNC_PARAMS(OnColorSelected, "ColorSelected", data);
+private:
+	//night time mode
+	bool m_bNightTimeMode = false;
+
+private:
+	//color picker
+	CColorPicker* m_ColorPicker;
 
 	//skybox
 private:
@@ -370,7 +1833,7 @@ private:
 private:
 	//clouds colors buttons
 	CMapPropertiesPanelButton* m_CloudButton;
-	
+
 	//clouds colors
 	Color m_CloudColor;
 	Rect_t m_CloudColorRect;
@@ -387,206 +1850,14 @@ private:
 	//bloom scalar slider
 	CMapPropertiesPanelSlider* m_BloomScalarSlider;
 	Label* m_BloomScalarText;
-
-	//sun
-private:
-	//enable sun
-	CheckButton* m_EnableSunButton;
-
-	//sun pitch
-	Slider* m_SunPitchSlider;
-	Label* m_SunPitchLabel;
-
-	//sun yaw
-	Slider* m_SunYawSlider;
-	Label* m_SunYawLabel;
-
-	//sun size
-	Slider* m_SunSizeSlider;
-	Label* m_SunSizeLabel;
-
-	//sun color
-	CMapPropertiesPanelButton* m_SunColorButton;
-	Color m_SunColor;
-	Rect_t m_SunColorDrawRect;
-
-	//sun material text entry
-	TextEntry* m_SunMaterialTextEntry;
-	
-	//sun overlay size
-	Slider* m_SunOverlaySizeSlider;
-	Label* m_SunOverlaySizeLabel;
-
-	//sun overlay color
-	CMapPropertiesPanelButton* m_SunOverlayColorButton;
-	Color m_SunOverlayColor;
-	Rect_t m_SunOverlayColorDrawRect;
-
-	//sun overlay material text entry
-	TextEntry* m_SunOverlayMaterialTextEntry;
-
-	//set the pitch to the players eyes pitch button
-	CMapPropertiesPanelButton* m_PitchToEyesButton;
-
-	//apply button
-private:
-	CMapPropertiesPanelButton* m_ApplyButton;
-
-	//other vars
-private:
-	//day or night?
-	bool m_bNightTimeMode;
-
-	//previous convar values to re-set when we close
-	char m_PreviousFilterConvarValue[256];
-	char m_PreviousFilterIntensityConvarValue[16];
-	char m_PreviousCloudsColorValue[16];
-	char m_PreviousCloudsShowValue[16];
-	char m_PreviousCloudsOverrideValue[4];
-	char m_PreviousGodConvarValue[4];
 };
 
-//static map properties panel
-static CMapPropertiesPanel* g_MapPropertiesPanel;
 
-
-#define COMMAND_CHANGE_FOG_COLOR "SetFogColor"
-#define COMMAND_CHANGE_FOG_SKYBOX_COLOR "SetFogSkyboxColor"
-#define COMMAND_CHANGE_CLOUDS_COLOR "ChangeCloudColors"
-#define COMMAND_CHANGE_SUN_COLOR "ChangeSunColors"
-#define COMMAND_CHANGE_SUN_OVERLAY_COLOR "ChangeSunOverlayColors"
-#define COMMAND_APPLY_PAGE_SETTINGS "ApplySettings"
-
-//sun commands
-#define COMMAND_SUN_ACTIVATE "ActivateSun"
-#define COMMAND_PITCH_TO_EYES "PitchToEyes"
-
-//divisor for bloom scalar
-#define BLOOM_SCALAR_DIVISOR 100
-
-extern ConVar cl_mouselook;
-
-//----------------------------------------------------------------------------------------------------
-// Purpose: Constructor for map properties page
-//----------------------------------------------------------------------------------------------------
-CMapPropertiesPanel::CMapPropertiesPanel(Panel* parent) : BaseClass(parent, "MapPropertiesPanel")
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Constructor for the skybox filter page
+//-------------------------------------------------------------------------------------------------------
+CMapPropertiesPanelSkyboxFiltersPage::CMapPropertiesPanelSkyboxFiltersPage(Panel* parent, const char* name) : BaseClass(parent, name, "resource/panels/MapPropertiesEditor/SkyboxFilterPage.res")
 {
-	//clear the previous convar values
-	memset(m_PreviousCloudsOverrideValue, 0, sizeof(m_PreviousCloudsOverrideValue));
-	memset(m_PreviousCloudsColorValue, 0, sizeof(m_PreviousCloudsColorValue));
-	memset(m_PreviousCloudsShowValue, 0, sizeof(m_PreviousCloudsShowValue));
-	memset(m_PreviousFilterConvarValue, 0, sizeof(m_PreviousFilterConvarValue));
-	memset(m_PreviousFilterIntensityConvarValue, 0, sizeof(m_PreviousFilterIntensityConvarValue));
-	memset(m_PreviousGodConvarValue, 0, sizeof(m_PreviousGodConvarValue));
-
-	//set our settings
-	g_MapPropertiesPanel = this;
-	m_bNightTimeMode = true;
-
-	SetParent(parent);
-	SetKeyBoardInputEnabled(true);
-	SetMouseInputEnabled(true);
-	SetVisible(true);
-	SetEnabled(true);
-	SetSizeable(true);
-	SetDeleteSelfOnClose(true);
-	SetFadeEffectDisableOverride(true);
-	Activate();
-
-	//init our keyvalues and attempt to load our file
-	m_KeyValuesFile = new KeyValues("PropertiesPanelDialog");
-	if (!m_KeyValuesFile->LoadFromFile(filesystem, "resource/panels/MapPropertiesEditor.txt", "MOD"))
-	{
-		QueryBox* modal = new QueryBox("Error", "Failed to load: \"resource/panels/MapPropertiesEditor.txt\"!\nAborting panel load.", this);
-		modal->MoveToCenterOfScreen();
-		modal->Activate();
-		modal->DoModal();
-		modal->SetOKCommand(new KeyValues("Command", "command", "Close"));
-		modal->SetCancelCommand(new KeyValues("Command", "command", "Close"));
-		return;
-	}
-
-	//create our dividers
-	KeyValues* dividers = m_KeyValuesFile->FindKey("Dividers");
-	if (dividers)
-	{
-		FOR_EACH_TRUE_SUBKEY(dividers, divider)
-		{
-			//make the divider
-			ApplySettingsToPanel(divider, (m_Dividers[m_Dividers.AddToTail(new Divider(this, divider->GetName()))]));
-		}
-	}
-
-	//create our labels
-	KeyValues* labels = m_KeyValuesFile->FindKey("Labels");
-	if (labels)
-	{
-		FOR_EACH_TRUE_SUBKEY(labels, label)
-		{
-			//make the divider
-			ApplySettingsToPanel(label, (m_Labels[m_Labels.AddToTail(new Label(this, label->GetName(), ""))]));
-		}
-	}
-
-	//create our fog items
-	{
-		//override button
-		m_OverrideFogButton = new CheckButton(this, "FogOverrideCheckButton", "");
-
-		//enable pixel fog
-		m_EnablePixelFogButton = new CheckButton(this, "EnablePixelFogButton", "");
-
-		//enable fog
-		m_EnableFogCheckButton = new CheckButton(this, "FogEnableCheckButton", "");
-		m_OverrideEnableFogCheckButton = new CheckButton(this, "OverrideFogEnableCheckButton", "");
-
-		//enable skybox fog
-		m_EnableSkyboxFogCheckButton = new CheckButton(this, "FogEnableSkyboxCheckButton", "");
-		m_OverrideEnableSkyboxFogCheckButton = new CheckButton(this, "OverrideFogEnableSkyboxCheckButton", "");
-
-		//fog color
-		m_FogColorButton = new CMapPropertiesPanelButton(this, "FogColorButton", "");
-		m_FogColorOverride = new CheckButton(this, "FogColorOverrideButton", "");
-		m_FogColorButton->SetCommand(COMMAND_CHANGE_FOG_COLOR);
-		m_FogColor.SetColor(255, 255, 255, 255);
-
-		//fog skybox color
-		m_FogSkyboxColorButton = new CMapPropertiesPanelButton(this, "FogSkyboxColorButton", "");
-		m_FogSkyboxColorOverride = new CheckButton(this, "FogSkyboxColorOverrideButton", "");
-		m_FogSkyboxColorButton->SetCommand(COMMAND_CHANGE_FOG_SKYBOX_COLOR);
-		m_FogSkyboxColor.SetColor(255, 255, 255, 255);
-
-		//fog start
-		m_FogStartSlider = new CMapPropertiesPanelSlider(this, "FogStartSlider", 150);
-		m_FogStartValueLabel = new Label(this, "FogStartSlider", "");
-		m_FogStartOverride = new CheckButton(this, "FogStartOverride", "");
-
-		//fog end
-		m_FogEndSlider = new CMapPropertiesPanelSlider(this, "FogEndSlider", 150);
-		m_FogEndValueLabel = new Label(this, "FogEndSlider", "");
-		m_FogEndOverride = new CheckButton(this, "FogEndOverride", "");
-
-		//fog start skybox
-		m_FogStartSkyboxSlider = new CMapPropertiesPanelSlider(this, "FogStartSkyboxSlider", 150);
-		m_FogStartSkyboxValueLabel = new Label(this, "FogStartSkyboxSlider", "");
-		m_FogStartSkyboxOverride = new CheckButton(this, "FogStartSkyboxOverride", "");
-
-		//fog end skybox
-		m_FogEndSkyboxSlider = new CMapPropertiesPanelSlider(this, "FogEndSkyboxSlider", 150);
-		m_FogEndSkyboxValueLabel = new Label(this, "FogEndSkyboxSlider", "");
-		m_FogEndSkyboxOverride = new CheckButton(this, "FogEndSkyboxOverride", "");
-
-		//fog density
-		m_FogDensitySlider = new CMapPropertiesPanelSlider(this, "FogDensitySlider");
-		m_FogDensityValueLabel = new Label(this, "FogDensitySlider", "");
-		m_FogDensityOverride = new CheckButton(this, "FogDensityOverride", "");
-
-		//fog density skybox
-		m_FogSkyboxDensitySlider = new CMapPropertiesPanelSlider(this, "FogSkyboxDensitySlider");
-		m_FogSkyboxDensityValueLabel = new Label(this, "FogSkyboxDensitySlider", "");
-		m_FogSkyboxDensityOverride = new CheckButton(this, "FogSkyboxDensityOverride", "");
-	}
-
 	//skybox
 	{
 		//make the background brush
@@ -615,7 +1886,7 @@ CMapPropertiesPanel::CMapPropertiesPanel(Panel* parent) : BaseClass(parent, "Map
 	{
 		m_CloudButton = new CMapPropertiesPanelButton(this, "CloudButton", "");
 		m_CloudButton->SetCommand(COMMAND_CHANGE_CLOUDS_COLOR);
-		
+
 		m_CloudColor.SetColor(255, 255, 255, 255);
 	}
 
@@ -638,583 +1909,59 @@ CMapPropertiesPanel::CMapPropertiesPanel(Panel* parent) : BaseClass(parent, "Map
 		m_BloomScalarText = new Label(this, "BloomScalarText", "");
 	}
 
-	//sun
-	{
-		//enable sun check button
-		m_EnableSunButton = new CheckButton(this, "EnableSunButton", "");
-		m_EnableSunButton->SetCommand(COMMAND_SUN_ACTIVATE);
-
-		//sun pitch
-		m_SunPitchSlider = new CMapPropertiesPanelSlider(this, "SunPitchSlider", 1);
-		m_SunPitchLabel = new Label(this, "SunPitchLabel", "");
-
-		//sun yaw
-		m_SunYawSlider = new CMapPropertiesPanelSlider(this, "SunYawSlider", 1);
-		m_SunYawLabel = new Label(this, "SunYawLabel", "");
-
-		//sun size
-		m_SunSizeSlider = new CMapPropertiesPanelSlider(this, "SunSizeSlider", 1);
-		m_SunSizeLabel = new Label(this, "SunSizeLabel", "");
-
-		//sun color
-		m_SunColorButton = new CMapPropertiesPanelButton(this, "SunColorButton", "");
-		m_SunColorButton->SetCommand(COMMAND_CHANGE_SUN_COLOR);
-		m_SunColor.SetColor(255, 255, 255, 255);
-
-		//sun material text entry
-		m_SunMaterialTextEntry = new TextEntry(this, "MaterialTextEntry");
-		m_SunMaterialTextEntry->AddActionSignalTarget(this);
-		m_SunMaterialTextEntry->SetMaximumCharCount(255);
-
-		//sun overlay size
-		m_SunOverlaySizeSlider = new CMapPropertiesPanelSlider(this, "SunOverlaySizeSlider", 1);
-		m_SunOverlaySizeLabel = new Label(this, "SunOverlaySizeLabel", "");
-
-		//sun overlay color
-		m_SunOverlayColorButton = new CMapPropertiesPanelButton(this, "SunOverlayColorButton", "");
-		m_SunOverlayColorButton->SetCommand(COMMAND_CHANGE_SUN_OVERLAY_COLOR);
-		m_SunOverlayColor.SetColor(255, 255, 255, 255);
-
-		//sun overlay material text entry
-		m_SunOverlayMaterialTextEntry = new TextEntry(this, "OverlayMaterialTextEntry");
-		m_SunOverlayMaterialTextEntry->AddActionSignalTarget(this);
-		m_SunOverlayMaterialTextEntry->SetMaximumCharCount(255);
-
-		//pitch to eyes button
-		m_PitchToEyesButton = new CMapPropertiesPanelButton(this, "PitchToEyesButton", "");
-		m_PitchToEyesButton->SetCommand(COMMAND_PITCH_TO_EYES);
-	}
-
-	//apply button
-	m_ApplyButton = new CMapPropertiesPanelButton(this, "PropertiesButton", "");
-	m_ApplyButton->SetCommand(COMMAND_APPLY_PAGE_SETTINGS);
-
-	//set our size + pos then perform the panel layout
-	SetBounds(m_KeyValuesFile->GetInt("x"), m_KeyValuesFile->GetInt("y"), m_OriginalWidth = m_KeyValuesFile->GetInt("w"), m_OriginalHeight = m_KeyValuesFile->GetInt("h"));
-	SetMinimumSize(m_KeyValuesFile->GetInt("minwide"), m_KeyValuesFile->GetInt("mintall"));
+	//perform layout to set the range sliders and such
 	PerformLayout();
-
-	//disable mouselook so keyboardlook can be used
-	cl_mouselook.SetValue(false);
 }
 
-//-------------------------------------------------------------------------------------------------------
-// Purpose: Performs the layout for our panel
-//-------------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::PerformLayout()
+//----------------------------------------------------------------------------------------------------
+// Purpose: Formats the image filepath
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSkyboxFiltersPage::FormatImage(const char* input, char* output, int outsize)
 {
-	BaseClass::PerformLayout();
+	//failsafe
+	Q_strncpy(output, CFmtStr("../skybox/%sup", input), outsize);
 
-	//check for m_KeyValuesFile
-	if (!m_KeyValuesFile)
+	//load the panels/sky path
+	KeyValuesAD keyvalues(new KeyValues("SkyPanel"));
+	if (!keyvalues->LoadFromFile(filesystem, "resource/panels/skypanel.txt"))
 		return;
 
-	//set our divider + label positions
-	KeyValues* dividers = m_KeyValuesFile->FindKey("Dividers");
-	for (int i = 0; i < m_Dividers.Count(); i++)
-	{
-		ApplySettingsToPanel(dividers->FindKey(m_Dividers[i]->GetName()), m_Dividers[i]);
-	}
-	
-	KeyValues* labels = m_KeyValuesFile->FindKey("Labels");
-	for (int i = 0; i < m_Labels.Count(); i++)
-	{
-		ApplySettingsToPanel(labels->FindKey(m_Labels[i]->GetName()), m_Labels[i]);
-	}
-
-	//set our fog stuff
-	{
-		//override button
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogOverrideCheckButton"), m_OverrideFogButton);
-
-		//enable pixel fog
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("EnablePixelFogButton"), m_EnablePixelFogButton);
-
-		//enable fog
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEnableCheckButton"), m_EnableFogCheckButton);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("OverrideFogEnableCheckButton"), m_OverrideEnableFogCheckButton);
-
-		//enable skybox fog
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEnableSkyboxCheckButton"), m_EnableSkyboxFogCheckButton);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("OverrideFogEnableSkyboxCheckButton"), m_OverrideEnableSkyboxFogCheckButton);
-
-		//fog color
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogColorButton"), m_FogColorButton);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogColorOverrideButton"), m_FogColorOverride);
-
-		//get the proportionate value for the fog color draw rect
-		sscanf(m_KeyValuesFile->GetString("FogColorRect"), "%d %d %d %d", &m_FogColorDrawRect.x, &m_FogColorDrawRect.y, &m_FogColorDrawRect.width, &m_FogColorDrawRect.height);
-		{
-			m_FogColorDrawRect.x = GetProportionateScaledValue(m_FogColorDrawRect.x, GetWide(), m_OriginalWidth);
-			m_FogColorDrawRect.y = GetProportionateScaledValue(m_FogColorDrawRect.y, GetTall(), m_OriginalHeight);
-			m_FogColorDrawRect.width = GetProportionateScaledValue(m_FogColorDrawRect.width, GetWide(), m_OriginalWidth);
-			m_FogColorDrawRect.height = GetProportionateScaledValue(m_FogColorDrawRect.height, GetTall(), m_OriginalHeight);
-		}
-
-		//fog skybox color
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogSkyboxColorButton"), m_FogSkyboxColorButton);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogSkyboxColorOverrideButton"), m_FogSkyboxColorOverride);
-
-		//get the proportionate value for the skybox fog color draw rect
-		sscanf(m_KeyValuesFile->GetString("FogSkyboxColorRect"), "%d %d %d %d", &m_FogSkyboxColorDrawRect.x, &m_FogSkyboxColorDrawRect.y, &m_FogSkyboxColorDrawRect.width, &m_FogSkyboxColorDrawRect.height);
-		{
-			m_FogSkyboxColorDrawRect.x = GetProportionateScaledValue(m_FogSkyboxColorDrawRect.x, GetWide(), m_OriginalWidth);
-			m_FogSkyboxColorDrawRect.y = GetProportionateScaledValue(m_FogSkyboxColorDrawRect.y, GetTall(), m_OriginalHeight);
-			m_FogSkyboxColorDrawRect.width = GetProportionateScaledValue(m_FogSkyboxColorDrawRect.width, GetWide(), m_OriginalWidth);
-			m_FogSkyboxColorDrawRect.height = GetProportionateScaledValue(m_FogSkyboxColorDrawRect.height, GetTall(), m_OriginalHeight);
-		}
-
-		//fog start
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogStartSlider"), m_FogStartSlider);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogStartValueLabel"), m_FogStartValueLabel);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogStartOverride"), m_FogStartOverride);
-
-		//fog end
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEndSlider"), m_FogEndSlider);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEndValueLabel"), m_FogEndValueLabel);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEndOverride"), m_FogEndOverride);
-
-		//fog start skybox
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogStartSkyboxSlider"), m_FogStartSkyboxSlider);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogStartSkyboxValueLabel"), m_FogStartSkyboxValueLabel);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogStartSkyboxOverride"), m_FogStartSkyboxOverride);
-
-		//fog end skybox
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEndSkyboxSlider"), m_FogEndSkyboxSlider);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEndSkyboxValueLabel"), m_FogEndSkyboxValueLabel);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogEndSkyboxOverride"), m_FogEndSkyboxOverride);
-
-		//fog density
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogDensitySlider"), m_FogDensitySlider);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogDensityValueLabel"), m_FogDensityValueLabel);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogDensityOverride"), m_FogDensityOverride);
-
-		//fog density skybox
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogSkyboxDensitySlider"), m_FogSkyboxDensitySlider);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogSkyboxDensityValueLabel"), m_FogSkyboxDensityValueLabel);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FogSkyboxDensityOverride"), m_FogSkyboxDensityOverride);
-	}
-
-	//set the skybox panel
-	{
-		//skybox background
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SkyboxBackground"), m_SkyboxBackground);
-
-		//skybox foreground
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SkyboxForeground"), m_SkyboxForeground);
-
-		//skybox combo box
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SkyboxNames"), m_SkyboxNames);
-	}
-
-	//post processing
-	{
-		//skybox background
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FilterIntensityComboBox"), m_FilterComboBox);
-
-		//skybox foreground
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FilterIntensityText"), m_FilterIntensityText);
-
-		//skybox combo box
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FilterIntensitySlider"), m_FilterIntensitySlider);
-	}
-
-	//cloud
-	{
-		//cloud button
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("CloudButton"), m_CloudButton);
-
-		//get the proportionate value for the cloud fog color draw rect
-		sscanf(m_KeyValuesFile->GetString("CloudColorRect"), "%d %d %d %d", &m_CloudColorRect.x, &m_CloudColorRect.y, &m_CloudColorRect.width, &m_CloudColorRect.height);
-		{
-			m_CloudColorRect.x = GetProportionateScaledValue(m_CloudColorRect.x, GetWide(), m_OriginalWidth);
-			m_CloudColorRect.y = GetProportionateScaledValue(m_CloudColorRect.y, GetTall(), m_OriginalHeight);
-			m_CloudColorRect.width = GetProportionateScaledValue(m_CloudColorRect.width, GetWide(), m_OriginalWidth);
-			m_CloudColorRect.height = GetProportionateScaledValue(m_CloudColorRect.height, GetTall(), m_OriginalHeight);
-		}
-	}
-
-	//bloom
-	{
-
-		//bloom enabled
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("BloomEnabledButton"), m_EnableBloomCheckButton);
-
-		//bloom scale
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("BloomScaleSlider"), m_BloomScaleSlider);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("BloomScaleText"), m_BloomScaleText);
-
-		//bloom scalar
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("BloomScalarSlider"), m_BloomScalarSlider);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("BloomScalarText"), m_BloomScalarText);
-	}
-
-	//sun
-	{
-		//sun enabled
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunEnabledCheckButton"), m_EnableSunButton);
-
-		//sun pitch
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunPitchSlider"), m_SunPitchSlider);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunPitchText"), m_SunPitchLabel);
-
-		//sun yaw
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunYawSlider"), m_SunYawSlider);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunYawText"), m_SunYawLabel);
-
-		//pitch to eyes button
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("PitchToEyeAngleButton"), m_PitchToEyesButton);
-
-		//sun size
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunSizeSlider"), m_SunSizeSlider);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunSizeText"), m_SunSizeLabel);
-
-		//sun color
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunColorButton"), m_SunColorButton);
-
-		//sun material
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunMaterialTextEntry"), m_SunMaterialTextEntry);
-
-		//get the proportionate value for the sun color draw rect
-		sscanf(m_KeyValuesFile->GetString("SunColorRect"), "%d %d %d %d", &m_SunColorDrawRect.x, &m_SunColorDrawRect.y, &m_SunColorDrawRect.width, &m_SunColorDrawRect.height);
-		{
-			m_SunColorDrawRect.x = GetProportionateScaledValue(m_SunColorDrawRect.x, GetWide(), m_OriginalWidth);
-			m_SunColorDrawRect.y = GetProportionateScaledValue(m_SunColorDrawRect.y, GetTall(), m_OriginalHeight);
-			m_SunColorDrawRect.width = GetProportionateScaledValue(m_SunColorDrawRect.width, GetWide(), m_OriginalWidth);
-			m_SunColorDrawRect.height = GetProportionateScaledValue(m_SunColorDrawRect.height, GetTall(), m_OriginalHeight);
-		}
-		
-		//sun overlay size
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunOverlaySizeSlider"), m_SunOverlaySizeSlider);
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunOverlaySizeText"), m_SunOverlaySizeLabel);
-
-		//sun overlay color
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunOverlayColorButton"), m_SunOverlayColorButton);
-
-		//sun overlay material
-		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunOverlayMaterialTextEntry"), m_SunOverlayMaterialTextEntry);
-
-		//get the proportionate value for the sun overlay color draw rect
-		sscanf(m_KeyValuesFile->GetString("SunOverlayColorRect"), "%d %d %d %d", &m_SunOverlayColorDrawRect.x, &m_SunOverlayColorDrawRect.y, &m_SunOverlayColorDrawRect.width, &m_SunOverlayColorDrawRect.height);
-		{
-			m_SunOverlayColorDrawRect.x = GetProportionateScaledValue(m_SunOverlayColorDrawRect.x, GetWide(), m_OriginalWidth);
-			m_SunOverlayColorDrawRect.y = GetProportionateScaledValue(m_SunOverlayColorDrawRect.y, GetTall(), m_OriginalHeight);
-			m_SunOverlayColorDrawRect.width = GetProportionateScaledValue(m_SunOverlayColorDrawRect.width, GetWide(), m_OriginalWidth);
-			m_SunOverlayColorDrawRect.height = GetProportionateScaledValue(m_SunOverlayColorDrawRect.height, GetTall(), m_OriginalHeight);
-		}
-	}
-
-	//apply button
-	ApplySettingsToPanel(m_KeyValuesFile->FindKey("ApplyButton"), m_ApplyButton);
-}
-
-//-------------------------------------------------------------------------------------------------------
-// Purpose: Applies settings to the Panel* from the keyvalues*
-//-------------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::ApplySettingsToPanel(KeyValues* subkey, Panel* panel)
-{
-	//check for subkey and panel
-	if (!subkey || !panel)
+	KeyValues* timekey = keyvalues->FindKey(m_bNightTimeMode ? "Night" : "Day");
+	if (!timekey)
 		return;
 
-	//set bounds
-	int x = GetProportionateScaledValue(subkey->GetInt("x"), GetWide(), m_OriginalWidth);
-	int y = GetProportionateScaledValue(subkey->GetInt("y"), GetTall(), m_OriginalHeight);
-	int w = GetProportionateScaledValue(subkey->GetInt("w"), GetWide(), m_OriginalWidth);
-	int h = GetProportionateScaledValue(subkey->GetInt("h"), GetTall(), m_OriginalHeight);
-
-	if (subkey->GetBool("squaresize"))
+	//go through each key
+	FOR_EACH_VALUE(timekey, value)
 	{
-		if (h < w)
-			w = h;
+		//check for % to change the direction the skybox displays
+		char temp[512];
+		Q_strncpy(temp, value->GetString(), sizeof(temp));
+		const char* current = temp;
+
+		//look for percent
+		char* percent = Q_strstr(temp, "%");
+		if (percent)
+		{
+			*percent = '\0';
+			percent++;
+		}
 		else
-			h = w;
-	}
+			percent = "up";
 
-	panel->SetBounds(x, y, w, h);
-
-
-	//check for zpos
-	KeyValues* zpos = subkey->FindKey("zpos");
-	if (zpos)
-		panel->SetZPos(zpos->GetInt());
-
-	//check for slider
-	Slider* slider = dynamic_cast<Slider*>(panel);
-	if (slider)
-	{
-		slider->SetRange(subkey->GetInt("min"), subkey->GetInt("max"));
-	}
-
-	//check for label
-	Label* label = dynamic_cast<Label*>(panel);
-	if (label)
-	{
-		label->SetText(subkey->GetString("text"));
-		label->SetContentAlignment((Label::Alignment)AnimationController::LookupAlignment(subkey->GetString("alignment", "a_west")));
-	}
-
-	//check for image
-	ImagePanel* Image = dynamic_cast<ImagePanel*>(panel);
-	if (Image)
-	{
-		int r, g, b, a;
-		sscanf(subkey->GetString("fillcolor", "255 255 255 255"), "%d %d %d %d", &r, &g, &b, &a);
-		Image->SetFillColor(Color(r, g, b, a));
-	}
-}
-
-
-//----------------------------------------------------------------------------------------------------
-// Purpose: Called when a keycode is pressed
-//----------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::OnKeyCodePressed(KeyCode code)
-{
-	//check for r. This requests focus back to the panel (or a button so this panel will accept input)
-	if (code == KeyCode::KEY_R)
-	{
-		m_FogColorButton->RequestFocus();
-		return;
-	}
-
-	//allow the user to move around
-	if (code == KeyCode::KEY_W)
-		engine->ClientCmd("+forward");
-	else if (code == KeyCode::KEY_A)
-		engine->ClientCmd("+moveleft");
-	else if (code == KeyCode::KEY_S)
-		engine->ClientCmd("+back");
-	else if (code == KeyCode::KEY_D)
-		engine->ClientCmd("+moveright");
-	
-	//allow the user to look around
-	else if (code == KeyCode::KEY_UP)
-		engine->ClientCmd("+lookup");
-	else if (code == KeyCode::KEY_LEFT)
-		engine->ClientCmd("+left");
-	else if (code == KeyCode::KEY_DOWN)
-		engine->ClientCmd("+lookdown");
-	else if (code == KeyCode::KEY_RIGHT)
-		engine->ClientCmd("+right");
-
-	//use
-	else if (code == KeyCode::KEY_E)
-		engine->ClientCmd("+use");
-
-	//enable noclip
-	else if (code == KeyCode::KEY_V)
-		engine->ClientCmd("noclip");
-
-	//show the flashlight
-	else if (code == KeyCode::KEY_F)
-		engine->ClientCmd("impulse 100");
-
-	BaseClass::OnKeyCodePressed(code);
-}
-
-//----------------------------------------------------------------------------------------------------
-// Purpose: Called when a keycode is released
-//----------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::OnKeyCodeReleased(KeyCode code)
-{
-	//allow the user to move around
-	if (code == KeyCode::KEY_W)
-		engine->ClientCmd("-forward");
-	else if (code == KeyCode::KEY_A)
-		engine->ClientCmd("-moveleft");
-	else if (code == KeyCode::KEY_S)
-		engine->ClientCmd("-back");
-	else if (code == KeyCode::KEY_D)
-		engine->ClientCmd("-moveright");
-	
-	//allow the user to look around
-	else if (code == KeyCode::KEY_UP)
-		engine->ClientCmd("-lookup");
-	else if (code == KeyCode::KEY_LEFT)
-		engine->ClientCmd("-left");
-	else if (code == KeyCode::KEY_DOWN)
-		engine->ClientCmd("-lookdown");
-	else if (code == KeyCode::KEY_RIGHT)
-		engine->ClientCmd("-right");
-
-	//use
-	else if (code == KeyCode::KEY_E)
-		engine->ClientCmd("-use");
-
-	BaseClass::OnKeyCodeReleased(code);
-}
-
-//----------------------------------------------------------------------------------------------------
-// Purpose: Called when a mouse is pressed
-//----------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::OnMousePressed(MouseCode code)
-{
-	//regain focus by setting our focus to a button. This makes it so we can move around if
-	//our input was previously being sent to the text entry
-	m_FogColorButton->RequestFocus();
-	BaseClass::OnMousePressed(code);
-}
-
-//----------------------------------------------------------------------------------------------------
-// Purpose: Destructor for map properties page.
-//----------------------------------------------------------------------------------------------------
-CMapPropertiesPanel::~CMapPropertiesPanel()
-{
-	//delete our keyvalues
-	if (m_KeyValuesFile)
-		m_KeyValuesFile->deleteThis();
-	m_KeyValuesFile = nullptr;
-
-	//set the previous convar values
-	if (m_PreviousCloudsOverrideValue[0]) ConVarRef("amod_clouds_color_override").SetValue(m_PreviousCloudsOverrideValue);
-	if (m_PreviousCloudsColorValue[0]) ConVarRef("amod_clouds_color").SetValue(m_PreviousCloudsColorValue);
-	if (m_PreviousCloudsShowValue[0]) ConVarRef("amod_clouds").SetValue(m_PreviousCloudsShowValue);
-	if (m_PreviousGodConvarValue[0]) ConVarRef("amod_enable_god").SetValue(m_PreviousGodConvarValue);
-	ConVarRef(m_bNightTimeMode ? "amod_epic_filter_night_filename" : "amod_epic_filter_day_filename").SetValue(m_PreviousFilterConvarValue);
-	ConVarRef(m_bNightTimeMode ? "amod_epic_filter_night_intensity" : "amod_epic_filter_day_intensity").SetValue(m_PreviousFilterIntensityConvarValue);
-
-	void Amod_WriteConfig();
-	Amod_WriteConfig();
-
-	g_MapPropertiesPanel = nullptr;
-
-	//enable mouselook so the mouse can be used
-	cl_mouselook.SetValue(true);
-
-	//stop all move commands
-	engine->ClientCmd("-forward");
-	engine->ClientCmd("-moveleft");
-	engine->ClientCmd("-back");
-	engine->ClientCmd("-moveright");
-	engine->ClientCmd("-lookup");
-	engine->ClientCmd("-left");
-	engine->ClientCmd("-lookdown");
-	engine->ClientCmd("-right");
-	engine->ClientCmd("-use");
-}
-
-//----------------------------------------------------------------------------------------------------
-// Purpose: Paints the panel
-//----------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::Paint()
-{
-	//set our new bg color
-	SetBgColor(Color(150, 150, 150, 150));
-	BaseClass::Paint();
-
-	//draw the colors
-	surface()->DrawSetColor(m_FogColor);
-	surface()->DrawFilledRect(m_FogColorDrawRect.x, m_FogColorDrawRect.y, m_FogColorDrawRect.x + m_FogColorDrawRect.width, m_FogColorDrawRect.y + m_FogColorDrawRect.height);
-
-	//draw the colors
-	surface()->DrawSetColor(m_FogSkyboxColor);
-	surface()->DrawFilledRect(m_FogSkyboxColorDrawRect.x, m_FogSkyboxColorDrawRect.y, m_FogSkyboxColorDrawRect.x + m_FogSkyboxColorDrawRect.width, m_FogSkyboxColorDrawRect.y + m_FogSkyboxColorDrawRect.height);
-
-	//draw the colors
-	Color color = m_CloudColor;
-	if (color.r() == 255 && color.g() == 255 && color.b() == 255 && color.a() == 255)
-		color = Color(51, 103, 153, 255);
-
-	surface()->DrawSetColor(color);
-	surface()->DrawFilledRect(m_CloudColorRect.x, m_CloudColorRect.y, m_CloudColorRect.x + m_CloudColorRect.width, m_CloudColorRect.y + m_CloudColorRect.height);
-
-	//draw the colors
-	surface()->DrawSetColor(m_SunColor);
-	surface()->DrawFilledRect(m_SunColorDrawRect.x, m_SunColorDrawRect.y, m_SunColorDrawRect.x + m_SunColorDrawRect.width, m_SunColorDrawRect.y + m_SunColorDrawRect.height);
-
-	//draw the colors
-	surface()->DrawSetColor(m_SunOverlayColor);
-	surface()->DrawFilledRect(m_SunOverlayColorDrawRect.x, m_SunOverlayColorDrawRect.y, m_SunOverlayColorDrawRect.x + m_SunOverlayColorDrawRect.width, m_SunOverlayColorDrawRect.y + m_SunOverlayColorDrawRect.height);
-}
-
-//----------------------------------------------------------------------------------------------------
-// Purpose: Called on panel think
-//----------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::OnThink()
-{
-	//set the fog
-	{
-		//get the convars
-		static ConVar* r_pixelfog = cvar->FindVar("r_pixelfog");
-		static ConVar* fog_override = cvar->FindVar("fog_override");
-		static ConVar* fog_enable = cvar->FindVar("fog_enable");
-		static ConVar* fog_enableskybox = cvar->FindVar("fog_enableskybox");
-		static ConVar* fog_color = cvar->FindVar("fog_color");
-		static ConVar* fog_colorskybox = cvar->FindVar("fog_colorskybox");
-		static ConVar* fog_start = cvar->FindVar("fog_start");
-		static ConVar* fog_end = cvar->FindVar("fog_end");
-		static ConVar* fog_startskybox = cvar->FindVar("fog_startskybox");
-		static ConVar* fog_endskybox = cvar->FindVar("fog_endskybox");
-		static ConVar* fog_maxdensity = cvar->FindVar("fog_maxdensity");
-		static ConVar* fog_maxdensityskybox = cvar->FindVar("fog_maxdensityskybox");
-
-		//do we override
-		bool _override = m_OverrideFogButton->IsSelected();
-
-		//convars
+		//check
+		if (!Q_stricmp(current, input))
 		{
-			//set the check button convar values
-			fog_override->SetValue(_override);
-			fog_enable->SetValue(!_override || !m_OverrideEnableFogCheckButton->IsSelected() ?					-1 :		m_EnableFogCheckButton->IsSelected());
-			fog_enableskybox->SetValue(!_override || !m_OverrideEnableSkyboxFogCheckButton->IsSelected() ?		-1 :		m_EnableSkyboxFogCheckButton->IsSelected());
-			r_pixelfog->SetValue(_override && !m_EnablePixelFogButton->IsSelected() ? false : true);
-
-			//set the color convar values
-			fog_color->SetValue(!_override || !m_FogColorOverride->IsSelected() ?						"-1 -1 -1" :		CFmtStr("%d %d %d", m_FogColor.r(), m_FogColor.g(), m_FogColor.b()));
-			fog_colorskybox->SetValue(!_override || !m_FogSkyboxColorOverride->IsSelected() ?			"-1 -1 -1" :		CFmtStr("%d %d %d", m_FogSkyboxColor.r(), m_FogSkyboxColor.g(), m_FogSkyboxColor.b()));
-
-			//set the slider convar values
-			fog_start->SetValue(!_override || !m_FogStartOverride->IsSelected() ?							-1 :			m_FogStartSlider->GetValue());
-			fog_end->SetValue(!_override || !m_FogEndOverride->IsSelected() ?								-1 :			m_FogEndSlider->GetValue());
-			fog_startskybox->SetValue(!_override || !m_FogStartSkyboxOverride->IsSelected() ?				-1 :			m_FogStartSkyboxSlider->GetValue());
-			fog_endskybox->SetValue(!_override || !m_FogEndSkyboxOverride->IsSelected() ?					-1 :			m_FogEndSkyboxSlider->GetValue());
-			fog_maxdensity->SetValue(!_override || !m_FogDensityOverride->IsSelected() ?					-1 :			(float)m_FogDensitySlider->GetValue() / m_FogDensitySlider->GetMax());
-			fog_maxdensityskybox->SetValue(!_override || !m_FogSkyboxDensityOverride->IsSelected() ?		-1 :			(float)m_FogSkyboxDensitySlider->GetValue() / m_FogSkyboxDensitySlider->GetMax());
-		}
-
-		//enable the items
-		{
-			//enable the check buttons
-			m_EnablePixelFogButton->SetEnabled(_override);
-			m_EnableFogCheckButton->SetEnabled(_override && m_OverrideEnableFogCheckButton->IsSelected());
-			m_EnableSkyboxFogCheckButton->SetEnabled(_override && m_OverrideEnableSkyboxFogCheckButton->IsSelected());
-			m_OverrideEnableFogCheckButton->SetEnabled(_override);
-			m_OverrideEnableSkyboxFogCheckButton->SetEnabled(_override);
-
-			//enable the color buttons
-			m_FogColorButton->SetEnabled(_override && m_FogColorOverride->IsSelected());
-			m_FogSkyboxColorButton->SetEnabled(_override && m_FogSkyboxColorOverride->IsSelected());
-			m_FogSkyboxColorOverride->SetEnabled(_override);
-			m_FogColorOverride->SetEnabled(_override);
-
-			//enable the sliders
-			m_FogStartSlider->SetEnabled(_override && m_FogStartOverride->IsSelected());
-			m_FogEndSlider->SetEnabled(_override && m_FogEndOverride->IsSelected());
-			m_FogStartSkyboxSlider->SetEnabled(_override && m_FogStartSkyboxOverride->IsSelected());
-			m_FogEndSkyboxSlider->SetEnabled(_override && m_FogEndSkyboxOverride->IsSelected());
-			m_FogDensitySlider->SetEnabled(_override && m_FogDensityOverride->IsSelected());
-			m_FogSkyboxDensitySlider->SetEnabled(_override && m_FogSkyboxDensityOverride->IsSelected());
-
-			//enable the slider override buttons
-			m_FogStartOverride->SetEnabled(_override);
-			m_FogEndOverride->SetEnabled(_override);
-			m_FogStartSkyboxOverride->SetEnabled(_override);
-			m_FogEndSkyboxOverride->SetEnabled(_override);
-			m_FogDensityOverride->SetEnabled(_override);
-			m_FogSkyboxDensityOverride->SetEnabled(_override);
-		}
-
-		//set the texts
-		{
-			m_FogStartValueLabel->SetText(CFmtStr("%d", fog_start->GetInt()));
-			m_FogEndValueLabel->SetText(CFmtStr("%d", fog_end->GetInt()));
-			m_FogStartSkyboxValueLabel->SetText(CFmtStr("%d", fog_startskybox->GetInt()));
-			m_FogEndSkyboxValueLabel->SetText(CFmtStr("%d", fog_endskybox->GetInt()));
-			m_FogDensityValueLabel->SetText(CFmtStr("%f", fog_maxdensity->GetFloat()));
-			m_FogSkyboxDensityValueLabel->SetText(CFmtStr("%f", fog_maxdensityskybox->GetFloat()));
+			Q_strncpy(output, CFmtStr("../skybox/%s%s", current, percent), outsize);
+			return;
 		}
 	}
+}
 
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called on think
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSkyboxFiltersPage::Update()
+{
 	//color correction
 	{
 		//set intensity text
@@ -1262,71 +2009,88 @@ void CMapPropertiesPanel::OnThink()
 		m_BloomScalarSlider->SetEnabled(m_EnableBloomCheckButton->IsSelected());
 	}
 
-	//sun
-	{
-		m_SunPitchLabel->SetText(CFmtStr("%d", m_SunPitchSlider->GetValue()));
-		m_SunYawLabel->SetText(CFmtStr("%d", m_SunYawSlider->GetValue()));
-		m_SunSizeLabel->SetText(CFmtStr("%d", m_SunSizeSlider->GetValue()));
-		m_SunOverlaySizeLabel->SetText(CFmtStr("%d", m_SunOverlaySizeSlider->GetValue()));
-
-		//set enabled states
-		m_SunPitchSlider->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
-		m_SunYawSlider->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
-		m_PitchToEyesButton->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
-		m_SunSizeSlider->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
-		m_SunColorButton->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
-		m_SunMaterialTextEntry->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
-		m_SunOverlaySizeSlider->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
-		m_SunOverlayColorButton->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
-		m_SunOverlayMaterialTextEntry->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
-		m_EnableSunButton->SetEnabled(!m_bNightTimeMode);
-	}
+	BaseClass::Update();
 }
 
 //----------------------------------------------------------------------------------------------------
-// Purpose: Helper
+// Purpose: Called on panel paint
 //----------------------------------------------------------------------------------------------------
-float OppositeAngle(float angle)
+void CMapPropertiesPanelSkyboxFiltersPage::Paint()
 {
-	float opposite = angle + 180.0f;
-	if (opposite >= 360.0f)
-		opposite -= 360.0f;
-	else if (opposite < 0.0f)
-		opposite += 360.0f;
-	return opposite;
+	BaseClass::Paint();
+
+	//draw the colors
+	Color color = m_CloudColor;
+	if (color.r() == 255 && color.g() == 255 && color.b() == 255 && color.a() == 255)
+		color = Color(51, 103, 153, 255);
+
+	surface()->DrawSetColor(color);
+	surface()->DrawFilledRect(m_CloudColorRect.x, m_CloudColorRect.y, m_CloudColorRect.x + m_CloudColorRect.width, m_CloudColorRect.y + m_CloudColorRect.height);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called on panel layout set
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSkyboxFiltersPage::PerformLayout()
+{
+	BaseClass::PerformLayout();
+
+	//set the skybox panel
+	{
+		//skybox background
+		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SkyboxBackground"), m_SkyboxBackground);
+
+		//skybox foreground
+		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SkyboxForeground"), m_SkyboxForeground);
+
+		//skybox combo box
+		ApplySettingsToPanel(m_KeyValuesFile->FindKey("SkyboxNames"), m_SkyboxNames);
+	}
+
+	//post processing
+	{
+		//skybox background
+		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FilterIntensityComboBox"), m_FilterComboBox);
+
+		//skybox foreground
+		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FilterIntensityText"), m_FilterIntensityText);
+
+		//skybox combo box
+		ApplySettingsToPanel(m_KeyValuesFile->FindKey("FilterIntensitySlider"), m_FilterIntensitySlider);
+	}
+
+	//cloud
+	{
+		//cloud button
+		ApplySettingsToPanel(m_KeyValuesFile->FindKey("CloudButton"), m_CloudButton);
+
+		//get the proportionate value for the cloud fog color draw rect
+		sscanf(m_KeyValuesFile->GetString("CloudColorRect"), "%d %d %d %d", &m_CloudColorRect.x, &m_CloudColorRect.y, &m_CloudColorRect.width, &m_CloudColorRect.height);
+	}
+
+	//bloom
+	{
+
+		//bloom enabled
+		ApplySettingsToPanel(m_KeyValuesFile->FindKey("BloomEnabledButton"), m_EnableBloomCheckButton);
+
+		//bloom scale
+		ApplySettingsToPanel(m_KeyValuesFile->FindKey("BloomScaleSlider"), m_BloomScaleSlider);
+		ApplySettingsToPanel(m_KeyValuesFile->FindKey("BloomScaleText"), m_BloomScaleText);
+
+		//bloom scalar
+		ApplySettingsToPanel(m_KeyValuesFile->FindKey("BloomScalarSlider"), m_BloomScalarSlider);
+		ApplySettingsToPanel(m_KeyValuesFile->FindKey("BloomScalarText"), m_BloomScalarText);
+	}
 }
 
 //----------------------------------------------------------------------------------------------------
 // Purpose: Called on command
 //----------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::OnCommand(const char* pszCommand)
+void CMapPropertiesPanelSkyboxFiltersPage::OnCommand(const char* pszCommand)
 {
-	//check for fog color command
-	if (!Q_stricmp(pszCommand, COMMAND_CHANGE_FOG_COLOR))
-	{
-		//create the fog color dialog
-		m_ColorPicker = new CColorPicker(GetVPanel());
-		m_ColorPicker->SetTitle("Set Fog Color", true);
-		m_ColorPicker->SetUsesAlpha(false);
-		m_ColorPicker->SetColor(m_FogColor);
-		m_ColorPicker->DoModal();
-	
-		m_ColorSelectorMode = ColorSelectorMode::Color_Fog;
-	}
-	
-	//check for fog color skybox command
-	else if (!Q_stricmp(pszCommand, COMMAND_CHANGE_FOG_SKYBOX_COLOR))
-	{
-		//create the skybox fog color dialog
-		m_ColorPicker = new CColorPicker(GetVPanel());
-		m_ColorPicker->SetTitle("Set Skybox Fog Color", true);
-		m_ColorPicker->SetUsesAlpha(false);
-		m_ColorPicker->SetColor(m_FogSkyboxColor);
-		m_ColorPicker->DoModal();
-	
-		m_ColorSelectorMode = ColorSelectorMode::Color_SkyboxFog;
-	}
-	else if (!Q_stricmp(pszCommand, COMMAND_CHANGE_CLOUDS_COLOR))
+	//called on command
+	if (!Q_stricmp(pszCommand, COMMAND_CHANGE_CLOUDS_COLOR))
 	{
 		//create the skybox fog color dialog
 		m_ColorPicker = new CColorPicker(GetVPanel());
@@ -1334,131 +2098,15 @@ void CMapPropertiesPanel::OnCommand(const char* pszCommand)
 		m_ColorPicker->SetUsesAlpha(true);
 		m_ColorPicker->SetColor(m_CloudColor);
 		m_ColorPicker->DoModal();
-	
-		m_ColorSelectorMode = ColorSelectorMode::Color_Clouds;
-	}
-	else if (!Q_stricmp(pszCommand, COMMAND_CHANGE_SUN_COLOR))
-	{
-		//create the skybox fog color dialog
-		m_ColorPicker = new CColorPicker(GetVPanel());
-		m_ColorPicker->SetTitle("Set Sun Color", true);
-		m_ColorPicker->SetUsesAlpha(false);
-		m_ColorPicker->SetColor(m_SunColor);
-		m_ColorPicker->DoModal();
-	
-		m_ColorSelectorMode = ColorSelectorMode::Color_Sun;
-	}
-	else if (!Q_stricmp(pszCommand, COMMAND_CHANGE_SUN_OVERLAY_COLOR))
-	{
-		//create the skybox fog color dialog
-		m_ColorPicker = new CColorPicker(GetVPanel());
-		m_ColorPicker->SetTitle("Set Sun Overlay Color", true);
-		m_ColorPicker->SetUsesAlpha(false);
-		m_ColorPicker->SetColor(m_SunOverlayColor);
-		m_ColorPicker->DoModal();
-	
-		m_ColorSelectorMode = ColorSelectorMode::Color_SunOverlay;
-	}
-
-	//check for apply command
-	else if (!Q_stricmp(pszCommand, COMMAND_APPLY_PAGE_SETTINGS))
-	{
-		//post message
-		PostActionSignal(new KeyValues("ApplyPageSetting"));
-		return;
-	}
-
-	//check for sun commands
-	else if (!Q_stricmp(pszCommand, COMMAND_SUN_ACTIVATE))
-	{
-		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun %d", m_EnableSunButton->IsSelected()));
-
-		if (m_EnableSunButton->IsSelected())
-		{
-			//reset the keyvalues
-			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue pitch %d", m_SunPitchSlider->GetValue()));
-			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue angle %d", m_SunYawSlider->GetValue()));
-
-
-			//size
-			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue size %d", m_SunSizeSlider->GetValue()));
-			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue rendercolor \"%d %d %d", m_SunColor.r(), m_SunColor.g(), m_SunColor.b()));
-
-			//get the material
-			char text[256];
-			m_SunMaterialTextEntry->GetText(text, sizeof(text));
-			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue material %s", text));
-			
-
-			//overlay size
-			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue overlaysize %d", m_SunSizeSlider->GetValue()));
-			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue overlaycolor \"%d %d %d", m_SunColor.r(), m_SunColor.g(), m_SunColor.b()));
-
-			//get the overlay material
-			text[256];
-			m_SunMaterialTextEntry->GetText(text, sizeof(text));
-			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue overlaymaterial %s", text));
-		}
-		return;
-	}
-	else if (!Q_stricmp(pszCommand, COMMAND_PITCH_TO_EYES))
-	{
-		//set the values of the sliders
-		CBasePlayer* pPlayer = CBasePlayer::GetLocalPlayer();
-		if (!pPlayer)
-			return;
-
-		//get the angle
-		QAngle ang = pPlayer->GetAbsAngles();
-		m_SunPitchSlider->SetValue(ang.x);
-		m_SunYawSlider->SetValue(OppositeAngle(ang.y));			//these should change the values
-		return;
-	}
-
-	if (!Q_stricmp(pszCommand, "SetModal"))
-	{
-		int x, y;
-		GetPos(x, y);
-		DoModal();
-		SetPos(x, y);
-		return;
 	}
 
 	BaseClass::OnCommand(pszCommand);
 }
 
 //-------------------------------------------------------------------------------------------------------
-// Purpose: Called when the panel closes
-//-------------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::OnClose()
-{
-	//reload server settings
-	engine->ClientCmd("_amod_day_do");
-
-	PostActionSignal(new KeyValues("MapPropertiesPanelClosed"));
-	BaseClass::OnClose();
-}
-
-//-------------------------------------------------------------------------------------------------------
-// Purpose: Called when a slider is moved
-//-------------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::OnSliderMoved(KeyValues* data)
-{
-	//check for sun slider
-	if (data->GetPtr("panel") == m_SunPitchSlider || data->GetPtr("panel") == m_SunYawSlider || data->GetPtr("panel") == m_SunSizeSlider || data->GetPtr("panel") == m_SunOverlaySizeSlider)
-	{
-		//call _amod_mapedit_server_sun_keyvalue
-		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue pitch %d", m_SunPitchSlider->GetValue()));
-		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue angle %d", m_SunYawSlider->GetValue()));
-		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue size %d", m_SunSizeSlider->GetValue()));
-		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue overlaysize %d", m_SunOverlaySizeSlider->GetValue()));
-	}
-}
-
-//-------------------------------------------------------------------------------------------------------
 // Purpose: Called when text is changed
 //-------------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::OnTextChanged(KeyValues* data)
+void CMapPropertiesPanelSkyboxFiltersPage::OnTextChanged(KeyValues* data)
 {
 	if (data->GetPtr("panel") == m_SkyboxNames)
 	{
@@ -1514,209 +2162,35 @@ void CMapPropertiesPanel::OnTextChanged(KeyValues* data)
 		ConVarRef amod_filter_filename(m_bNightTimeMode ? "amod_epic_filter_night_filename" : "amod_epic_filter_day_filename");
 		amod_filter_filename.SetValue(m_FilterComboBox->GetActiveItemUserData()->GetName());
 	}
-	
-	//check for sun material
-	else if (data->GetPtr("panel") == m_SunMaterialTextEntry)
-	{
-		//get the text
-		char text[256];
-		m_SunMaterialTextEntry->GetText(text, sizeof(text));
-
-		//check for the material first
-		if (!CMaterialReference(text).IsValid() || CMaterialReference(text)->IsErrorMaterial())
-		{
-			//copy the default texture in
-			Q_snprintf(text, sizeof(text), "sprites/light_glow02_add_noz.spr");
-		}
-
-		//send to server
-		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue material %s", text));
-	}
-	
-	//check for sun overlay material
-	else if (data->GetPtr("panel") == m_SunOverlayMaterialTextEntry)
-	{
-		//get the text
-		char text[256];
-		m_SunOverlayMaterialTextEntry->GetText(text, sizeof(text));
-
-		//check for the material first
-		if (!CMaterialReference(text).IsValid() || CMaterialReference(text)->IsErrorMaterial())
-		{
-			//copy the default texture in
-			Q_snprintf(text, sizeof(text), "sprites/light_glow02_add_noz.spr");
-		}
-
-		//send to server
-		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue overlaymaterial %s", text));
-	}
 }
 
 //-------------------------------------------------------------------------------------------------------
 // Purpose: Called when a color gets selected
 //-------------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::OnColorSelected(KeyValues* data)
+void CMapPropertiesPanelSkyboxFiltersPage::OnColorSelected(KeyValues* data)
 {
 	//close the color picker
 	m_ColorPicker->Close();
 	m_ColorPicker = nullptr;
 
+	//add an undo step
+	AddUndo_SetColor(&m_CloudColor, m_CloudColor._color);
+
+	//get the color
 	Color color(data->GetInt("r"), data->GetInt("g"), data->GetInt("b"), data->GetInt("a"));
-	switch (m_ColorSelectorMode)
-	{
-	case ColorSelectorMode::Color_Fog:
-		m_FogColor = color;
-		return;
-	case ColorSelectorMode::Color_SkyboxFog:
-		m_FogSkyboxColor = color;
-		return;
-	case ColorSelectorMode::Color_Clouds:
-		m_CloudColor = color;
-		return;
-	case ColorSelectorMode::Color_Sun:
-		m_SunColor = color;
-		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue rendercolor \"%d %d %d", m_SunColor.r(), m_SunColor.g(), m_SunColor.b()));
-		return;
-	case ColorSelectorMode::Color_SunOverlay:
-		m_SunOverlayColor = color;
-		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue overlaycolor \"%d %d %d", m_SunOverlayColor.r(), m_SunOverlayColor.g(), m_SunOverlayColor.b()));
-		return;
-	}
+	m_CloudColor = color;
+
+	//call base func
+	BaseClass::OnColorSelected(data);
 }
- 
+
 //----------------------------------------------------------------------------------------------------
-// Purpose: Formats the image filepath
+// Purpose: Initalizes the skybox, filter and cloud color settings
 //----------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::FormatImage(const char* input, char* output, int outsize)
+void CMapPropertiesPanelSkyboxFiltersPage::InitSkyboxAndFilter(MapTimeInfo_t& info, bool IsNightPage)
 {
-	//failsafe
-	Q_strncpy(output, CFmtStr("../skybox/%sup", input), outsize);
-
-	//load the panels/sky path
-	KeyValuesAD keyvalues(new KeyValues("SkyPanel"));
-	if (!keyvalues->LoadFromFile(filesystem, "resource/panels/skypanel.txt"))
-		return;
-
-	KeyValues* timekey = keyvalues->FindKey(m_bNightTimeMode ? "Night" : "Day");
-	if (!timekey)
-		return;
-
-	//go through each key
-	FOR_EACH_VALUE(timekey, value)
-	{
-		//check for % to change the direction the skybox displays
-		char temp[512];
-		Q_strncpy(temp, value->GetString(), sizeof(temp));
-		const char* current = temp;
-
-		//look for percent
-		char* percent = Q_strstr(temp, "%");
-		if (percent)
-		{
-			*percent = '\0';
-			percent++;
-		}
-		else
-			percent = "up";
-
-		//check
-		if (!Q_stricmp(current, input))
-		{
-			Q_strncpy(output, CFmtStr("../skybox/%s%s", current, percent), outsize);
-			return;
-		}
-	}
-}
-
-//----------------------------------------------------------------------------------------------------
-// Purpose: Initalizes the data
-//----------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::Init(MapTimeInfo_t& info, bool IsNightPage)
-{	
-	//store the convars current values
-	Q_strncpy(m_PreviousCloudsOverrideValue,ConVarRef("amod_clouds_color_override").GetString(), sizeof(m_PreviousCloudsOverrideValue));
-	Q_strncpy(m_PreviousCloudsColorValue, ConVarRef("amod_clouds_color").GetString(), sizeof(m_PreviousCloudsColorValue));
-	Q_strncpy(m_PreviousCloudsShowValue, ConVarRef("amod_clouds").GetString(), sizeof(m_PreviousCloudsShowValue));
-	Q_strncpy(m_PreviousFilterConvarValue, ConVarRef(IsNightPage ? "amod_epic_filter_night_filename" : "amod_epic_filter_day_filename").GetString(), sizeof(m_PreviousFilterConvarValue));
-	Q_strncpy(m_PreviousFilterIntensityConvarValue, ConVarRef(IsNightPage ? "amod_epic_filter_night_intensity" : "amod_epic_filter_day_intensity").GetString(), sizeof(m_PreviousFilterIntensityConvarValue));
-	Q_strncpy(m_PreviousGodConvarValue, ConVarRef("amod_enable_god").GetString(), sizeof(m_PreviousGodConvarValue));
-
-	//set these convars ALWAYS
-	engine->ClientCmd("amod_enable_god 1");
-	engine->ClientCmd("amod_clouds 1");
-	engine->ClientCmd("amod_clouds_color_override 1");
-
-	//set m_bNightTimeMode
 	m_bNightTimeMode = IsNightPage;
 
-	//fog
-	{
-		//get the array
-		CUtlVector<MapTimeInfo_t::FogInfo_t>& fog_array = IsNightPage ? info.NightInfo.FogInfo : info.DayInfo.FogInfo;
-
-		//init the fog check buttons
-		{
-			//get
-			int enabled = atoi(FindFogInfoFromArray(fog_array, "fog_enable", "-1"));
-			int enabled_skybox = atoi(FindFogInfoFromArray(fog_array, "fog_enableskybox", "-1"));
-
-			//set
-			m_OverrideFogButton->SetSelected(IsNightPage ? info.NightInfo.FogEnabled : info.DayInfo.FogEnabled);
-			m_EnablePixelFogButton->SetSelected(atoi(FindFogInfoFromArray(fog_array, "r_pixelfog", "1")) != 0);
-
-			m_OverrideEnableFogCheckButton->SetSelected(enabled >= 0);
-			m_EnableFogCheckButton->SetSelected(enabled > 0);
-
-			m_OverrideEnableSkyboxFogCheckButton->SetSelected(enabled_skybox >= 0);
-			m_EnableSkyboxFogCheckButton->SetSelected(enabled_skybox > 0);
-		}
-
-		//init the fog sliders
-		{
-			//get
-			int fog_start = atoi(FindFogInfoFromArray(fog_array, "fog_start", "-1"));
-			int fog_end = atoi(FindFogInfoFromArray(fog_array, "fog_end", "-1"));
-			int fog_startskybox = atoi(FindFogInfoFromArray(fog_array, "fog_startskybox", "-1"));
-			int fog_endskybox = atoi(FindFogInfoFromArray(fog_array, "fog_endskybox", "-1"));
-			float fog_maxdensity = atof(FindFogInfoFromArray(fog_array, "fog_maxdensity", "-1"));
-			float fog_maxdensityskybox = atof(FindFogInfoFromArray(fog_array, "fog_maxdensityskybox", "-1"));
-
-			//set
-			m_FogStartOverride->SetSelected(fog_start != -1);
-			m_FogEndOverride->SetSelected(fog_end != -1);
-			m_FogStartSkyboxOverride->SetSelected(fog_startskybox != -1);
-			m_FogEndSkyboxOverride->SetSelected(fog_endskybox != -1);
-			m_FogDensityOverride->SetSelected(fog_maxdensity >= 0);
-			m_FogSkyboxDensityOverride->SetSelected(fog_maxdensityskybox >= 0);
-
-			m_FogStartSlider->SetValue(fog_start);
-			m_FogEndSlider->SetValue(fog_end);
-			m_FogStartSkyboxSlider->SetValue(fog_startskybox);
-			m_FogEndSkyboxSlider->SetValue(fog_endskybox);
-			m_FogDensitySlider->SetValue((float)fog_maxdensity * m_FogDensitySlider->GetMax());
-			m_FogSkyboxDensitySlider->SetValue((float)fog_maxdensityskybox * m_FogSkyboxDensitySlider->GetMax());
-		}
-
-		//init the fog color buttons
-		{
-			//get
-			int r, g, b;
-			int skyboxr, skyboxg, skyboxb;
-
-			sscanf(FindFogInfoFromArray(fog_array, "fog_color", "-1 -1 -1"), "%d %d %d", &r, &g, &b);
-			sscanf(FindFogInfoFromArray(fog_array, "fog_colorskybox", "-1 -1 -1"), "%d %d %d", &skyboxr, &skyboxg, &skyboxb);
-
-			//set the fog color override check buttons
-			m_FogColorOverride->SetSelected(r != -1 && g != -1 && b != -1);
-			m_FogSkyboxColorOverride->SetSelected(skyboxr != -1 && skyboxg != -1 && skyboxb != -1);
-
-			//set the fog color buttons
-			m_FogColor.SetColor(r, g, b, 255);
-			m_FogSkyboxColor.SetColor(skyboxr, skyboxg, skyboxb, 255);
-		}
-	}
-
-	//skybox
 	{
 		const char* skybox = IsNightPage ? StringFromMapTimeStringTableIndex(info.NightInfo.DefaultNightSky) : StringFromMapTimeStringTableIndex(info.DayInfo.DefaultDaySky);
 
@@ -1741,7 +2215,7 @@ void CMapPropertiesPanel::Init(MapTimeInfo_t& info, bool IsNightPage)
 				break;
 
 			//go through each key
-			int index = 0, current = 0;
+			int index = -1, current = 0;
 			FOR_EACH_VALUE(timekey, value)
 			{
 				//remove percent sigh
@@ -1755,14 +2229,14 @@ void CMapPropertiesPanel::Init(MapTimeInfo_t& info, bool IsNightPage)
 				m_SkyboxNames->AddItem(value->GetName(), new KeyValues(temp));
 
 				//check skybox
-				if (!Q_strnicmp(skybox, value->GetString(), Q_strlen(skybox)))
+				if (!Q_stricmp(skybox, temp) && index == -1)
 					index = current;
 
 				current++;
 			}
 
 			//active the current index
-			m_SkyboxNames->ActivateItem(index);
+			m_SkyboxNames->ActivateItem(index == -1 ? 0 : index);
 
 		} while (false);
 	}
@@ -1831,108 +2305,13 @@ void CMapPropertiesPanel::Init(MapTimeInfo_t& info, bool IsNightPage)
 		m_BloomScaleSlider->SetValue(atoi(StringFromMapTimeStringTableIndex(IsNightPage ? info.NightInfo.BloomScale : info.DayInfo.BloomScale)));
 		m_BloomScalarSlider->SetValue(atof(StringFromMapTimeStringTableIndex(IsNightPage ? info.NightInfo.BloomScalarFactor : info.DayInfo.BloomScalarFactor)) * BLOOM_SCALAR_DIVISOR);
 	}
-
-	//sun
-	//disable or enable the sun
-	if (!IsNightPage)
-	{
-		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun %d", info.DayInfo.SunInfoEnabled));
-		m_EnableSunButton->SetSelected(info.DayInfo.SunInfoEnabled);
-
-		//check for an 'angles' key. If not found then we will have to use the 'angle' and 'pitch' keys
-		const char* angles = FindSunInfoFromArray(info.DayInfo.SunInfo, "angles", nullptr);
-		if (angles)
-		{
-			//suck out the value
-			int _, y;
-			sscanf(angles, "%d %d", &_, &y);
-
-			m_SunPitchSlider->SetValue(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "pitch", "90")));
-			m_SunYawSlider->SetValue(y);
-			
-		}
-		else
-		{
-			m_SunYawSlider->SetValue(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "angle", "0")));
-			m_SunPitchSlider->SetValue(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "pitch", "90")));
-		}
-
-		//set the size
-		m_SunSizeSlider->SetValue(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "size", "10")));
-
-		//set color
-		int r, g, b;
-		sscanf(FindSunInfoFromArray(info.DayInfo.SunInfo, "rendercolor", "255 255 255"), "%d %d %d", &r, &g, &b);
-		m_SunColor.SetColor(r, g, b, 255);
-
-		//set the material
-		m_SunMaterialTextEntry->SetText(FindSunInfoFromArray(info.DayInfo.SunInfo, "material", "sprites/light_glow02_add_noz.spr"));
-		
-
-		//set the overlay size
-		m_SunOverlaySizeSlider->SetValue(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "overlaysize", "-1")));
-
-		//set overlay color
-		int or , og, ob;
-		sscanf(FindSunInfoFromArray(info.DayInfo.SunInfo, "overlaycolor", "255 255 255"), "%d %d %d", &or, &og, &ob);
-
-		//check for -1
-		m_SunOverlayColor.SetColor(or == -1 ? r : or, og == -1 ? g : og, ob == -1 ? b : ob, 255);
-
-		//set the material
-		m_SunOverlayMaterialTextEntry->SetText(FindSunInfoFromArray(info.DayInfo.SunInfo, "overlaymaterial", "sprites/light_glow02_add_noz.spr"));
-	}
 }
 
-
 //----------------------------------------------------------------------------------------------------
-// Purpose: Sets the data from the panel
+// Purpose: Gets the fog info
 //----------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::GetData(MapTimeInfo_t& info)
+void CMapPropertiesPanelSkyboxFiltersPage::GetSkyboxFilterInfo(MapTimeInfo_t& info)
 {
-	//set the fog info
-	do
-	{
-		//get and always clear the fog info
-		CUtlVector<MapTimeInfo_t::FogInfo_t>& fog_array = m_bNightTimeMode ? info.NightInfo.FogInfo : info.DayInfo.FogInfo;
-
-		//set the enabled state
-		(m_bNightTimeMode ? info.NightInfo.FogEnabled : info.DayInfo.FogEnabled) = m_OverrideFogButton->IsSelected();
-
-		//if the fog isnt enabled then just return
-		if (!m_OverrideFogButton->IsSelected())
-		{
-			AddOrUpdateFogInfoInArray(fog_array, "fog_override", "0");
-			break;
-		}
-
-		//set the info
-		MapTimeInfo_t::FogInfo_t FogInfos[12] = {
-			{	StringToMapTimeStringTableIndex("r_pixelfog"),				StringToMapTimeStringTableIndex(CFmtStr("%d", m_OverrideFogButton->IsSelected() ? m_EnablePixelFogButton->IsSelected() : 1))},
-			{	StringToMapTimeStringTableIndex("fog_override"),			StringToMapTimeStringTableIndex(CFmtStr("%d", m_OverrideFogButton->IsSelected())) },
-			{	StringToMapTimeStringTableIndex("fog_enable"),				StringToMapTimeStringTableIndex(!m_OverrideEnableFogCheckButton->IsSelected() ?				"-1" : CFmtStr("%d", m_EnableFogCheckButton->IsSelected())) },
-			{	StringToMapTimeStringTableIndex("fog_enableskybox"),		StringToMapTimeStringTableIndex(!m_OverrideEnableSkyboxFogCheckButton->IsSelected() ?		"-1" : CFmtStr("%d", m_EnableSkyboxFogCheckButton->IsSelected())) },
-			{	StringToMapTimeStringTableIndex("fog_start"),				StringToMapTimeStringTableIndex(!m_FogStartOverride->IsSelected() ?							"-1" : CFmtStr("%d", m_FogStartSlider->GetValue())) },
-			{	StringToMapTimeStringTableIndex("fog_end"),					StringToMapTimeStringTableIndex(!m_FogEndOverride->IsSelected() ?							"-1" : CFmtStr("%d", m_FogEndSlider->GetValue())) },
-			{	StringToMapTimeStringTableIndex("fog_startskybox"),			StringToMapTimeStringTableIndex(!m_FogStartSkyboxOverride->IsSelected() ?					"-1" : CFmtStr("%d", m_FogStartSkyboxSlider->GetValue())) },
-			{	StringToMapTimeStringTableIndex("fog_endskybox"),			StringToMapTimeStringTableIndex(!m_FogEndSkyboxOverride->IsSelected() ?						"-1" : CFmtStr("%d", m_FogEndSkyboxSlider->GetValue())) },
-			{	StringToMapTimeStringTableIndex("fog_maxdensity"),			StringToMapTimeStringTableIndex(!m_FogDensityOverride->IsSelected() ?						"-1" : CFmtStr("%.2f", (float)m_FogDensitySlider->GetValue() / m_FogDensitySlider->GetMax())) },
-			{	StringToMapTimeStringTableIndex("fog_maxdensityskybox"),	StringToMapTimeStringTableIndex(!m_FogSkyboxDensityOverride->IsSelected() ?					"-1" : CFmtStr("%.2f", (float)m_FogSkyboxDensitySlider->GetValue() / m_FogSkyboxDensitySlider->GetMax())) },
-			{	StringToMapTimeStringTableIndex("fog_color"),				StringToMapTimeStringTableIndex(!m_FogColorOverride->IsSelected() ?							"-1 -1 -1" : CFmtStr("%d %d %d", m_FogColor.r(), m_FogColor.g(), m_FogColor.b())) },
-			{	StringToMapTimeStringTableIndex("fog_colorskybox"),			StringToMapTimeStringTableIndex(!m_FogSkyboxColorOverride->IsSelected() ?					"-1 -1 -1" : CFmtStr("%d %d %d", m_FogSkyboxColor.r(), m_FogSkyboxColor.g(), m_FogSkyboxColor.b())) }
-		};
-
-		//add to the array
-		for (int i = 0; i < SIZE_OF_ARRAY(FogInfos); i++)
-		{
-			//i used to have it so i would clear the fog array then add all the FogInfos[i] to them. BUT i realized
-			//you could possibly add any other convar into this array. These convars wouldnt show up in the panel BUT
-			//would still be in the info. So what we are going to do is not clear the fog infos but instead modify
-			//the already existing ones.
-			AddOrUpdateFogInfoInArray(fog_array, FogInfos[i].convar, FogInfos[i].value);
-		}
-	} while (false);
-
 	//set the skybox
 	do
 	{
@@ -1995,7 +2374,478 @@ void CMapPropertiesPanel::GetData(MapTimeInfo_t& info)
 		}
 
 	} while (false);
+}
 
+
+
+
+
+
+
+
+
+//divisor for bloom scalar
+#define COMMAND_SUN_ACTIVATE "ActivateSun"
+#define COMMAND_PITCH_TO_EYES "PitchToEyes"
+#define COMMAND_CHANGE_SUN_COLOR "ChangeSunColors"
+#define COMMAND_CHANGE_SUN_OVERLAY_COLOR "ChangeSunOverlayColors"
+
+//skybox + filters page
+class CMapPropertiesPanelSunPage : public CMapPropertiesPanelPageBase
+{
+	DECLARE_CLASS_SIMPLE(CMapPropertiesPanelSunPage, CMapPropertiesPanelPageBase);
+public:
+	CMapPropertiesPanelSunPage(Panel* parent, const char* name);
+
+	virtual void PerformLayout();
+	virtual void Paint();
+	virtual void Update();
+	virtual void OnCommand(const char* pszCommand);
+
+	//init funcs
+	virtual void InitSunInfo(MapTimeInfo_t& info, bool IsNightPage);
+	virtual void GetSunInfo(MapTimeInfo_t& info);
+
+	MESSAGE_FUNC_PARAMS(OnColorSelected, "ColorSelected", data);
+	MESSAGE_FUNC_PARAMS(OnSliderMoved, "SliderMoved", data);
+	MESSAGE_FUNC_PARAMS(OnTextChanged, "TextChanged", kv);
+private:
+	//night time mode
+	bool m_bNightTimeMode = false;
+
+	//color picker
+	enum ColorSelectorMode { Color_Sun, Color_SunOverlay } m_ColorSelectorMode;
+	CColorPicker* m_ColorPicker;
+
+	//sun
+private:
+	//enable sun
+	CheckButton* m_EnableSunButton;
+
+	//sun pitch
+	Slider* m_SunPitchSlider;
+	Label* m_SunPitchLabel;
+
+	//sun yaw
+	Slider* m_SunYawSlider;
+	Label* m_SunYawLabel;
+
+	//sun size
+	Slider* m_SunSizeSlider;
+	Label* m_SunSizeLabel;
+
+	//sun color
+	CMapPropertiesPanelButton* m_SunColorButton;
+	Color m_SunColor;
+	Rect_t m_SunColorDrawRect;
+
+	//sun material text entry
+	TextEntry* m_SunMaterialTextEntry;
+
+	//sun overlay size
+	Slider* m_SunOverlaySizeSlider;
+	Label* m_SunOverlaySizeLabel;
+
+	//sun overlay color
+	CMapPropertiesPanelButton* m_SunOverlayColorButton;
+	Color m_SunOverlayColor;
+	Rect_t m_SunOverlayColorDrawRect;
+
+	//sun overlay material text entry
+	TextEntry* m_SunOverlayMaterialTextEntry;
+
+	//set the pitch to the players eyes pitch button
+	CMapPropertiesPanelButton* m_PitchToEyesButton;
+};
+
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Constructor for the sun page
+//-------------------------------------------------------------------------------------------------------
+CMapPropertiesPanelSunPage::CMapPropertiesPanelSunPage(Panel* parent, const char* name) : BaseClass(parent, name, "resource/panels/MapPropertiesEditor/SunPage.res")
+{
+	//enable sun check button
+	m_EnableSunButton = new CheckButton(this, "EnableSunButton", "");
+	m_EnableSunButton->SetCommand(COMMAND_SUN_ACTIVATE);
+
+	//sun pitch
+	m_SunPitchSlider = new CMapPropertiesPanelSlider(this, "SunPitchSlider", 1);
+	m_SunPitchLabel = new Label(this, "SunPitchLabel", "");
+
+	//sun yaw
+	m_SunYawSlider = new CMapPropertiesPanelSlider(this, "SunYawSlider", 1);
+	m_SunYawLabel = new Label(this, "SunYawLabel", "");
+
+	//sun size
+	m_SunSizeSlider = new CMapPropertiesPanelSlider(this, "SunSizeSlider", 1);
+	m_SunSizeLabel = new Label(this, "SunSizeLabel", "");
+
+	//sun color
+	m_SunColorButton = new CMapPropertiesPanelButton(this, "SunColorButton", "");
+	m_SunColorButton->SetCommand(COMMAND_CHANGE_SUN_COLOR);
+	m_SunColorButton->SetAttatchedColor(&m_SunColor);
+	m_SunColor.SetColor(255, 255, 255, 255);
+
+	//sun material text entry
+	m_SunMaterialTextEntry = new TextEntry(this, "MaterialTextEntry");
+	m_SunMaterialTextEntry->AddActionSignalTarget(this);
+	m_SunMaterialTextEntry->SetMaximumCharCount(255);
+
+	//sun overlay size
+	m_SunOverlaySizeSlider = new CMapPropertiesPanelSlider(this, "SunOverlaySizeSlider", 1);
+	m_SunOverlaySizeLabel = new Label(this, "SunOverlaySizeLabel", "");
+
+	//sun overlay color
+	m_SunOverlayColorButton = new CMapPropertiesPanelButton(this, "SunOverlayColorButton", "");
+	m_SunOverlayColorButton->SetCommand(COMMAND_CHANGE_SUN_OVERLAY_COLOR);
+	m_SunOverlayColorButton->SetAttatchedColor(&m_SunOverlayColor);
+	m_SunOverlayColor.SetColor(255, 255, 255, 255);
+
+	//sun overlay material text entry
+	m_SunOverlayMaterialTextEntry = new TextEntry(this, "OverlayMaterialTextEntry");
+	m_SunOverlayMaterialTextEntry->AddActionSignalTarget(this);
+	m_SunOverlayMaterialTextEntry->SetMaximumCharCount(255);
+
+	//pitch to eyes button
+	m_PitchToEyesButton = new CMapPropertiesPanelButton(this, "PitchToEyesButton", "");
+	m_PitchToEyesButton->SetCommand(COMMAND_PITCH_TO_EYES);
+
+	//perform layout to set the range sliders and such
+	PerformLayout();
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called on think
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSunPage::Update()
+{
+	m_SunPitchLabel->SetText(CFmtStr("%d", m_SunPitchSlider->GetValue()));
+	m_SunYawLabel->SetText(CFmtStr("%d", m_SunYawSlider->GetValue()));
+	m_SunSizeLabel->SetText(CFmtStr("%d", m_SunSizeSlider->GetValue()));
+	m_SunOverlaySizeLabel->SetText(CFmtStr("%d", m_SunOverlaySizeSlider->GetValue()));
+
+	//set enabled states
+	m_SunPitchSlider->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
+	m_SunYawSlider->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
+	m_PitchToEyesButton->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
+	m_SunSizeSlider->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
+	m_SunColorButton->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
+	m_SunMaterialTextEntry->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
+	m_SunOverlaySizeSlider->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
+	m_SunOverlayColorButton->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
+	m_SunOverlayMaterialTextEntry->SetEnabled(!m_bNightTimeMode && m_EnableSunButton->IsSelected());
+	m_EnableSunButton->SetEnabled(!m_bNightTimeMode);
+
+	BaseClass::Update();
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called on panel paint
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSunPage::Paint()
+{
+	BaseClass::Paint();
+
+	//draw the colors
+	surface()->DrawSetColor(m_SunColor);
+	surface()->DrawFilledRect(m_SunColorDrawRect.x, m_SunColorDrawRect.y, m_SunColorDrawRect.x + m_SunColorDrawRect.width, m_SunColorDrawRect.y + m_SunColorDrawRect.height);
+
+	//draw the colors
+	surface()->DrawSetColor(m_SunOverlayColor);
+	surface()->DrawFilledRect(m_SunOverlayColorDrawRect.x, m_SunOverlayColorDrawRect.y, m_SunOverlayColorDrawRect.x + m_SunOverlayColorDrawRect.width, m_SunOverlayColorDrawRect.y + m_SunOverlayColorDrawRect.height);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called on panel layout set
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSunPage::PerformLayout()
+{
+	BaseClass::PerformLayout();
+
+	//sun enabled
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunEnabledCheckButton"), m_EnableSunButton);
+
+	//sun pitch
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunPitchSlider"), m_SunPitchSlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunPitchText"), m_SunPitchLabel);
+
+	//sun yaw
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunYawSlider"), m_SunYawSlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunYawText"), m_SunYawLabel);
+
+	//pitch to eyes button
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("PitchToEyeAngleButton"), m_PitchToEyesButton);
+
+	//sun size
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunSizeSlider"), m_SunSizeSlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunSizeText"), m_SunSizeLabel);
+
+	//sun color
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunColorButton"), m_SunColorButton);
+
+	//sun material
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunMaterialTextEntry"), m_SunMaterialTextEntry);
+
+	//get the value for the sun color draw rect
+	sscanf(m_KeyValuesFile->GetString("SunColorRect"), "%d %d %d %d", &m_SunColorDrawRect.x, &m_SunColorDrawRect.y, &m_SunColorDrawRect.width, &m_SunColorDrawRect.height);
+
+	//sun overlay size
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunOverlaySizeSlider"), m_SunOverlaySizeSlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunOverlaySizeText"), m_SunOverlaySizeLabel);
+
+	//sun overlay color
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunOverlayColorButton"), m_SunOverlayColorButton);
+
+	//sun overlay material
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SunOverlayMaterialTextEntry"), m_SunOverlayMaterialTextEntry);
+
+	//get the value for the sun overlay color draw rect
+	sscanf(m_KeyValuesFile->GetString("SunOverlayColorRect"), "%d %d %d %d", &m_SunOverlayColorDrawRect.x, &m_SunOverlayColorDrawRect.y, &m_SunOverlayColorDrawRect.width, &m_SunOverlayColorDrawRect.height);
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Called when a slider is moved
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSunPage::OnSliderMoved(KeyValues* data)
+{
+	//check for sun slider
+	if (data->GetPtr("panel") == m_SunPitchSlider || data->GetPtr("panel") == m_SunYawSlider || data->GetPtr("panel") == m_SunSizeSlider || data->GetPtr("panel") == m_SunOverlaySizeSlider)
+	{
+		//call _amod_mapedit_server_sun_keyvalue
+		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue pitch %d", m_SunPitchSlider->GetValue()));
+		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue angle %d", m_SunYawSlider->GetValue()));
+		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue size %d", m_SunSizeSlider->GetValue()));
+		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue overlaysize %d", m_SunOverlaySizeSlider->GetValue()));
+	}
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Helper
+//----------------------------------------------------------------------------------------------------
+float OppositeAngle(float angle)
+{
+	float opposite = angle + 180.0f;
+	if (opposite >= 360.0f)
+		opposite -= 360.0f;
+	else if (opposite < 0.0f)
+		opposite += 360.0f;
+	return opposite;
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called on command
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSunPage::OnCommand(const char* pszCommand)
+{
+	//check for sun commands
+	if (!Q_stricmp(pszCommand, COMMAND_CHANGE_SUN_COLOR))
+	{
+		//create the skybox fog color dialog
+		m_ColorPicker = new CColorPicker(GetVPanel());
+		m_ColorPicker->SetTitle("Set Sun Color", true);
+		m_ColorPicker->SetUsesAlpha(false);
+		m_ColorPicker->SetColor(m_SunColor);
+		m_ColorPicker->DoModal();
+
+		m_ColorSelectorMode = ColorSelectorMode::Color_Sun;
+	}
+	else if (!Q_stricmp(pszCommand, COMMAND_CHANGE_SUN_OVERLAY_COLOR))
+	{
+		//create the skybox fog color dialog
+		m_ColorPicker = new CColorPicker(GetVPanel());
+		m_ColorPicker->SetTitle("Set Sun Overlay Color", true);
+		m_ColorPicker->SetUsesAlpha(false);
+		m_ColorPicker->SetColor(m_SunOverlayColor);
+		m_ColorPicker->DoModal();
+
+		m_ColorSelectorMode = ColorSelectorMode::Color_SunOverlay;
+	}
+	else if (!Q_stricmp(pszCommand, COMMAND_SUN_ACTIVATE))
+	{
+		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun %d", m_EnableSunButton->IsSelected()));
+
+		if (m_EnableSunButton->IsSelected())
+		{
+			//reset the keyvalues
+			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue pitch %d", m_SunPitchSlider->GetValue()));
+			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue angle %d", m_SunYawSlider->GetValue()));
+
+
+			//size
+			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue size %d", m_SunSizeSlider->GetValue()));
+			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue rendercolor \"%d %d %d", m_SunColor.r(), m_SunColor.g(), m_SunColor.b()));
+
+			//get the material
+			char text[256];
+			m_SunMaterialTextEntry->GetText(text, sizeof(text));
+			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue material %s", text));
+
+
+			//overlay size
+			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue overlaysize %d", m_SunSizeSlider->GetValue()));
+			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue overlaycolor \"%d %d %d", m_SunColor.r(), m_SunColor.g(), m_SunColor.b()));
+
+			//get the overlay material
+			text[256];
+			m_SunMaterialTextEntry->GetText(text, sizeof(text));
+			engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue overlaymaterial %s", text));
+		}
+		return;
+	}
+	else if (!Q_stricmp(pszCommand, COMMAND_PITCH_TO_EYES))
+	{
+		//set the values of the sliders
+		CBasePlayer* pPlayer = CBasePlayer::GetLocalPlayer();
+		if (!pPlayer)
+			return;
+
+		//get the angle
+		QAngle ang = pPlayer->GetAbsAngles();
+		m_SunPitchSlider->SetValue(ang.x);
+		m_SunYawSlider->SetValue(OppositeAngle(ang.y));			//these should change the values
+		return;
+	}
+
+	BaseClass::OnCommand(pszCommand);
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Called when text is changed
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSunPage::OnTextChanged(KeyValues* data)
+{
+	//check for sun material
+	if (data->GetPtr("panel") == m_SunMaterialTextEntry)
+	{
+		//get the text
+		char text[256];
+		m_SunMaterialTextEntry->GetText(text, sizeof(text));
+
+		//check for the material first
+		if (!CMaterialReference(text).IsValid() || CMaterialReference(text)->IsErrorMaterial())
+		{
+			//copy the default texture in
+			Q_snprintf(text, sizeof(text), "sprites/light_glow02_add_noz.spr");
+		}
+
+		//send to server
+		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue material %s", text));
+	}
+
+	//check for sun overlay material
+	else if (data->GetPtr("panel") == m_SunOverlayMaterialTextEntry)
+	{
+		//get the text
+		char text[256];
+		m_SunOverlayMaterialTextEntry->GetText(text, sizeof(text));
+
+		//check for the material first
+		if (!CMaterialReference(text).IsValid() || CMaterialReference(text)->IsErrorMaterial())
+		{
+			//copy the default texture in
+			Q_snprintf(text, sizeof(text), "sprites/light_glow02_add_noz.spr");
+		}
+
+		//send to server
+		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue overlaymaterial %s", text));
+	}
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Called when a color gets selected
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSunPage::OnColorSelected(KeyValues* data)
+{
+	//close the color picker
+	m_ColorPicker->Close();
+	m_ColorPicker = nullptr;
+
+	Color color(data->GetInt("r"), data->GetInt("g"), data->GetInt("b"), data->GetInt("a"));
+	switch (m_ColorSelectorMode)
+	{
+	case ColorSelectorMode::Color_Sun:
+		//add an undo step
+		AddUndo_SetColor(&m_SunColor, m_SunColor._color);
+
+		m_SunColor = color;
+		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue rendercolor \"%d %d %d", m_SunColor.r(), m_SunColor.g(), m_SunColor.b()));
+		break;
+	case ColorSelectorMode::Color_SunOverlay:
+		//add an undo step
+		AddUndo_SetColor(&m_SunColor, m_SunColor._color);
+
+		m_SunOverlayColor = color;
+		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue overlaycolor \"%d %d %d", m_SunOverlayColor.r(), m_SunOverlayColor.g(), m_SunOverlayColor.b()));
+		break;
+	}
+
+	//call base func
+	BaseClass::OnColorSelected(data);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Initalizes the data
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSunPage::InitSunInfo(MapTimeInfo_t& info, bool IsNightPage)
+{
+	m_bNightTimeMode = IsNightPage;
+
+	//sun
+	if (!IsNightPage)
+	{
+		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun %d", info.DayInfo.SunInfoEnabled));
+		m_EnableSunButton->SetSelected(info.DayInfo.SunInfoEnabled);
+
+		//check for an 'angles' key. If not found then we will have to use the 'angle' and 'pitch' keys
+		const char* angles = FindSunInfoFromArray(info.DayInfo.SunInfo, "angles", nullptr);
+		if (angles)
+		{
+			//suck out the value
+			int _, y;
+			sscanf(angles, "%d %d", &_, &y);
+
+			m_SunPitchSlider->SetValue(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "pitch", "90")));
+			m_SunYawSlider->SetValue(y);
+
+		}
+		else
+		{
+			m_SunYawSlider->SetValue(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "angle", "0")));
+			m_SunPitchSlider->SetValue(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "pitch", "90")));
+		}
+
+		//set the size
+		m_SunSizeSlider->SetValue(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "size", "10")));
+
+		//set color
+		int r, g, b;
+		sscanf(FindSunInfoFromArray(info.DayInfo.SunInfo, "rendercolor", "255 255 255"), "%d %d %d", &r, &g, &b);
+		m_SunColor.SetColor(r, g, b, 255);
+
+		//set the material
+		m_SunMaterialTextEntry->SetText(FindSunInfoFromArray(info.DayInfo.SunInfo, "material", "sprites/light_glow02_add_noz.spr"));
+
+
+		//set the overlay size
+		m_SunOverlaySizeSlider->SetValue(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "overlaysize", "-1")));
+
+		//set overlay color
+		int or , og, ob;
+		sscanf(FindSunInfoFromArray(info.DayInfo.SunInfo, "overlaycolor", "255 255 255"), "%d %d %d", &or , &og, &ob);
+
+		//check for -1
+		m_SunOverlayColor.SetColor(or == -1 ? r : or , og == -1 ? g : og, ob == -1 ? b : ob, 255);
+
+		//set the material
+		m_SunOverlayMaterialTextEntry->SetText(FindSunInfoFromArray(info.DayInfo.SunInfo, "overlaymaterial", "sprites/light_glow02_add_noz.spr"));
+	}
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Gets the sun info
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSunPage::GetSunInfo(MapTimeInfo_t& info)
+{
 	//set the sun info
 	do
 	{
@@ -2061,6 +2911,408 @@ void CMapPropertiesPanel::GetData(MapTimeInfo_t& info)
 		AddOrUpdateSunInfoInArray(info.DayInfo.SunInfo, "overlaymaterial", text);
 
 	} while (false);
+}
+
+
+
+
+
+
+
+//map properties panel
+class CMapPropertiesPanel : public PropertyDialog
+{
+	DECLARE_CLASS_SIMPLE(CMapPropertiesPanel, PropertyDialog)
+public:
+	CMapPropertiesPanel(Panel* parent);
+	~CMapPropertiesPanel();
+
+	//paint/tick
+	void Paint();
+	void OnThink();
+	void OnClose();
+	void OnCommand(const char* pszCommand);
+	
+	//loads the settings into the panel
+	void PerformLayout();
+
+	//keyboard/mouse
+	void OnKeyCodePressed(KeyCode code);
+	void OnKeyCodeReleased(KeyCode code);
+	void OnMousePressed(KeyCode code);
+
+	//init funcs
+	void Init(MapTimeInfo_t& info, bool IsNightPage);
+
+	void GetData(MapTimeInfo_t& info);
+	void FormatImage(const char* input, char* output, int outside);
+
+	MESSAGE_FUNC_PARAMS(OnResetUndoSteps, "ResetUndoSteps", data);
+private:
+	//pages
+	CMapPropertiesPanelFogPage* m_FogPage;
+	CMapPropertiesPanelSkyboxFiltersPage* m_SkyboxFilterPage;
+	CMapPropertiesPanelSunPage* m_SunPage;
+
+private:
+	//day or night?
+	bool m_bNightTimeMode;
+
+	//previous convar values to re-set when we close
+	char m_PreviousFilterConvarValue[256];
+	char m_PreviousFilterIntensityConvarValue[16];
+	char m_PreviousCloudsColorValue[16];
+	char m_PreviousCloudsShowValue[16];
+	char m_PreviousCloudsOverrideValue[4];
+	char m_PreviousGodConvarValue[4];
+};
+
+//static map properties panel
+static CMapPropertiesPanel* g_MapPropertiesPanel;
+
+#define COMMAND_APPLY_PAGE_SETTINGS "ApplySettings"
+
+extern ConVar cl_mouselook;
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Constructor for map properties panel
+//----------------------------------------------------------------------------------------------------
+CMapPropertiesPanel::CMapPropertiesPanel(Panel* parent) : BaseClass(nullptr, "MapPropertiesPanel")
+{
+	//clear the previous convar values
+	memset(m_PreviousCloudsOverrideValue, 0, sizeof(m_PreviousCloudsOverrideValue));
+	memset(m_PreviousCloudsColorValue, 0, sizeof(m_PreviousCloudsColorValue));
+	memset(m_PreviousCloudsShowValue, 0, sizeof(m_PreviousCloudsShowValue));
+	memset(m_PreviousFilterConvarValue, 0, sizeof(m_PreviousFilterConvarValue));
+	memset(m_PreviousFilterIntensityConvarValue, 0, sizeof(m_PreviousFilterIntensityConvarValue));
+	memset(m_PreviousGodConvarValue, 0, sizeof(m_PreviousGodConvarValue));
+
+	//reset our coppied steps
+	memset(s_UndoSteps, 0, sizeof(s_UndoSteps));
+	s_NeedSave = false;
+	s_UndoStepsCount = 0;
+	s_CurrentUndoStep = 0;
+
+	//set our settings
+	g_MapPropertiesPanel = this;
+	m_bNightTimeMode = true;
+
+	SetParent(enginevgui->GetPanel(VGuiPanel_t::PANEL_TOOLS));
+	SetKeyBoardInputEnabled(true);
+	SetMouseInputEnabled(true);
+	SetVisible(true);
+	SetEnabled(true);
+	SetSizeable(false);
+	SetDeleteSelfOnClose(true);
+	SetFadeEffectDisableOverride(true);
+	Activate();
+
+	//set our ok button command
+	SetOKButtonText("Apply");
+	_okButton->SetCommand(COMMAND_APPLY_PAGE_SETTINGS);
+
+	//set our pos
+	SetPos(0, 0);
+
+	//disable mouselook so keyboard look can be used
+	cl_mouselook.SetValue(false);
+}
+
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: HACK: When we create and set the check buttons, this actually creates an undo step. To counter this.
+//			send a message to this (self) to reset the undo steps once all the values have been initalized.
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanel::OnResetUndoSteps(KeyValues* subkey)
+{
+	RemoveActionSignalTarget(this);
+	s_UndoStepsCount = 0;
+	s_CurrentUndoStep = 0;
+	s_NeedSave = false;
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Performs the layout for our panel
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanel::PerformLayout()
+{
+	BaseClass::PerformLayout();
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called when a keycode is pressed
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanel::OnKeyCodePressed(KeyCode code)
+{
+	//check for r. This requests focus back to the panel (or a button so this panel will accept input)
+	if (code == KeyCode::KEY_R)
+	{
+		_okButton->RequestFocus();
+		return;
+	}
+
+	//allow the user to move around
+	if (code == KeyCode::KEY_W)
+		engine->ClientCmd("+forward");
+	else if (code == KeyCode::KEY_A)
+		engine->ClientCmd("+moveleft");
+	else if (code == KeyCode::KEY_S)
+		engine->ClientCmd("+back");
+	else if (code == KeyCode::KEY_D)
+		engine->ClientCmd("+moveright");
+	
+	//allow the user to look around
+	else if (code == KeyCode::KEY_UP)
+		engine->ClientCmd("+lookup");
+	else if (code == KeyCode::KEY_LEFT)
+		engine->ClientCmd("+left");
+	else if (code == KeyCode::KEY_DOWN)
+		engine->ClientCmd("+lookdown");
+	else if (code == KeyCode::KEY_RIGHT)
+		engine->ClientCmd("+right");
+
+	//use
+	else if (code == KeyCode::KEY_E)
+		engine->ClientCmd("+use");
+
+	//enable noclip
+	else if (code == KeyCode::KEY_V)
+		engine->ClientCmd("noclip");
+
+	//show the flashlight
+	else if (code == KeyCode::KEY_F)
+		engine->ClientCmd("impulse 100");
+
+	//handle ctrl + z
+	if (code == KeyCode::KEY_Z && (input()->IsKeyDown(KEY_RCONTROL) || input()->IsKeyDown(KEY_LCONTROL)))
+	{
+		bool shiftdown = (input()->IsKeyDown(KEY_LSHIFT) || input()->IsKeyDown(KEY_RSHIFT));
+		UndoStep_Apply(shiftdown == false);
+	}
+
+	BaseClass::OnKeyCodePressed(code);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called when a keycode is released
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanel::OnKeyCodeReleased(KeyCode code)
+{
+	//allow the user to move around
+	if (code == KeyCode::KEY_W)
+		engine->ClientCmd("-forward");
+	else if (code == KeyCode::KEY_A)
+		engine->ClientCmd("-moveleft");
+	else if (code == KeyCode::KEY_S)
+		engine->ClientCmd("-back");
+	else if (code == KeyCode::KEY_D)
+		engine->ClientCmd("-moveright");
+	
+	//allow the user to look around
+	else if (code == KeyCode::KEY_UP)
+		engine->ClientCmd("-lookup");
+	else if (code == KeyCode::KEY_LEFT)
+		engine->ClientCmd("-left");
+	else if (code == KeyCode::KEY_DOWN)
+		engine->ClientCmd("-lookdown");
+	else if (code == KeyCode::KEY_RIGHT)
+		engine->ClientCmd("-right");
+
+	//use
+	else if (code == KeyCode::KEY_E)
+		engine->ClientCmd("-use");
+
+	BaseClass::OnKeyCodeReleased(code);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called when a mouse is pressed
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanel::OnMousePressed(MouseCode code)
+{
+	//regain focus by setting our focus to a button. This makes it so we can move around if
+	//our input was previously being sent to the text entry
+	_okButton->RequestFocus();
+	BaseClass::OnMousePressed(code);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Destructor for map properties page.
+//----------------------------------------------------------------------------------------------------
+CMapPropertiesPanel::~CMapPropertiesPanel()
+{
+	//reset our coppied steps
+	memset(s_UndoSteps, 0, sizeof(s_UndoSteps));
+	s_UndoStepsCount = 0;
+	s_CurrentUndoStep = 0;
+
+	//set the previous convar values
+	if (m_PreviousCloudsOverrideValue[0]) ConVarRef("amod_clouds_color_override").SetValue(m_PreviousCloudsOverrideValue);
+	if (m_PreviousCloudsColorValue[0]) ConVarRef("amod_clouds_color").SetValue(m_PreviousCloudsColorValue);
+	if (m_PreviousCloudsShowValue[0]) ConVarRef("amod_clouds").SetValue(m_PreviousCloudsShowValue);
+	if (m_PreviousGodConvarValue[0]) ConVarRef("amod_enable_god").SetValue(m_PreviousGodConvarValue);
+	ConVarRef(m_bNightTimeMode ? "amod_epic_filter_night_filename" : "amod_epic_filter_day_filename").SetValue(m_PreviousFilterConvarValue);
+	ConVarRef(m_bNightTimeMode ? "amod_epic_filter_night_intensity" : "amod_epic_filter_day_intensity").SetValue(m_PreviousFilterIntensityConvarValue);
+
+	void Amod_WriteConfig();
+	Amod_WriteConfig();
+
+	g_MapPropertiesPanel = nullptr;
+
+	//enable mouselook so the mouse can be used
+	cl_mouselook.SetValue(true);
+
+	//stop all move commands
+	engine->ClientCmd("-forward");
+	engine->ClientCmd("-moveleft");
+	engine->ClientCmd("-back");
+	engine->ClientCmd("-moveright");
+	engine->ClientCmd("-lookup");
+	engine->ClientCmd("-left");
+	engine->ClientCmd("-lookdown");
+	engine->ClientCmd("-right");
+	engine->ClientCmd("-use");
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Paints the panel
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanel::Paint()
+{
+	//set our new bg color
+	SetBgColor(Color(150, 150, 150, 150));
+	BaseClass::Paint();
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called on panel think
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanel::OnThink()
+{
+	//call each pages Update function
+	m_FogPage->Update();
+	m_SkyboxFilterPage->Update();
+
+	//only update the sun page if not using the daytime panel
+	if (!m_bNightTimeMode)
+		m_SunPage->Update();
+
+	BaseClass::OnThink();
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called on panel close
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanel::OnClose()
+{
+	//check our s_NeedSave
+	if (s_NeedSave)
+	{
+		//show confirm
+		QueryBox* modal = new QueryBox("Close?", "Are you sure you would like to close this dialog without saving?", this);
+		modal->MoveToCenterOfScreen();
+		modal->Activate();
+		modal->DoModal();
+		modal->SetOKCommand(new KeyValues("Command", "command", "ConfirmClose"));
+		modal->SetCancelCommand(new KeyValues("Command", "command", "DoModal"));
+		return;
+	}
+
+	//call base func
+	engine->ClientCmd("_amod_day_do");
+	PostActionSignal(new KeyValues("MapPropertiesPanelClosed"));
+	BaseClass::OnClose();
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called on command
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanel::OnCommand(const char* pszCommand)
+{	
+	//check for apply command
+	if (!Q_stricmp(pszCommand, COMMAND_APPLY_PAGE_SETTINGS))
+	{
+		s_NeedSave = false;
+
+		//post message
+		PostActionSignal(new KeyValues("ApplyPageSetting"));
+		return;
+	}
+	
+	//confirms the close command
+	else if (!Q_stricmp(pszCommand, "ConfirmClose"))
+	{
+		s_NeedSave = false;
+		BaseClass::OnCommand("Close");
+		return;
+	}
+	
+	//resets this panels modal state
+	else if (!Q_stricmp(pszCommand, "DoModal"))
+	{
+		m_hPreviousModal = vgui::input()->GetAppModalSurface();
+		vgui::input()->SetAppModalSurface(GetVPanel());
+		return;
+	}
+
+	BaseClass::OnCommand(pszCommand);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Initalizes the data
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanel::Init(MapTimeInfo_t& info, bool IsNightPage)
+{	
+	//store the convars current values
+	Q_strncpy(m_PreviousCloudsOverrideValue,ConVarRef("amod_clouds_color_override").GetString(), sizeof(m_PreviousCloudsOverrideValue));
+	Q_strncpy(m_PreviousCloudsColorValue, ConVarRef("amod_clouds_color").GetString(), sizeof(m_PreviousCloudsColorValue));
+	Q_strncpy(m_PreviousCloudsShowValue, ConVarRef("amod_clouds").GetString(), sizeof(m_PreviousCloudsShowValue));
+	Q_strncpy(m_PreviousFilterConvarValue, ConVarRef(IsNightPage ? "amod_epic_filter_night_filename" : "amod_epic_filter_day_filename").GetString(), sizeof(m_PreviousFilterConvarValue));
+	Q_strncpy(m_PreviousFilterIntensityConvarValue, ConVarRef(IsNightPage ? "amod_epic_filter_night_intensity" : "amod_epic_filter_day_intensity").GetString(), sizeof(m_PreviousFilterIntensityConvarValue));
+	Q_strncpy(m_PreviousGodConvarValue, ConVarRef("amod_enable_god").GetString(), sizeof(m_PreviousGodConvarValue));
+
+	//set these convars ALWAYS
+	engine->ClientCmd("amod_enable_god 1");
+	engine->ClientCmd("amod_clouds 1");
+	engine->ClientCmd("amod_clouds_color_override 1");
+
+	//set m_bNightTimeMode
+	m_bNightTimeMode = IsNightPage;
+
+	//create and set our pages
+	AddPage(m_FogPage = new CMapPropertiesPanelFogPage(this, "FogPage"), "Fog Settings");
+	m_FogPage->InitFogInfo(info, IsNightPage);
+
+	AddPage(m_SkyboxFilterPage = new CMapPropertiesPanelSkyboxFiltersPage(this, "SkyboxFilterPage"), "Skybox + Filter Settings");
+	m_SkyboxFilterPage->InitSkyboxAndFilter(info, IsNightPage);
+
+	//only add the sun page if it isnt the daytime panel
+	if (!IsNightPage)
+	{
+		AddPage(m_SunPage = new CMapPropertiesPanelSunPage(this, "SunPage"), "Sun Settings");
+		m_SunPage->InitSunInfo(info, IsNightPage);
+	}
+
+	//HACK: reset the undo steps
+	AddActionSignalTarget(this);
+	PostActionSignal(new KeyValues("ResetUndoSteps"));
+
+	//set our active page
+	_propertySheet->SetActivePage(m_FogPage);
+
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Sets the data from the panel
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanel::GetData(MapTimeInfo_t& info)
+{
+	m_FogPage->GetFogInfo(info);
+	m_SkyboxFilterPage->GetSkyboxFilterInfo(info);
+
+	//dont get the sun data if this is the night page
+	if (!m_bNightTimeMode)
+		m_SunPage->GetSunInfo(info);
 }
 
 
@@ -2323,6 +3575,7 @@ void CMapPropertiesEditorPageBase::OnApplyPageSetting()
 //----------------------------------------------------------------------------------------------------
 void CMapPropertiesEditorPageBase::OnMapPropertiesPanelClosed()
 {
+	//reset these
 	GetParent()->GetParent()->SetAlpha(255);
 }
 
@@ -2634,6 +3887,13 @@ public:
 			return;
 		}
 
+		//check for backspace
+		if (code == 8)
+		{
+			BaseClass::OnKeyTyped(code);
+			return;
+		}
+
 		//check the key
 		for (int i = 0; i < SIZE_OF_ARRAY(AllowedKeys); i++)
 		{
@@ -2907,7 +4167,7 @@ void CMapPropertiesEditorPanel::OnCommand(const char* pszCommand)
 
 		delete m_DayPage;
 
-		//ALWAYS delete g_MapPropertiesPanel  if its open
+		//ALWAYS delete g_MapPropertiesPanel if its open
 		if (g_MapPropertiesPanel)
 			delete g_MapPropertiesPanel;
 
@@ -2926,6 +4186,12 @@ void CMapPropertiesEditorPanel::OnCommand(const char* pszCommand)
 CMapPropertiesEditorPanel::~CMapPropertiesEditorPanel()
 {
 	s_MapPropertiesEditorPanel = nullptr;
+
+	//check for the actuall editor
+	if (g_MapPropertiesPanel)
+		g_MapPropertiesPanel->DeletePanel();
+
+	g_MapPropertiesPanel = nullptr;
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -2972,4 +4238,12 @@ CON_COMMAND(open_map_time_properties_editor, "")
 		s_MapPropertiesEditorPanel = new CMapPropertiesEditorPanel(enginevgui->GetPanel(VGuiPanel_t::PANEL_TOOLS));
 
 	s_MapPropertiesEditorPanel->Activate();
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Returns if the map properties panel is open or not
+//----------------------------------------------------------------------------------------------------
+const bool IsMapPropertiesPanelOpen()
+{
+	return g_MapPropertiesPanel != nullptr;
 }

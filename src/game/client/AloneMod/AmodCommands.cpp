@@ -52,12 +52,12 @@ void Amod_WriteConfig()
 		"amod_filter_brightness_off",				//filter off value
 		"amod_sky",									//current sky name
 
-		"amod_day_sky",								//current day skybox
-		"amod_night_sky",							//current night skybox
-		"amod_epic_filter_night_filename",			//current night filter filename
-		"amod_epic_filter_night_intensity",			//current night filter intensity
-		"amod_epic_filter_day_filename",			//current day filter filename
-		"amod_epic_filter_day_intensity"			//current day filter intensity
+		//"amod_day_sky",								//current day skybox
+		//"amod_night_sky",							//current night skybox
+		//"amod_epic_filter_night_filename",			//current night filter filename
+		//"amod_epic_filter_night_intensity",			//current night filter intensity
+		//"amod_epic_filter_day_filename",			//current day filter filename
+		//"amod_epic_filter_day_intensity"			//current day filter intensity
 	};
 
 
