@@ -193,6 +193,8 @@ $Project
 			{
 				$File "$SRCDIR\game\shared\AloneMod\Amod_SharedDefs.cpp"
 				$File "$SRCDIR\game\shared\AloneMod\Amod_SharedDefs.h"
+				$File "$SRCDIR\game\shared\AloneMod\AloneModTimeInfo.cpp"
+				$File "$SRCDIR\game\shared\AloneMod\AloneModTimeInfo.h"
 				$File "$SRCDIR\game\shared\AloneMod\AmodAchievements.cpp"
 			}
 			$Folder "Bik Background"
@@ -230,30 +232,62 @@ $Project
 			{
 				$Folder "Effects Panel"
 				{
-					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanel.cpp"
-					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanel.h"
-					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelConvarPage.cpp"
-					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelConvarPage.h"
-					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelLightingPage.cpp"
-					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelLightingPage.h"
-					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelOverlayPage.cpp"
-					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelOverlayPage.h"
-					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelSettingsPage.h"
-					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelSettingsPage.cpp"
-					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelViewEffectsPage.h"
-					$File 	"$SRCDIR\game\client\AloneMod\effects panel\EffectsPanelViewEffectsPage.cpp"
+					$File 	"AloneMod\effects panel\EffectsPanel.cpp"
+					$File 	"AloneMod\effects panel\EffectsPanel.h"
+					$File 	"AloneMod\effects panel\EffectsPanelConvarPage.cpp"
+					$File 	"AloneMod\effects panel\EffectsPanelConvarPage.h"
+					$File 	"AloneMod\effects panel\EffectsPanelLightingPage.cpp"
+					$File 	"AloneMod\effects panel\EffectsPanelLightingPage.h"
+					$File 	"AloneMod\effects panel\EffectsPanelOverlayPage.cpp"
+					$File 	"AloneMod\effects panel\EffectsPanelOverlayPage.h"
+					$File 	"AloneMod\effects panel\EffectsPanelSettingsPage.cpp"
+					$File 	"AloneMod\effects panel\EffectsPanelSettingsPage.h"
+					$File 	"AloneMod\effects panel\EffectsPanelViewEffectsPage.cpp"
+					$File 	"AloneMod\effects panel\EffectsPanelViewEffectsPage.h"
 				}
 				
-				$File 	"$SRCDIR\game\client\AloneMod\BackgroundPanel.cpp"
-				$File 	"$SRCDIR\game\client\AloneMod\IBackgroundPanel.h"
-				$File 	"$SRCDIR\game\client\AloneMod\INewGamePanel.h"
-				$File 	"$SRCDIR\game\client\AloneMod\IOptionsPanel.h"
-				$File 	"$SRCDIR\game\client\AloneMod\ISongPanel.h"
-				//$File 	"$SRCDIR\game\client\AloneMod\IEffectsPanel.h"
-				$File 	"$SRCDIR\game\client\AloneMod\NewGamePanel.cpp"
-				$File 	"$SRCDIR\game\client\AloneMod\OptionsPanel.cpp"
-				$File 	"$SRCDIR\game\client\AloneMod\SongPanel.cpp"
-				//$File 	"$SRCDIR\game\client\AloneMod\EffectsPanel.cpp"
+				$Folder "Map properties editor"
+				{
+					$File	"AloneMod\map properties editor\MapPropertiesEditor.cpp"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorMenuPages.cpp"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorMenuPages.h"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorMenuPanel.cpp"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorMenuPanel.h"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorPanel.cpp"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorPanel.h"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelBasePage.cpp"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelBasePage.h"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelFogPage.cpp"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelFogPage.h"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelSkyboxPage.cpp"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelSkyboxPage.h"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelSunPage.cpp"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelSunPage.h"
+				}
+				
+				$Folder "Dynamic skybox"
+				{
+					$File	"AloneMod\DynamicSky.cpp"
+					$File	"AloneMod\DynamicSky.h"
+				}
+				
+				$Folder "Dynamic skybox"
+				{
+					$File	"AloneMod\DynamicSky.cpp"
+					$File	"AloneMod\DynamicSky.h"
+				}
+				
+				
+				$File	"AloneMod\ColorPicker.cpp"
+				$File	"AloneMod\ColorPicker.h"
+				$File 	"AloneMod\BackgroundPanel.cpp"
+				$File 	"AloneMod\IBackgroundPanel.h"
+				$File 	"AloneMod\INewGamePanel.h"
+				$File 	"AloneMod\IOptionsPanel.h"
+				$File 	"AloneMod\ISongPanel.h"
+				$File 	"AloneMod\NewGamePanel.cpp"
+				$File 	"AloneMod\OptionsPanel.cpp"
+				$File 	"AloneMod\SongPanel.cpp"
 			}
 			$File	"$SRCDIR\game\client\episodic\c_prop_coreball.cpp"
 			$File	"$SRCDIR\game\client\episodic\c_prop_scalable.cpp"

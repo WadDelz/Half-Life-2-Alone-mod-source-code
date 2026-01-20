@@ -97,6 +97,8 @@ $Project
 			{
 				$File "$SRCDIR\game\shared\AloneMod\Amod_SharedDefs.cpp"
 				$File "$SRCDIR\game\shared\AloneMod\Amod_SharedDefs.h"
+				$File "$SRCDIR\game\shared\AloneMod\AloneModTimeInfo.cpp"
+				$File "$SRCDIR\game\shared\AloneMod\AloneModTimeInfo.h"
 				$File "$SRCDIR\game\shared\AloneMod\AmodAchievements.cpp"
 			}
 			$file "$SRCDIR\game\server\episodic\prop_scalable.cpp"
