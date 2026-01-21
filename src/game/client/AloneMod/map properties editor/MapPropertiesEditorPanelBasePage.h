@@ -9,6 +9,7 @@
 #include <vgui_controls/PropertyPage.h>
 #include <vgui_controls/Frame.h>
 #include <vgui_controls/CheckButton.h>
+#include <vgui_controls/ComboBox.h>
 #include <vgui_controls/Slider.h>
 #include <vgui_controls/TextEntry.h>
 #include <vgui_controls/Button.h>
@@ -43,13 +44,13 @@ bool FindMapPath(const char* base, const char* find, char* output, int outputsiz
 
 
 //max undo steps
-#define MAX_UNDO_STEPS 32
+#define MAX_UNDO_STEPS 64
 
 //undo struct
 struct UndoStep_t
 {
 	//step type
-	enum class StepType_e { Step_SetCheckButton, Step_SetColor, Step_SetSlider };
+	enum class StepType_e { Step_SetCheckButton, Step_SetColor, Step_SetSlider, Step_SetComboBox };
 	StepType_e m_CurrentStepType;
 
 	//data
@@ -62,11 +63,19 @@ struct UndoStep_t
 			int m_GetValue;
 		} SliderData;
 
+		//combo box
+		struct
+		{
+			ComboBox* m_SetComboBox;
+			int m_GetValue;
+		} ComboBoxData;
+
 		//color
 		struct
 		{
 			unsigned char m_GetColor[4];
 			unsigned char m_PreviousColor[4];
+			char m_Command[128];
 			Color* m_SetColor;
 		} ColorData;
 
@@ -86,8 +95,9 @@ extern bool s_NeedSave;
 
 //undo funcs
 void AddUndo_SetSlider(Slider* slider, int previousValue);
-void AddUndo_SetColor(Color* setColor, const unsigned char previouscolor[4]);
+void AddUndo_SetColor(Color* setColor, const unsigned char previouscolor[4], const char* commandToRun = "");
 void AddUndo_SetCheckButton(CheckButton* button, bool previousValue);
+void AddUndo_SetComboBox(ComboBox* cbox, int previousValue);
 void UndoStep_Apply(bool undo);
 
 
@@ -105,8 +115,12 @@ public:
 	virtual void OnMouseReleased(MouseCode code);
 	virtual void OnMousePressed(MouseCode code);
 	virtual void OnMouseWheeled(int delta);
+	virtual void OnKeyPressed(KeyCode code);
 
 	virtual void OnCommand(const char* pszCommand);
+
+	//ensures m_PreviousValue is correct
+	//virtual void SetValue(int value, bool FireEvent = true) { m_PreviousValue = value; BaseClass::SetValue(value, FireEvent); }
 
 	virtual int GetMin();
 	virtual int GetMax();
@@ -134,12 +148,16 @@ public:
 
 	//called on command
 	virtual void OnCommand(const char* pszCommand);
-
+	
 	//attach functions
 	virtual void SetAttatchedColor(Color* color) { m_AttachedColor = color; };
+	virtual void SetPasteCommand(const char* command) { Q_strncpy(m_Command, command, sizeof(m_Command)); }
 private:
 	//color attached to this
 	Color* m_AttachedColor = nullptr;
+
+	//command to run when the color gets pasted
+	char m_Command[128];
 };
 
 

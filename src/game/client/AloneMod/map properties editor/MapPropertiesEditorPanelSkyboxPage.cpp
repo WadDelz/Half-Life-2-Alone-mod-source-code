@@ -34,6 +34,8 @@ CMapPropertiesPanelSkyboxFiltersPage::CMapPropertiesPanelSkyboxFiltersPage(Panel
 	{
 		m_CloudButton = new CMapPropertiesPanelButton(this, "CloudButton", "");
 		m_CloudButton->SetCommand(COMMAND_CHANGE_CLOUDS_COLOR);
+		m_CloudButton->SetAttatchedColor(&m_CloudColor);
+		m_CloudButton->SetPasteCommand("amod_clouds_color %d %d %d %d");
 
 		m_CloudColor.SetColor(255, 255, 255, 255);
 	}
@@ -284,6 +286,10 @@ void CMapPropertiesPanelSkyboxFiltersPage::OnTextChanged(KeyValues* data)
 
 		//set the sv_skyname convar
 		ConVarRef("sv_skyname").SetValue(m_SkyboxNames->GetActiveItemUserData()->GetName());
+
+		//add a step
+		AddUndo_SetComboBox(m_SkyboxNames, m_PrevSkyboxNamesValue);
+		m_PrevSkyboxNamesValue = m_SkyboxNames->GetActiveItem();
 	}
 
 	//check for epic filter combo box
@@ -309,6 +315,10 @@ void CMapPropertiesPanelSkyboxFiltersPage::OnTextChanged(KeyValues* data)
 		//set amod_filter_filename
 		ConVarRef amod_filter_filename(m_bNightTimeMode ? "amod_epic_filter_night_filename" : "amod_epic_filter_day_filename");
 		amod_filter_filename.SetValue(m_FilterComboBox->GetActiveItemUserData()->GetName());
+
+		//add a step
+		AddUndo_SetComboBox(m_FilterComboBox, m_PrevFilterComboBoxValue);
+		m_PrevFilterComboBoxValue = m_FilterComboBox->GetActiveItem();
 	}
 }
 
@@ -322,7 +332,7 @@ void CMapPropertiesPanelSkyboxFiltersPage::OnColorSelected(KeyValues* data)
 	m_ColorPicker = nullptr;
 
 	//add an undo step
-	AddUndo_SetColor(&m_CloudColor, m_CloudColor._color);
+	AddUndo_SetColor(&m_CloudColor, m_CloudColor._color, "amod_clouds_color %d %d %d %d");
 
 	//get the color
 	Color color(data->GetInt("r"), data->GetInt("g"), data->GetInt("b"), data->GetInt("a"));
@@ -385,6 +395,7 @@ void CMapPropertiesPanelSkyboxFiltersPage::InitSkyboxAndFilter(MapTimeInfo_t& in
 
 			//active the current index
 			m_SkyboxNames->ActivateItem(index == -1 ? 0 : index);
+			m_PrevSkyboxNamesValue = index == -1 ? 0 : index;
 
 		} while (false);
 	}
@@ -431,6 +442,7 @@ void CMapPropertiesPanelSkyboxFiltersPage::InitSkyboxAndFilter(MapTimeInfo_t& in
 
 		//active the current index
 		m_FilterComboBox->ActivateItem(index);
+		m_PrevFilterComboBoxValue = index;
 
 		filesystem->FindClose(find);
 

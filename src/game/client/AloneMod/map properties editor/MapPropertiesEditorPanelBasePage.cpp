@@ -161,8 +161,12 @@ static void AddUndoStep(UndoStep_t::StepType_e type, const UndoStep_t& data)
 	case UndoStep_t::StepType_e::Step_SetSlider:
 		step.m_Data.SliderData = data.m_Data.SliderData;
 		break;
+	case UndoStep_t::StepType_e::Step_SetComboBox:
+		step.m_Data.ComboBoxData = data.m_Data.ComboBoxData;
+		break;
 	case UndoStep_t::StepType_e::Step_SetColor:
 		step.m_Data.ColorData = data.m_Data.ColorData;
+		Q_strncpy(step.m_Data.ColorData.m_Command, data.m_Data.ColorData.m_Command, sizeof(step.m_Data.ColorData.m_Command));
 		break;
 	case UndoStep_t::StepType_e::Step_SetCheckButton:
 		step.m_Data.ButtonData = data.m_Data.ButtonData;
@@ -191,28 +195,45 @@ void AddUndo_SetSlider(Slider* slider, int previousValue)
 //-----------------------------------------------------------------------------
 // Purpose: add an undo step for a color change
 //-----------------------------------------------------------------------------
-void AddUndo_SetColor(Color* setColor, const unsigned char previouscolor[4])
+void AddUndo_SetColor(Color* setColor, const unsigned char previouscolor[4], const char* commandToRun)
 {
 	UndoStep_t data;
 	data.m_Data.ColorData.m_SetColor = setColor;
+	Q_strncpy(data.m_Data.ColorData.m_Command, commandToRun, sizeof(data.m_Data.ColorData.m_Command));
 	memcpy(data.m_Data.ColorData.m_GetColor, previouscolor, 4);
 	memset(data.m_Data.ColorData.m_PreviousColor, 0, sizeof(unsigned char) * 4);
 	AddUndoStep(UndoStep_t::StepType_e::Step_SetColor, data);
 }
 
 //HACK HACK VERY EVIL HACK (not really): 
-//when we set the check buttons value for the UndoStep_Apply function. That calls the 'CheckButtonChecked' action signal.
+//when we set the check buttons value (or combo box) for the UndoStep_Apply function. That calls the 'CheckButtonChecked' action signal.
 //That then adds another check button undo step onto the undo steps. So prevent this
-static bool g_bCurrentlyInSuperEvilCheckButtonHack = false;
+static bool g_bCurrentlyInSuperEvilHack = false;
+
+//-----------------------------------------------------------------------------
+// Purpose: add an undo step for a combo box change
+//-----------------------------------------------------------------------------
+void AddUndo_SetComboBox(ComboBox* combobox, int previous)
+{
+	if (g_bCurrentlyInSuperEvilHack)
+	{
+		g_bCurrentlyInSuperEvilHack = false;
+		return;
+	}
+	UndoStep_t data;
+	data.m_Data.ComboBoxData.m_SetComboBox = combobox;
+	data.m_Data.ComboBoxData.m_GetValue = previous;
+	AddUndoStep(UndoStep_t::StepType_e::Step_SetComboBox, data);
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: add an undo step for a checkbutton
 //-----------------------------------------------------------------------------
 void AddUndo_SetCheckButton(CheckButton* button, bool previousValue)
 {
-	if (g_bCurrentlyInSuperEvilCheckButtonHack)
+	if (g_bCurrentlyInSuperEvilHack)
 	{
-		g_bCurrentlyInSuperEvilCheckButtonHack = false;
+		g_bCurrentlyInSuperEvilHack = false;
 		return;
 	}
 
@@ -245,6 +266,23 @@ void UndoStep_Apply(bool undo)
 		step.m_Data.SliderData.m_GetValue = temp;
 		break;
 	}
+	case UndoStep_t::StepType_e::Step_SetComboBox:
+	{
+		ComboBox* cbox = step.m_Data.ComboBoxData.m_SetComboBox;
+		if (!cbox) break;
+
+		//HACK:
+		g_bCurrentlyInSuperEvilHack = true;
+		int temp = cbox->GetActiveItem();
+
+		//set the value
+		cbox->ActivateItem(step.m_Data.SliderData.m_GetValue);
+
+		//another hack
+		g_bCurrentlyInSuperEvilHack = temp != step.m_Data.SliderData.m_GetValue;
+		step.m_Data.SliderData.m_GetValue = temp;
+		break;
+	}
 	case UndoStep_t::StepType_e::Step_SetColor:
 	{
 		Color* target = step.m_Data.ColorData.m_SetColor;
@@ -266,6 +304,10 @@ void UndoStep_Apply(bool undo)
 				step.m_Data.ColorData.m_GetColor[2],
 				step.m_Data.ColorData.m_GetColor[3]);
 
+			//run the command
+			if (step.m_Data.ColorData.m_Command[0])
+				engine->ClientCmd(CFmtStr(step.m_Data.ColorData.m_Command, step.m_Data.ColorData.m_GetColor[0], step.m_Data.ColorData.m_GetColor[1], step.m_Data.ColorData.m_GetColor[2], step.m_Data.ColorData.m_GetColor[3]));
+
 			// store current color for redo
 			memcpy(step.m_Data.ColorData.m_PreviousColor, temp, 4);
 		}
@@ -283,9 +325,14 @@ void UndoStep_Apply(bool undo)
 				step.m_Data.ColorData.m_PreviousColor[2],
 				step.m_Data.ColorData.m_PreviousColor[3]);
 
+			//run the command
+			if (step.m_Data.ColorData.m_Command[0])
+				engine->ClientCmd(CFmtStr(step.m_Data.ColorData.m_Command, step.m_Data.ColorData.m_PreviousColor[0], step.m_Data.ColorData.m_PreviousColor[1], step.m_Data.ColorData.m_PreviousColor[2], step.m_Data.ColorData.m_PreviousColor[3]));
+
 			// store current color for undo
 			memcpy(step.m_Data.ColorData.m_GetColor, temp, 4);
 		}
+
 		break;
 	}
 
@@ -297,9 +344,16 @@ void UndoStep_Apply(bool undo)
 		bool temp = button->IsSelected();
 
 		//HACK:
-		g_bCurrentlyInSuperEvilCheckButtonHack = true;
+		g_bCurrentlyInSuperEvilHack = true;
+
 		button->SetSelected(step.m_Data.ButtonData.m_SetCheckButtonValue);
 		step.m_Data.ButtonData.m_SetCheckButtonValue = temp;
+
+		//now send out the 'OnCommand' message so the check button getting checked gets handled
+		KeyValues* data = button->GetCommand();
+		if (data)
+			button->PostActionSignal(new KeyValues("Command", "command", data->GetString("command")));
+
 		break;
 	}
 	}
@@ -459,6 +513,18 @@ CMapPropertiesPanelSlider::CMapPropertiesPanelSlider(Panel* parent, const char* 
 }
 
 //----------------------------------------------------------------------------------------------------
+// Purpose: Called when a key is pressed
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelSlider::OnKeyPressed(KeyCode code)
+{
+	//dont allow to change the value with the arrow keys
+	if (code == KeyCode::KEY_LEFT || code == KeyCode::KEY_RIGHT)
+		return;
+
+	BaseClass::OnKeyCodePressed(code);
+}
+
+//----------------------------------------------------------------------------------------------------
 // Purpose: Called when the mouse is wheeled
 //----------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelSlider::OnMouseWheeled(int delta)
@@ -583,7 +649,17 @@ int CMapPropertiesPanelSlider::GetMax()
 //----------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelSlider::OnSetExactValue(KeyValues* data)
 {
+	//add an undo step if needed
+	int previous = GetValue() ;
+	
 	SetValue(data->GetInt("Value"));
+	
+	//add an undo step if needed
+	if (previous != GetValue())
+	{
+		AddUndo_SetSlider(this, previous);
+		previous = GetValue();
+	}
 }
 
 
@@ -602,6 +678,7 @@ static Color s_CurrentCoppiedColor;
 CMapPropertiesPanelButton::CMapPropertiesPanelButton(Panel* parent, const char* name, const char* text)
 	: BaseClass(parent, name, text)
 {
+	memset(m_Command, 0, sizeof(m_Command));
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -647,9 +724,16 @@ void CMapPropertiesPanelButton::OnCommand(const char* pszCommand)
 	}
 	else if (!Q_stricmp(pszCommand, "Paste"))
 	{
+		//add an undo step
+		AddUndo_SetColor(m_AttachedColor, m_AttachedColor->_color, m_Command);
+
 		//check for our color
 		if (m_AttachedColor)
 			*m_AttachedColor = s_CurrentCoppiedColor;
+
+		//call the command if needed
+		if (m_Command[0])
+			engine->ClientCmd(CFmtStr(m_Command, m_AttachedColor->r(), m_AttachedColor->g(), m_AttachedColor->b(), m_AttachedColor->a()));
 
 		s_bHasCoppiedColor = true;
 	}

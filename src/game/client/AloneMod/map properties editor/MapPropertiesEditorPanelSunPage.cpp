@@ -27,6 +27,7 @@ CMapPropertiesPanelSunPage::CMapPropertiesPanelSunPage(Panel* parent, const char
 	m_SunColorButton = new CMapPropertiesPanelButton(this, "SunColorButton", "");
 	m_SunColorButton->SetCommand(COMMAND_CHANGE_SUN_COLOR);
 	m_SunColorButton->SetAttatchedColor(&m_SunColor);
+	m_SunColorButton->SetPasteCommand("_amod_mapedit_server_sun_keyvalue rendercolor \"%d %d %d");
 	m_SunColor.SetColor(255, 255, 255, 255);
 
 	//sun material text entry
@@ -42,6 +43,7 @@ CMapPropertiesPanelSunPage::CMapPropertiesPanelSunPage(Panel* parent, const char
 	m_SunOverlayColorButton = new CMapPropertiesPanelButton(this, "SunOverlayColorButton", "");
 	m_SunOverlayColorButton->SetCommand(COMMAND_CHANGE_SUN_OVERLAY_COLOR);
 	m_SunOverlayColorButton->SetAttatchedColor(&m_SunOverlayColor);
+	m_SunOverlayColorButton->SetPasteCommand("_amod_mapedit_server_sun_keyvalue overlaycolor \"%d %d %d");
 	m_SunOverlayColor.SetColor(255, 255, 255, 255);
 
 	//sun overlay material text entry
@@ -242,6 +244,10 @@ void CMapPropertiesPanelSunPage::OnCommand(const char* pszCommand)
 		if (!pPlayer)
 			return;
 
+		//add undo steps
+		AddUndo_SetSlider(m_SunPitchSlider, m_SunPitchSlider->GetValue());
+		AddUndo_SetSlider(m_SunYawSlider, m_SunYawSlider->GetValue());
+
 		//get the angle
 		QAngle ang = pPlayer->GetAbsAngles();
 		m_SunPitchSlider->SetValue(ang.x);
@@ -308,14 +314,14 @@ void CMapPropertiesPanelSunPage::OnColorSelected(KeyValues* data)
 	{
 	case ColorSelectorMode::Color_Sun:
 		//add an undo step
-		AddUndo_SetColor(&m_SunColor, m_SunColor._color);
+		AddUndo_SetColor(&m_SunColor, m_SunColor._color, "_amod_mapedit_server_sun_keyvalue rendercolor \"%d %d %d");
 
 		m_SunColor = color;
 		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue rendercolor \"%d %d %d", m_SunColor.r(), m_SunColor.g(), m_SunColor.b()));
 		break;
 	case ColorSelectorMode::Color_SunOverlay:
 		//add an undo step
-		AddUndo_SetColor(&m_SunColor, m_SunColor._color);
+		AddUndo_SetColor(&m_SunOverlayColor, m_SunOverlayColor._color, "_amod_mapedit_server_sun_keyvalue overlaycolor \"%d %d %d");
 
 		m_SunOverlayColor = color;
 		engine->ClientCmd(CFmtStr("_amod_mapedit_server_sun_keyvalue overlaycolor \"%d %d %d", m_SunOverlayColor.r(), m_SunOverlayColor.g(), m_SunOverlayColor.b()));

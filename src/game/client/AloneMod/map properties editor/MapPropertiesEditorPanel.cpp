@@ -40,8 +40,9 @@ CMapPropertiesPanel::CMapPropertiesPanel(Panel* parent) : BaseClass(nullptr, "Ma
 	SetFadeEffectDisableOverride(true);
 	Activate();
 
-	//tell our property sheet to shut up
-	GetPropertySheet()->SetKeyBoardInputEnabled(false);
+	//tell our property sheet to shut up. 
+	//edit: nevermind. This also disables keyboard input to combo boxes and sliders :(
+	//GetPropertySheet()->SetKeyBoardInputEnabled(false);
 
 	//set our ok button command
 	SetOKButtonText("Apply");
@@ -60,7 +61,6 @@ CMapPropertiesPanel::CMapPropertiesPanel(Panel* parent) : BaseClass(nullptr, "Ma
 //-------------------------------------------------------------------------------------------------------
 void CMapPropertiesPanel::OnResetUndoSteps(KeyValues* subkey)
 {
-	RemoveActionSignalTarget(this);
 	s_UndoStepsCount = 0;
 	s_CurrentUndoStep = 0;
 	s_NeedSave = false;
@@ -328,9 +328,9 @@ void CMapPropertiesPanel::Init(MapTimeInfo_t& info, bool IsNightPage)
 		m_SunPage->InitSunInfo(info, IsNightPage);
 	}
 
-	//HACK: reset the undo steps
-	AddActionSignalTarget(this);
-	PostActionSignal(new KeyValues("ResetUndoSteps"));
+	//HACK: reset the undo steps because setting the values (with like SetSelected or SetActiveItem can
+	//		add an undo step)
+	PostMessage(this, new KeyValues("ResetUndoSteps"), 0.05f);
 
 	//set our active page
 	_propertySheet->SetActivePage(m_FogPage);

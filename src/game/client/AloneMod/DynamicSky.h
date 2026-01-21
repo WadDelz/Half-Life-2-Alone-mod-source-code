@@ -16,6 +16,8 @@
 #define DRAW_USES_DYNAMIC_SKY !USES_DYNAMIC_SKY_NEWFUNC && USES_DYNAMIC_SKY
 
 #ifdef LINUX
+#define USES_DYNAMIC_SKY_NEWFUNC 0
+#else
 #define USES_DYNAMIC_SKY_NEWFUNC 1							//im going to try out the new system i created that actually calls engine code instead of engine code coppied to the client. If it goes to shit then i will set this to 0.
 #endif
 

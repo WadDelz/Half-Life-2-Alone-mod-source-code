@@ -47,11 +47,13 @@ private:
 
 	//skybox text entries
 	ComboBox* m_SkyboxNames;
+	int m_PrevSkyboxNamesValue;
 
 	//post processing filter
 private:
 	//filter list
 	ComboBox* m_FilterComboBox;
+	int m_PrevFilterComboBoxValue;
 
 	//filter intensity text
 	Label* m_FilterIntensityText;

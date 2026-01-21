@@ -480,19 +480,19 @@ void CMapPropertiesPanelFogPage::OnColorSelected(KeyValues* data)
 		break;
 	case ColorSelectorMode::Color_SkyboxFog:
 		//add an undo step
-		AddUndo_SetColor(&m_FogColor, m_FogSkyboxColor._color);
+		AddUndo_SetColor(&m_FogSkyboxColor, m_FogSkyboxColor._color);
 
 		m_FogSkyboxColor = color;
 		break;
 	case ColorSelectorMode::Color_BlendFog:
 		//add an undo step
-		AddUndo_SetColor(&m_FogColor, m_FogBlendColor._color);
+		AddUndo_SetColor(&m_FogBlendColor, m_FogBlendColor._color);
 
 		m_FogBlendColor = color;
 		break;
 	case ColorSelectorMode::Color_BlendSkyboxFog:
 		//add an undo step
-		AddUndo_SetColor(&m_FogColor, m_FogBlendSkyboxColor._color);
+		AddUndo_SetColor(&m_FogBlendSkyboxColor, m_FogBlendSkyboxColor._color);
 
 		m_FogBlendSkyboxColor = color;
 		break;
