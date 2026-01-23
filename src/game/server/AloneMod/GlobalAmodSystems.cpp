@@ -123,10 +123,6 @@ void AmodSkyCallback(IConVar* var, const char* oldstring, float)
 	if (!amod_sky_override.GetBool())
 		return;
 
-	//check for episode map
-	if (IsInvalidChangeMap(gpGlobals->mapname.ToCStr()))
-		return;
-
 	//get the convar type
 	bool CalledFromDayConvar = cvar->FindVar(var->GetName()) == &amod_day_sky;
 
@@ -173,51 +169,32 @@ void AmodEpicFilterCallback(IConVar* var, const char*, float)
 	//set the color correction differently if daytime
 	if (IsDaytimeEnabled())
 	{
-		// check for invalid map
-		if (IsInvalidChangeMap(gpGlobals->mapname.ToCStr()))
-		{
-			cc->KeyValue("filename", "scripts/colorcorrection/cc_epic_filter.raw");
-			cc->KeyValue("maxweight", "0.6");
+		//check the convars
+		const char* filename = amod_epic_filter_day_filename.GetString();
+		if (!filename[0])
+			filename = StringFromMapTimeStringTableIndex(info.DayInfo.FilterName);
 
-		}
-		else
-		{
-			//check the convars
-			const char* filename = amod_epic_filter_day_filename.GetString();
-			if (!filename[0])
-				filename = StringFromMapTimeStringTableIndex(info.DayInfo.FilterName);
+		const char* intensity = amod_epic_filter_day_intensity.GetString();
+		if (!intensity[0])
+			intensity = StringFromMapTimeStringTableIndex(info.DayInfo.FilterIntensity);
 
-			const char* intensity = amod_epic_filter_day_intensity.GetString();
-			if (!intensity[0])
-				intensity = StringFromMapTimeStringTableIndex(info.DayInfo.FilterIntensity);
-
-			cc->KeyValue("filename", filename);
-			cc->KeyValue("maxweight", atof(intensity));
-		}
+		cc->KeyValue("filename", filename);
+		cc->KeyValue("maxweight", atof(intensity));
 	}
 	else
 	{
-		// check for invalid map
-		if (IsInvalidChangeMap(gpGlobals->mapname.ToCStr()))
-		{
-			cc->KeyValue("filename", "scripts/colorcorrection/cc_epic_filter.raw");
-			cc->KeyValue("maxweight", "0.6");
-		}
-		else
-		{
-			//check the convars
-			const char* filename = amod_epic_filter_night_filename.GetString();
-			if (!filename[0])
-				filename = StringFromMapTimeStringTableIndex(info.NightInfo.FilterName);
+		//check the convars
+		const char* filename = amod_epic_filter_night_filename.GetString();
+		if (!filename[0])
+			filename = StringFromMapTimeStringTableIndex(info.NightInfo.FilterName);
 
-			const char* intensity = amod_epic_filter_night_intensity.GetString();
-			if (!intensity[0])
-				intensity = StringFromMapTimeStringTableIndex(info.NightInfo.FilterIntensity);
+		const char* intensity = amod_epic_filter_night_intensity.GetString();
+		if (!intensity[0])
+			intensity = StringFromMapTimeStringTableIndex(info.NightInfo.FilterIntensity);
 
-			//set vars
-			cc->KeyValue("filename", filename);
-			cc->KeyValue("maxweight", atof(intensity));
-		}
+		//set vars
+		cc->KeyValue("filename", filename);
+		cc->KeyValue("maxweight", atof(intensity));
 	}
 
 	//enable or disable
@@ -333,10 +310,6 @@ public:
 
 		clientengine->ClientCmd_Unrestricted("r_pixelfog 1");
 		clientengine->ClientCmd_Unrestricted("r_farz -1");
-
-		//no overriding for invalid change maps
-		if (IsInvalidChangeMap(gpGlobals->mapname.ToCStr()))
-			return;
 
 		//get the time info
 		MapTimeInfo_t& info = GetMapTimeInfo(V_GetFileName(gpGlobals->mapname.ToCStr()));

@@ -12,6 +12,7 @@ class CColorPicker : public vgui::Frame
 	DECLARE_CLASS_SIMPLE(CColorPicker, Frame);
 public:
 	CColorPicker(vgui::VPANEL parent);
+	~CColorPicker();
 
 	//layout
 	virtual void PerformLayout();
@@ -51,5 +52,9 @@ private:
 	//internal setters
 	void UpdateTextEntries();
 };
+
+//all color pickers should be modals. This is the current modal
+extern CColorPicker* s_ColorPickerModal;
+extern bool g_bShouldSetColorPicker;
 
 #endif

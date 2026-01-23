@@ -20,11 +20,17 @@ static Color s_CommonColorPresets[10] = {
 
 static const char* const s_CommonColorCmdPrefix = "PresetColor_";
 
+//color picker modal singleton
+CColorPicker* s_ColorPickerModal = nullptr;
+bool g_bShouldSetColorPicker = false;				//should we get the color of the pixel at the mouse position for CViewRender::RenderView(...)
+
 //-----------------------------------------------------------------------
 // Purpose: Color picker window constructor
 //-----------------------------------------------------------------------
 CColorPicker::CColorPicker(vgui::VPANEL parent) : BaseClass(nullptr, "CColorPicker")
 {
+	s_ColorPickerModal = this;
+
 	//parent funcs
 	SetParent(parent);
 	SetSize(630, 290);
@@ -68,6 +74,14 @@ CColorPicker::CColorPicker(vgui::VPANEL parent) : BaseClass(nullptr, "CColorPick
 
 	//update the text entries
 	UpdateTextEntries();
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Destructor
+//-----------------------------------------------------------------------
+CColorPicker::~CColorPicker()
+{
+	s_ColorPickerModal = nullptr;
 }
 
 //-----------------------------------------------------------------------

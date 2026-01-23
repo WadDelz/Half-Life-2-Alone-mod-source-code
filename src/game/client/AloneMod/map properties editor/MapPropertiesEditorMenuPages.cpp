@@ -1,6 +1,8 @@
 #include "cbase.h"
 #include "MapPropertiesEditorMenuPages.h"
+#include "MapPropertiesEditorMenuPanel.h"
 #include "../IOptionsPanel.h"
+#include <vgui_controls/PropertySheet.h>
 
 //copied state
 static bool gs_HasCopiedState[2];
@@ -12,6 +14,14 @@ void ClearCopiedState()
 	gs_HasCopiedState[0] = false;
 	gs_HasCopiedState[1] = false;
 }
+
+//pages
+static int CurrentNightComboBoxItem = 0;
+static int CurrentDayComboBoxItem = 0;
+
+//scroll bar values
+static int CurrentScrolledNightValue = 0;
+static int CurrentScrolledDayValue = 0;
 
 //----------------------------------------------------------------------------------------------------
 // Purpose: Constructor for map properties editor night page.
@@ -40,7 +50,7 @@ CMapPropertiesEditorPageBase::CMapPropertiesEditorPageBase(Panel* parent, const 
 	}
 
 	//create our top combo box
-	m_FileList = new ComboBox(this, "FileList", 10, false);
+	m_FileList = new CMapPropertiesEditorComboBox(this, "FileList", 10, false);
 	m_FileList->AddActionSignalTarget(this);
 
 	//make the scroll bar
@@ -54,7 +64,7 @@ CMapPropertiesEditorPageBase::CMapPropertiesEditorPageBase(Panel* parent, const 
 	for (int i = 0; i < base.Count(); i++)
 		m_FileList->AddItem(base[i].filename, nullptr);
 
-	m_FileList->ActivateItem(0);
+	m_FileList->ActivateItem(IsNightPage ? CurrentNightComboBoxItem : CurrentDayComboBoxItem);
 }
 
 #define MAP_CONTAINER_HEIGHT 150
@@ -143,6 +153,8 @@ void CMapPropertiesEditorPageBase::OnTextChanged(KeyValues* data)
 	int index = m_FileList->GetActiveItem();
 	if (index < 0 || index >= base.Count())
 		return;
+
+	(m_bIsNightPage ? CurrentNightComboBoxItem : CurrentDayComboBoxItem) = index;
 
 	//clear then populate the list
 	Clear();
@@ -258,6 +270,24 @@ void CMapPropertiesEditorPageBase::Populate(CUtlVector<MapTimeInfo_t>& base)
 			skybox->SetBounds(baseX + faces[f].col * cellW, baseY + faces[f].row * cellH, cellW, cellH);
 		}
 
+		//is this enabled
+		bool enabled = m_bIsNightPage ? base[i].AllowNightTime : base[i].AllowDaytime;
+
+		//if both AllowNightTime and AllowDayTime are false. Then set this to true 
+		if (!base[i].AllowDaytime && !base[i].AllowNightTime)
+		{
+			enabled = true;
+			base[i].AllowDaytime = true;
+			base[i].AllowNightTime = true;
+		}
+
+		//create the enabled check button
+		CheckButton* enabledCheckButton = new CheckButton(divider, "enabledCheckButton", CFmtStr("Allow %s", m_bIsNightPage ? "Night time" : "Day time"));
+		enabledCheckButton->SetBounds(4, MAP_CONTAINER_HEIGHT - 92, 218, 24);
+		enabledCheckButton->SetCommand(CFmtStr(ENABLE_MAP_PREFIX "%d", i));
+		enabledCheckButton->AddActionSignalTarget(this);
+		enabledCheckButton->SetSelected(enabled);
+		
 		//create the copy map settings button
 		Button* copyButton = new Button(divider, "copyButton", "Copy Map State");
 		copyButton->SetBounds(4, MAP_CONTAINER_HEIGHT - 61, 105, 24);
@@ -275,6 +305,11 @@ void CMapPropertiesEditorPageBase::Populate(CUtlVector<MapTimeInfo_t>& base)
 		modifyButton->SetBounds(4, MAP_CONTAINER_HEIGHT - 35, 355, 24);
 		modifyButton->SetCommand(CFmtStr(MODIFY_MAP_PREFIX "%d", i));
 		modifyButton->AddActionSignalTarget(this);
+		modifyButton->SetEnabled(enabled);
+
+		//hack: when enabledCheckButton gets checked. We will need a way to toggle the modify button on/off.
+		//		To fix this i can use 'checkButton->GetNavUp()' in OnCommand
+		enabledCheckButton->SetNavUp(modifyButton);
 
 		m_MapList.AddToTail(divider);
 	}
@@ -322,8 +357,10 @@ void CMapPropertiesEditorPageBase::ApplySchemeSettings(IScheme* settings)
 //----------------------------------------------------------------------------------------------------
 // Purpose: Called on command
 //----------------------------------------------------------------------------------------------------
-void CMapPropertiesEditorPageBase::OnCommand(const char* cmd)
+void CMapPropertiesEditorPageBase::OnCommand(KeyValues* data)
 {
+	const char* cmd = data->GetString("command");
+
 	//check for MODIFY_MAP_PREFIX
 	if (Q_strstr(cmd, MODIFY_MAP_PREFIX))
 	{
@@ -447,5 +484,70 @@ void CMapPropertiesEditorPageBase::OnCommand(const char* cmd)
 		}
 	}
 
-	return BaseClass::OnCommand(cmd);
+	//check for ENABLE_MAP_PREFIX
+	else if (Q_strstr(cmd, ENABLE_MAP_PREFIX))
+	{
+		//get the index
+		int index = Q_atoi(cmd + Q_strlen(ENABLE_MAP_PREFIX));
+
+		//get the time info
+		CUtlVector<MapTimeInfoBase_t>& baseinfo = GetDayNightInfo();
+		if (index < 0 || index >= baseinfo[m_FileList->GetActiveItem()].base.Count())
+			return;
+
+		MapTimeInfo_t& info = baseinfo[m_FileList->GetActiveItem()].base[index];
+
+		//get the check button
+		CheckButton* checkbutton = (CheckButton*)data->GetPtr("panel");
+		if (m_bIsNightPage)
+			info.AllowNightTime = checkbutton->IsSelected();
+		else
+			info.AllowDaytime = checkbutton->IsSelected();
+
+		//if both are disabled then spit out a query box and enable both
+		if (!info.AllowDaytime && !info.AllowNightTime)
+		{
+			//play a sound and show the query box
+			surface()->PlaySound("ui/buttonclickrelease.wav");
+
+			QueryBox* modal = new QueryBox("Both times are disabled!", "Currently, both the day and night time modes for this map are not enabled/selected.\nWhen this happens, the game treats both time modes as enabled.\nThis will now check and enable the time states for both the day and night version of this map!", this);
+			modal->MoveToCenterOfScreen();
+			modal->Activate();
+			modal->DoModal();
+
+			//set the enabled state
+			info.AllowDaytime = true;
+			info.AllowNightTime = true;
+			checkbutton->SetSelected(true);
+
+			//tell our child page to re-populate to apply the changes
+			PropertySheet* parent = dynamic_cast<PropertySheet*>(GetParent());
+			if (parent)
+			{
+				CMapPropertiesEditorPageBase* page = dynamic_cast<CMapPropertiesEditorPageBase*>(parent->GetPage(!!m_bIsNightPage));
+				if (page)
+				{
+					page->m_FileList->PostMessage(page, new KeyValues("TextChanged"));
+				}
+			}
+		}
+
+		//get the button to disable/enable. this uses the hack i mentioned before.
+		checkbutton->GetNavUp()->SetEnabled(checkbutton->IsSelected());
+
+		//send the data to the server. The only time we do this is when we change something (i.e paste data from 1 panel to another).
+		{
+			KeyValuesAD temp(new KeyValues("temp_file"));
+			WriteTimeInfoToKeyvalues(info, temp);
+			temp->SaveToFile(filesystem, "__temptime.txt", "MOD", true, true);
+
+			//tell server to read the info
+			engine->ClientCmd(CFmtStr("_amod_daytimeinfo_reset %d %d", m_FileList->GetActiveItem(), index));
+
+			//reload server settings. This could have been the map that was changed.
+			engine->ClientCmd("_amod_day_do");
+		}
+	}
+
+	BaseClass::OnCommand(cmd);
 }

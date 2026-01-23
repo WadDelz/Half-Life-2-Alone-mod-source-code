@@ -17,10 +17,12 @@ public:
 	~CMapPropertiesPanel();
 
 	//paint/tick
-	void Paint();
 	void OnThink();
 	void OnClose();
 	void OnCommand(const char* pszCommand);
+
+	//scheme
+	void ApplySchemeSettings(IScheme* scheme);
 
 	//loads the settings into the panel
 	void PerformLayout();
@@ -54,6 +56,7 @@ private:
 	char m_PreviousCloudsShowValue[16];
 	char m_PreviousCloudsOverrideValue[4];
 	char m_PreviousGodConvarValue[4];
+	char m_PreviousEpicFilterConvarValue[4];
 };
 
 //singleton

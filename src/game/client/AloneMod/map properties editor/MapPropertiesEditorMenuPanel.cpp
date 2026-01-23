@@ -175,7 +175,7 @@ public:
 	void OnCommand(const char* pszCommand);
 private:
 	//load text entry
-	ComboBox* m_ComboBoxList;
+	CMapPropertiesEditorComboBox* m_ComboBoxList;
 };
 
 //singleton
@@ -205,7 +205,7 @@ CLoadFromFolderPanel::CLoadFromFolderPanel(Panel* parent, const char* name) : Ba
 	SetTitle("Load Theme", true);
 
 	//create the text entry
-	m_ComboBoxList = new ComboBox(this, "LoadFromFolderList", 10, false);
+	m_ComboBoxList = new CMapPropertiesEditorComboBox(this, "LoadFromFolderList", 10, false);
 	m_ComboBoxList->SetBounds(5, 25, 290, 25);
 
 	//load the files
@@ -294,7 +294,46 @@ CLoadFromFolderPanel::~CLoadFromFolderPanel()
 
 
 
+//----------------------------------------------------------------------------------------------------
+// Purpose: Map properties editor combo box class
+//----------------------------------------------------------------------------------------------------
+CMapPropertiesEditorComboBox::CMapPropertiesEditorComboBox(Panel* parent, const char* name, int numlines, bool allowedit)
+	: BaseClass(parent, name, numlines, allowedit)
+{
+}
 
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called when a key is pressed
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesEditorComboBox::OnKeyCodeTyped(KeyCode code)
+{
+	//check for up or down
+	if (code == KeyCode::KEY_UP)
+	{
+		//get the item
+		int item = clamp(GetActiveItem() - 1, 0, GetItemCount());
+		SelectMenuItem(item);
+		RequestFocus();
+		return;
+	}
+	else if (code == KeyCode::KEY_DOWN)
+	{
+		//get the item
+		int item = clamp(GetActiveItem() + 1, 0, GetItemCount());
+		SelectMenuItem(item);
+		RequestFocus();
+		return;
+	}
+
+	BaseClass::OnKeyCodeTyped(code);
+}
+
+
+
+
+
+
+extern ConVar amod_time_properties_editor_theme;
 
 //----------------------------------------------------------------------------------------------------
 // Purpose: Constructor for map properties editor panel.
@@ -307,10 +346,14 @@ CMapPropertiesEditorPanel::CMapPropertiesEditorPanel(VPANEL parent) : BaseClass(
 	SetVisible(true);
 	SetEnabled(true);
 	SetSize(480, 600);
-	SetDeleteSelfOnClose(true);
 	MoveToCenterOfScreen();
 	SetTitle(CFmtStr("Map Properties Editor: %s", map_properties_editor_load_mod.GetString()), false);
 	SetApplyButtonVisible(true);
+	SetDeleteSelfOnClose(true);
+	SetFadeEffectDisableOverride(true);
+
+	//set our scheme
+	SetScheme(GetTimePropertiesScheme());
 
 	//add the pages
 	AddPage(m_NightPage = new CMapPropertiesEditorNightPage(this), "Night Map Properties");
@@ -320,6 +363,17 @@ CMapPropertiesEditorPanel::CMapPropertiesEditorPanel(VPANEL parent) : BaseClass(
 
 	//init our buttons
 	InitButtons();
+
+	//create the themes combo box
+	m_ThemeComboBox = new CMapPropertiesEditorComboBox(this, "ThemesCombnoBox", 10, false);
+	m_ThemeComboBox->AddActionSignalTarget(this);
+
+	//add all the themes
+	for (int i = 0; i < SIZE_OF_ARRAY(g_TimePropertyThemes); i++)
+		m_ThemeComboBox->AddItem(g_TimePropertyThemes[i].name, nullptr);
+
+	//active the current item
+	m_ThemeComboBox->ActivateItem(amod_time_properties_editor_theme.GetInt());
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -340,6 +394,13 @@ void CMapPropertiesEditorPanel::InitButtons()
 	SetOKButtonText("Save");
 	_okButton->SetCommand(COMMAND_SAVE_TO_FILE);
 
+	//delete _saveAsButton if needed
+	if (_saveAsButton)
+	{
+		delete _saveAsButton;
+		_saveAsButton = nullptr;
+	}
+
 	//create our save button if needed
 	if (map_properties_editor_load_mod.GetString()[0] && !_saveAsButton)
 	{
@@ -349,15 +410,24 @@ void CMapPropertiesEditorPanel::InitButtons()
 }
 
 //----------------------------------------------------------------------------------------------------
+// Purpose: Called when text is changed from the themes combo box
+//----------------------------------------------------------------------------------------------------
+void CMapPropertiesEditorPanel::OnTextChanged(KeyValues* data)
+{
+	//safe check
+	if (data->GetPtr("panel") != m_ThemeComboBox)
+		return;
+
+	//set the value of amod_time_properties_editor_theme
+	amod_time_properties_editor_theme.SetValue(m_ThemeComboBox->GetActiveItem());
+}
+
+//----------------------------------------------------------------------------------------------------
 // Purpose: layout
 //----------------------------------------------------------------------------------------------------
 void CMapPropertiesEditorPanel::PerformLayout()
 {
 	BaseClass::PerformLayout();
-
-	//save as button must be valid
-	if (!_saveAsButton)
-		return;
 
 	//get the bounds for the button
 	int x, y, w, h;
@@ -366,10 +436,17 @@ void CMapPropertiesEditorPanel::PerformLayout()
 	//take (w + (_cancelButton->GetX() - (x + w))) off the x pos
 	int cbx, _;
 	_cancelButton->GetPos(cbx, _);
-	x = x - (w + (cbx - (x + w)));
 
-	//create and set the save as button
-	_saveAsButton->SetBounds(x, y, w, h);
+	//get the gap
+	int gap = (cbx - (x + w));
+	x = x - (w + gap);
+
+	//save as button must be valid
+	if (_saveAsButton)
+		_saveAsButton->SetBounds(x, y, w, h);
+
+	//set the bounds of our theme button
+	m_ThemeComboBox->SetBounds(8, y, (x - 8) - gap, h); //yay
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -426,8 +503,13 @@ void CMapPropertiesEditorPanel::OnFileLoaded(KeyValues* data)
 //----------------------------------------------------------------------------------------------------
 void CMapPropertiesEditorPanel::ApplySchemeSettings(IScheme* settings)
 {
-	MoveToCenterOfScreen();
 	BaseClass::ApplySchemeSettings(settings);
+
+	//idk why i put this here but its here
+	MoveToCenterOfScreen();
+
+	//set the bg color of the property sheet
+	_propertySheet->SetBgColor(settings->GetColor("PropertySheet.BgColor", _propertySheet->GetBgColor()));
 }
 
 //----------------------------------------------------------------------------------------------------

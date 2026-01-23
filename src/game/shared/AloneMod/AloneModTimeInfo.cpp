@@ -40,6 +40,9 @@ CUtlVector<MapTimeInfoBase_t>& GetDayNightInfo()
 //--------------------------------------------------------------------------------------------
 void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 {
+	info.AllowDaytime = map->GetBool("AllowDaytime", true);
+	info.AllowNightTime = map->GetBool("AllowNightTime", true);
+
 	//get the night info
 	KeyValues* night = map->FindKey("Night");
 	if (night)
@@ -176,7 +179,7 @@ ConVar amod_timeinfo_load_directory("amod_timeinfo_load_directory", "resource/ti
 void InitalizeDayNightInfo(bool reload)
 {
 #ifdef CLIENT_DLL
-	//call open_map_time_properties_editor 1
+	//call open_map_time_properties_editor 1 to reset the map properties editor
 	engine->ClientCmd("open_map_time_properties_editor 1");
 
 	void ClearCopiedState();
@@ -330,6 +333,10 @@ public:
 //----------------------------------------------------------------------------------------------------
 void WriteTimeInfoToKeyvalues(MapTimeInfo_t& info, KeyValues* out)
 {
+	//write our force mode
+	out->SetInt("AllowDayTime", info.AllowDaytime);
+	out->SetInt("AllowNightTime", info.AllowNightTime);
+
 	//get day/night keys
 	KeyValues* day = new KeyValues("day");
 	KeyValues* night = new KeyValues("night");
@@ -469,6 +476,8 @@ void WriteAllTimeInfosToFiles(const char* prefix)
 //--------------------------------------------------------------------------------------------
 MapTimeInfo_t& GetMapTimeInfo(const char* mapname)
 {
+	mapname = V_GetFileName(mapname);
+
 	//go through all the files
 	for (int i = 0; i < DayNightInfo.Count(); i++)
 	{
@@ -482,8 +491,11 @@ MapTimeInfo_t& GetMapTimeInfo(const char* mapname)
 
 	//default
 	static MapTimeInfo_t def;
+	def.mapname[0] = '\0';
+	def.AllowDaytime = true;
+	def.AllowNightTime = true;
 
-	//reset set skyboxs INCASE ive ever used amod_timeinfo_reset to reset the symbol table
+	//reset set skyboxs/data INCASE ive ever used amod_timeinfo_reset to reset the symbol table
 	def.DayInfo.DefaultDaySky = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_SKY_NAME);
 	def.DayInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_FILTER_NAME);
 	def.DayInfo.FilterIntensity = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_FILTER_INTENSITY);
@@ -525,6 +537,7 @@ UtlSymId_t StringToMapTimeStringTableIndex(const char* string)
 void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool copynight, bool copyday)
 {
 	//night info
+	if (copynight)
 	{
 		//clear current data
 		to.NightInfo.FogInfo.RemoveAll();
@@ -549,6 +562,7 @@ void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool copynight, bo
 	}
 
 	//day info
+	if (copyday)
 	{
 		//clear current data
 		to.DayInfo.FogInfo.RemoveAll();

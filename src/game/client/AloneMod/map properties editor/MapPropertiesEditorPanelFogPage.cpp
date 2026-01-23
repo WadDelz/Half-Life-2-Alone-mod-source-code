@@ -253,6 +253,7 @@ void CMapPropertiesPanelFogPage::Update()
 		fog_color->SetValue(!_override || !m_FogColorOverride->IsSelected() ? "-1 -1 -1" : CFmtStr("%d %d %d", m_FogColor.r(), m_FogColor.g(), m_FogColor.b()));
 		fog_colorskybox->SetValue(!_override || !m_FogSkyboxColorOverride->IsSelected() ? "-1 -1 -1" : CFmtStr("%d %d %d", m_FogSkyboxColor.r(), m_FogSkyboxColor.g(), m_FogSkyboxColor.b()));
 
+
 		//fog distances
 		fog_start->SetValue(!_override || !m_FogStartOverride->IsSelected() ? -1 : m_FogStartSlider->GetValue());
 		fog_end->SetValue(!_override || !m_FogEndOverride->IsSelected() ? -1 : m_FogEndSlider->GetValue());
@@ -262,14 +263,14 @@ void CMapPropertiesPanelFogPage::Update()
 		fog_endskybox->SetValue(!_override || !m_FogEndSkyboxOverride->IsSelected() ? -1 : m_FogEndSkyboxSlider->GetValue());
 
 		//fog density
-		fog_maxdensity->SetValue(!_override || !m_FogDensityOverride->IsSelected() ? -1 : (float)m_FogDensitySlider->GetValue() / m_FogDensitySlider->GetMax());
-		fog_maxdensityskybox->SetValue(!_override || !m_FogSkyboxDensityOverride->IsSelected() ? -1 : (float)m_FogSkyboxDensitySlider->GetValue() / m_FogSkyboxDensitySlider->GetMax());
+		fog_maxdensity->SetValue(!_override || !m_FogDensityOverride->IsSelected() ? -1.0f : ((float)m_FogDensitySlider->GetValue() / m_FogDensitySlider->GetMax()));
+		fog_maxdensityskybox->SetValue(!_override || !m_FogSkyboxDensityOverride->IsSelected() ? -1.0f : ((float)m_FogSkyboxDensitySlider->GetValue() / m_FogSkyboxDensitySlider->GetMax()));
 
 		//farz
 		r_farz->SetValue(!_override || !m_FarzClippingPlaneOverride->IsSelected() ? -1 : m_FarzClippingPlaneSlider->GetValue());
 
 		//fog blend
-		fog_blend->SetValue(_overrideblend && m_EnableFogBlendCheckButton->IsSelected());
+		fog_blend->SetValue(!_overrideblend ? -1 : m_EnableFogBlendCheckButton->IsSelected());
 
 		//fog blend colors
 		fog_blendcolor->SetValue(!_overrideblend || !m_FogBlendColorOverride->IsSelected() ? "-1 -1 -1" : CFmtStr("%d %d %d", m_FogBlendColor.r(), m_FogBlendColor.g(), m_FogBlendColor.b()));
@@ -277,9 +278,8 @@ void CMapPropertiesPanelFogPage::Update()
 		//fog blend angle
 		fog_blendangle->SetValue(!_overrideblend || !m_FogBlendAngleOverride->IsSelected() ? -1 : m_FogBlendAngleSlider->GetValue());
 
-
 		//fog skybox blend
-		fog_blendskybox->SetValue(_overrideskyboxblend && m_EnableFogBlendSkyboxCheckButton->IsSelected());
+		fog_blendskybox->SetValue(!_overrideskyboxblend ? -1 : m_EnableFogBlendSkyboxCheckButton->IsSelected());
 
 		//fog skybox blend colors
 		fog_blendcolorskybox->SetValue(!_overrideskyboxblend || !m_FogBlendSkyboxColorOverride->IsSelected() ? "-1 -1 -1" : CFmtStr("%d %d %d", m_FogBlendSkyboxColor.r(), m_FogBlendSkyboxColor.g(), m_FogBlendSkyboxColor.b()));
@@ -611,6 +611,11 @@ void CMapPropertiesPanelFogPage::InitFogInfo(MapTimeInfo_t& info, bool IsNightPa
 		sscanf(FindFogInfoFromArray(fog_array, "fog_blendcolor", "-1 -1 -1"), "%d %d %d", &r, &g, &b);
 		m_FogBlendColorOverride->SetSelected(r != -1 && g != -1 && b != -1);
 		m_FogBlendColor.SetColor(r, g, b, 255);
+
+		//get the fog skybox blend color
+		sscanf(FindFogInfoFromArray(fog_array, "fog_blendcolorskybox", "-1 -1 -1"), "%d %d %d", &r, &g, &b);
+		m_FogBlendSkyboxColorOverride->SetSelected(r != -1 && g != -1 && b != -1);
+		m_FogBlendSkyboxColor.SetColor(r, g, b, 255);
 	}
 }
 
@@ -656,8 +661,8 @@ void CMapPropertiesPanelFogPage::GetFogInfo(MapTimeInfo_t& info)
 			{	StringToMapTimeStringTableIndex("fog_endskybox"),			StringToMapTimeStringTableIndex(!m_FogEndSkyboxOverride->IsSelected() ? "-1" : CFmtStr("%d", m_FogEndSkyboxSlider->GetValue())) },
 
 			//fog densities
-			{	StringToMapTimeStringTableIndex("fog_maxdensity"),			StringToMapTimeStringTableIndex(!m_FogDensityOverride->IsSelected() ? "-1" : CFmtStr("%.2f", (float)m_FogDensitySlider->GetValue() / m_FogDensitySlider->GetMax())) },
-			{	StringToMapTimeStringTableIndex("fog_maxdensityskybox"),	StringToMapTimeStringTableIndex(!m_FogSkyboxDensityOverride->IsSelected() ? "-1" : CFmtStr("%.2f", (float)m_FogSkyboxDensitySlider->GetValue() / m_FogSkyboxDensitySlider->GetMax())) },
+			{	StringToMapTimeStringTableIndex("fog_maxdensity"),			StringToMapTimeStringTableIndex(!m_FogDensityOverride->IsSelected() ? "-1" : CFmtStr("%.3f", (float)m_FogDensitySlider->GetValue() / m_FogDensitySlider->GetMax())) },
+			{	StringToMapTimeStringTableIndex("fog_maxdensityskybox"),	StringToMapTimeStringTableIndex(!m_FogSkyboxDensityOverride->IsSelected() ? "-1" : CFmtStr("%.3f", (float)m_FogSkyboxDensitySlider->GetValue() / m_FogSkyboxDensitySlider->GetMax())) },
 
 			//fog colors
 			{	StringToMapTimeStringTableIndex("fog_color"),				StringToMapTimeStringTableIndex(!m_FogColorOverride->IsSelected() ? "-1 -1 -1" : CFmtStr("%d %d %d", m_FogColor.r(), m_FogColor.g(), m_FogColor.b())) },

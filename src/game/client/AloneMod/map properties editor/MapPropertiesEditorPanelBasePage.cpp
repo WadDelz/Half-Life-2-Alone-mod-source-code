@@ -604,6 +604,8 @@ void CMapPropertiesPanelSlider::OnCommand(const char* pszCommand)
 	}
 	else if (!Q_stricmp(pszCommand, "Paste"))
 	{
+		//add an undo state
+		AddUndo_SetSlider(this, GetValue());
 		SetValue(g_bHasValueCoppied);
 	}
 	else if (!Q_stricmp(pszCommand, "SetExactValue"))

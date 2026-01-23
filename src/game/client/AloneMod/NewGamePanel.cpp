@@ -11,10 +11,6 @@
 #include "AloneMod/IOptionsPanel.h"
 #include "AloneMod/DynamicSky.h"
 
-#if !AMOD_DAYTIME_EDITION
-extern ConVar amod_day;
-#endif
-
 //new game panel game list struct
 struct GameListInfo_t
 {
@@ -23,6 +19,9 @@ struct GameListInfo_t
 	char prefix[32];
 	int CurrentChapterIndex = 0;
 	CUtlVector<const char*> ChapterNames;
+
+	//has themes?
+	bool UsesThemes = true;
 
 	//day info
 	struct DayInfo_t
@@ -329,6 +328,9 @@ void CNewGamePanel::LoadNewGameInfo(const char* filename)
 		Q_strncpy(info.name, game->GetName(), sizeof(info.name));
 		Q_strncpy(info.prefix, game->GetString("Prefix"), sizeof(info.prefix));
 
+		//does this have themes?
+		info.UsesThemes = game->GetBool("HasThemes", true);
+
 		//get the chapter names
 		for (int i = 1; i < MAX_CHAPTERS; i++)
 		{
@@ -455,14 +457,12 @@ void CNewGamePanel::SelectPage(int page)
 		//see if an image exists with the chapters/(FE)/%s/chapters%d%s name where (FE) is just V_GetFileName(m_ThemesComboBox->GetActiveItemUserData()->GetName()).
 		char buf[512] = { 0 };
 
-		if (m_ThemesComboBox->GetActiveItem() != 0)
+		if (m_ThemesComboBox->GetActiveItem() != 0 && m_CurrentSelectedGameInfo->UsesThemes)
 			Q_snprintf(buf, sizeof(buf), "chapters/%s/%s/chapter%d%s", V_GetFileName(m_ThemesComboBox->GetActiveItemUserData()->GetName()), m_CurrentSelectedGameInfo->prefix, realindex, sDayTime);
 
-		if (m_ThemesComboBox->GetActiveItem() == 0 || IsErrorMaterial(materials->FindMaterial(CFmtStr("vgui/%s", buf), TEXTURE_GROUP_VGUI, false)))
-		{
-			//resort to default filepath
+		//resort to default filepath
+		if (!m_CurrentSelectedGameInfo->UsesThemes || m_ThemesComboBox->GetActiveItem() == 0 || IsErrorMaterial(materials->FindMaterial(CFmtStr("vgui/%s", buf), TEXTURE_GROUP_VGUI, false)))
 			Q_snprintf(buf, sizeof(buf), "chapters/default/%s/chapter%d%s", m_CurrentSelectedGameInfo->prefix, realindex, sDayTime);
-		}
 
 		m_ChapterImages[i]->SetImage(buf);
 
@@ -480,6 +480,15 @@ void CNewGamePanel::SelectPage(int page)
 		m_PrevButton->SetEnabled(false);
 	if (!m_ChapterButtons[2]->IsVisible() || index + 3 >= m_CurrentSelectedGameInfo->ChapterNames.Count())
 		m_NextButton->SetEnabled(false);
+
+	//disable the themes combo box if needed
+	if (!m_CurrentSelectedGameInfo->UsesThemes)
+	{
+		m_ThemesComboBox->SetEnabled(false);
+		m_ThemesComboBox->ActivateItem(0);
+	}
+	else
+		m_ThemesComboBox->SetEnabled(true);
 }
 
 //-----------------------------------------------------------------------
@@ -493,6 +502,7 @@ void CNewGamePanel::OnCommand(const char* pszCommand)
 		SelectPage(m_CurrentSelectedGameInfo->CurrentChapterIndex + 1);
 		return;
 	}
+
 	else if (!Q_stricmp(pszCommand, COMMAND_PREV))
 	{
 		SelectPage(m_CurrentSelectedGameInfo->CurrentChapterIndex - 1);
@@ -504,9 +514,17 @@ void CNewGamePanel::OnCommand(const char* pszCommand)
 	{
 		//load the theme
 		extern ConVar amod_timeinfo_load_directory;
-		amod_timeinfo_load_directory.SetValue(m_ThemesComboBox->GetActiveItemUserData()->GetName());
+
+		//check for UsesThemes
+		if (m_CurrentSelectedGameInfo->UsesThemes)
+			amod_timeinfo_load_directory.SetValue(m_ThemesComboBox->GetActiveItemUserData()->GetName());
+		else
+			amod_timeinfo_load_directory.SetValue("resource/time_info");
+
+		//reload the time info
 		engine->ClientCmd("amod_timeinfo_reset_noreload");
-		
+
+		//get and exec the map
 		int index = Q_atoi(pszCommand + Q_strlen(COMMAND_CHAPTER_PREFIX));
 		engine->ClientCmd(CFmtStr("exec \"%s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentSelectedGameInfo->CurrentChapterIndex * 3) + index));
 		return;
@@ -523,6 +541,9 @@ void CNewGamePanel::OnTextChanged(KeyValues* kv)
 	//check the panel
 	if (kv->GetPtr("Panel") == m_GameComboBox)
 	{
+		//remove this panels focus IMMEDIATLY so when we close the newgamepanel it doesnt reset the combo box
+		m_NextButton->RequestFocus();
+
 		ActivateGame(m_GameComboBox->GetActiveItem());
 		return;
 	}
@@ -534,6 +555,9 @@ void CNewGamePanel::OnTextChanged(KeyValues* kv)
 		//select the active page
 		if (m_CurrentSelectedGameInfo)
 			SelectPage(m_CurrentSelectedGameInfo->CurrentChapterIndex);
+
+		//remove this panels focus IMMEDIATLY so when we close the newgamepanel it doesnt reset the combo box
+		m_NextButton->RequestFocus();
 
 		return;
 	}

@@ -72,6 +72,10 @@ struct MapTimeInfo_t
 	char mapname[128];		//mapname (e.g d2_coast_01_d). do NOT keep the / of a map name (like bonus_maps/d1_trainstation_01_snowey).
 	NightInfo_t NightInfo;	//night info
 	DayInfo_t DayInfo;		//day info
+
+	//allow daytime and night time
+	bool AllowDaytime = true;
+	bool AllowNightTime = true;
 };
 
 //map times info base
@@ -100,7 +104,6 @@ void WriteAllTimeInfosToFiles(const char* prefix = nullptr);
 void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool copynight = true, bool copyday = true);
 
 //Returns if the current map is invalid for the day/night sky change
-bool IsInvalidChangeMap(const char* map);
 void InitalizeDayNightInfo(bool reload = false);		//initalizes the day/night info
 
 #endif //__ALONEMODTIMEINFO_H

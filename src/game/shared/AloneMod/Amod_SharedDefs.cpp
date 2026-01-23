@@ -134,17 +134,6 @@ const char* g_szMapNames[] = {
 };
 
 //--------------------------------------------------------------------------------------------
-// Purpose: Returns if the current map is invalid for the day/night sky change
-//--------------------------------------------------------------------------------------------
-bool IsInvalidChangeMap(const char* map)
-{
-	if (Q_strstr(map, "ep1") || Q_strstr(map, "amod_outro") || !Q_strcmp(map, "background08_d") || !Q_strcmp(map, "background10_d") || !Q_stricmp(map, "portal_06"))
-		return true;
-
-	return false;
-}
-
-//--------------------------------------------------------------------------------------------
 // Purpose: Returns if daytime for alone mod is enabled or not
 //--------------------------------------------------------------------------------------------
 bool IsDaytimeEnabled()
@@ -154,10 +143,26 @@ bool IsDaytimeEnabled()
 		return false;
 
 #ifdef CLIENT_DLL
-	return amod_day->GetBool() && !IsInvalidChangeMap(szMapName);
+	const char* mapname = szMapName;
 #else
-	return amod_day->GetBool() && !IsInvalidChangeMap(gpGlobals->mapname.ToCStr());
+	const char* mapname = gpGlobals->mapname.ToCStr();
 #endif
+
+	//get the current time info
+	MapTimeInfo_t& info = GetMapTimeInfo(mapname);
+
+	//check to see if both are disabled
+	if (!info.AllowDaytime && !info.AllowNightTime)
+		return amod_day->GetBool();
+
+	//check for only day or only night
+	if (!info.AllowDaytime)
+		return true;
+	else if (!info.AllowNightTime)
+		return true;
+
+	//just return the value of amod_day
+	return amod_day->GetBool();
 }
 
 #ifdef CLIENT_DLL

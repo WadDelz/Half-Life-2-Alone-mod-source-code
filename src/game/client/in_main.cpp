@@ -41,6 +41,11 @@ extern ConVar in_joystick;
 extern ConVar cam_idealpitch;
 extern ConVar cam_idealyaw;
 
+//alone mod
+#include "vgui_video.h"
+#include "shaderapi/ishaderapi.h"
+#include "AloneMod/ColorPicker.h"
+
 // For showing/hiding the scoreboard
 #include <game/client/iviewport.h>
 
@@ -61,7 +66,7 @@ static int in_cancel = 0;
 
 ConVar cl_anglespeedkey( "cl_anglespeedkey", "0.67", 0 );
 ConVar cl_yawspeed( "cl_yawspeed", "75", FCVAR_NONE, "Client yaw speed.", true, -100000, true, 100000 );
-ConVar cl_pitchspeed( "cl_pitchspeed", "100", FCVAR_NONE, "Client pitch speed.", true, -100000, true, 100000 );
+ConVar cl_pitchspeed( "cl_pitchspeed", "80", FCVAR_NONE, "Client pitch speed.", true, -100000, true, 100000 );
 ConVar cl_pitchdown( "cl_pitchdown", "89", FCVAR_CHEAT );
 ConVar cl_pitchup( "cl_pitchup", "89", FCVAR_CHEAT );
 #if defined( CSTRIKE_DLL )
@@ -585,7 +590,6 @@ KeyEvent
 Return 1 to allow engine to process the key, otherwise, act on it as needed
 ============
 */
-#include "vgui_video.h"
 
 int CInput::KeyEvent( int down, ButtonCode_t code, const char *pszCurrentBinding )
 {
@@ -595,6 +599,14 @@ int CInput::KeyEvent( int down, ButtonCode_t code, const char *pszCurrentBinding
 		if (down)
 			g_VideoPanelSingleton->HandleKeyPress(code);
 
+		return 0;
+	}
+
+	//check for s_ColorPickerModal
+	if (s_ColorPickerModal && code == MOUSE_LEFT && down)
+	{
+		//set this to true so the view render can get the pixel pixel color
+		g_bShouldSetColorPicker = true;
 		return 0;
 	}
 

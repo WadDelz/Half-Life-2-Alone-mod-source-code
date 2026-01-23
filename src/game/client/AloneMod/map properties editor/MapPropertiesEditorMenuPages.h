@@ -4,13 +4,10 @@
 #include "MapPropertiesEditorPanel.h"
 #include <vgui_controls/ScrollBar.h>
 
+#define ENABLE_MAP_PREFIX "EnableTimeForMap"
 #define MODIFY_MAP_PREFIX "OpenModifyMapWindow"
 #define COPY_MAP_STATE_PREFIX "CopyMapState"
 #define PASTE_MAP_STATE_PREFIX "PasteMapState"
-
-//scroll bar values
-static int CurrentScrolledNightValue = 0;
-static int CurrentScrolledDayValue = 0;
 
 //main map properties editor night page
 class CMapPropertiesEditorPageBase : public PropertyPage
@@ -29,7 +26,6 @@ public:
 	void Populate(CUtlVector<MapTimeInfo_t>& base);
 	void Clear();
 
-	void OnCommand(const char* cmd);
 	void ApplySchemeSettings(IScheme* settings);
 
 	//message funcs
@@ -37,12 +33,13 @@ public:
 	MESSAGE_FUNC(OnScrollBarSliderMoved, "ScrollBarSliderMoved");
 	MESSAGE_FUNC(OnApplyPageSetting, "ApplyPageSetting");
 	MESSAGE_FUNC(OnMapPropertiesPanelClosed, "MapPropertiesPanelClosed");
+	MESSAGE_FUNC_PARAMS(OnCommand, "Command", data);
 private:
 	//is this for the day or night page
 	bool m_bIsNightPage;
 
 	//top combo box
-	ComboBox* m_FileList;
+	class CMapPropertiesEditorComboBox* m_FileList;
 
 	//scroll bar
 	ScrollBar* m_ScrollBar;

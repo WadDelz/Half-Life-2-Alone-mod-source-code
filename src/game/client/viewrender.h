@@ -316,7 +316,7 @@ public:
 	static CViewRender *	GetMainView() { return assert_cast<CViewRender *>( view ); }
 
 	void			AddViewToScene( CRendering3dView *pView ) { m_SimpleExecutor.AddView( pView ); }
-protected:
+public:
 	bool m_HasPrevViewSetup;
 	CViewSetup m_PrevViewSetup;
 

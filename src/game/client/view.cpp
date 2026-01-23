@@ -59,6 +59,11 @@
 #include "c_prop_portal.h" //portal surface rendering functions
 #endif
 
+//amod
+#include "materialsystem/imaterialsystem.h"
+#include "AloneMod/INewGamePanel.h"
+#include "AloneMod/Amod_SharedDefs.h"
+#include "fmtstr.h"
 	
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -865,7 +870,8 @@ void CViewRender::SetUpViews()
 }
 
 
-
+//fov hack
+int g_CustomFovHack = -1;
 
 void CViewRender::WriteSaveGameScreenshotOfSize( const char *pFilename, int width, int height, bool bCreatePowerOf2Padded/*=false*/,
 												 bool bWriteVTF/*=false*/ )
@@ -889,7 +895,7 @@ void CViewRender::WriteSaveGameScreenshotOfSize( const char *pFilename, int widt
 	viewSetup.y = 0;
 	viewSetup.width = width;
 	viewSetup.height = height;
-	viewSetup.fov = ScaleFOVByWidthRatio( viewSetup.fov, ( (float)width / (float)height ) / ( 4.0f / 3.0f ) );
+	viewSetup.fov = ScaleFOVByWidthRatio(g_CustomFovHack == -1 ? viewSetup.fov : g_CustomFovHack, ( (float)width / (float)height ) / ( 4.0f / 3.0f ) );
 	viewSetup.m_bRenderToSubrectOfLargerScreen = true;
 
 	// draw out the scene
@@ -987,7 +993,7 @@ void CViewRender::WriteSaveGameScreenshotOfSize( const char *pFilename, int widt
 
 	if ( !bWriteResult )
 	{
-		Error( "Couldn't write bitmap data snapshot.\n" );
+		ConWarning( "Couldn't write bitmap data snapshot.\n" );
 	}
 	
 	free( pImage );
@@ -997,7 +1003,7 @@ void CViewRender::WriteSaveGameScreenshotOfSize( const char *pFilename, int widt
 	char szPathedFileName[_MAX_PATH];
 	Q_snprintf( szPathedFileName, sizeof(szPathedFileName), "//MOD/%s", pFilename );
 
-	filesystem->AsyncWrite( szPathedFileName, buffer.Base(), buffer.TellPut(), true );
+	filesystem->AsyncWrite(szPathedFileName, buffer.Base(), buffer.TellPut(), true);
 
 	// restore our previous state
 	pRenderContext->PopRenderTargetAndViewport();
@@ -1044,6 +1050,224 @@ void CViewRender::WriteSaveGameScreenshot( const char *pFilename )
 	WriteSaveGameScreenshotOfSize( pFilename, SAVEGAME_SCREENSHOT_WIDTH, SAVEGAME_SCREENSHOT_HEIGHT );
 }
 
+CON_COMMAND(amod_write_game_screenshot, "")
+{
+
+	//get the mod folder name
+	const char* modfolder = args.Arg(1);
+	if (!*modfolder)
+	{
+		extern ConVar map_properties_editor_load_mod;
+		modfolder = map_properties_editor_load_mod.GetString();
+		if (!*modfolder)
+		{
+			ConWarning("Screenshot 'mod/theme' name must NOT be empty!\n");
+			return;
+		}
+	}
+
+	//check for 'default' or '_ignore'
+	if (!Q_stricmp(modfolder, "default") || !Q_stricmp(modfolder, "_ignore"))
+	{
+		ConWarning("Screenshot 'mod/theme' path must NOT be a reserved name (default or _ignore)!\n");
+		return;
+	}
+
+	//check for '/' or '\\'
+	if (strchr(modfolder, '/') || strchr(modfolder, '\\'))
+	{
+		ConWarning("Screenshot mod path must NOT have / or \\ inside the name!\n");
+		return;
+	}
+
+	//check the game name
+	const char* gamename = args.Arg(2);
+	if (!*gamename)
+	{
+		ConWarning("Screenshot game name must NOT be empty!\n");
+		return;
+	}
+
+	//get the chapter index and daytime screenshot
+	int chapter = atoi(args.Arg(3));
+	bool daytime = atoi(args.Arg(4)) != 0;
+
+	//make sure the path exists
+	const char* dir = CFmtStr("materials/vgui/chapters/%s/%s", modfolder, gamename);
+	if (!filesystem->IsDirectory(dir, "MOD"))
+		filesystem->CreateDirHierarchy(dir);
+
+	//disable color correction if day is 0. this shit doesnt work :(
+	colorcorrection->EnableColorCorrection(daytime);
+
+	//set our fov hack to 75
+	g_CustomFovHack = 75;
+
+	char filenamebase[512];
+	Q_strncpy(filenamebase, CFmtStr("%s/chapter%d%s", dir, chapter, daytime ? "_day" : ""), sizeof(filenamebase));
+	g_DefaultViewRender.WriteSaveGameScreenshotOfSize(CFmtStr("%s.vtf", filenamebase), 160, 90, true, true);
+
+	//reset our hack
+	g_CustomFovHack = -1;
+
+	//write the keyvalues file
+	KeyValuesAD vmt(new KeyValues("UnlitGeneric"));
+	vmt->SetString("$baseTexture", filenamebase + Q_strlen("materials/"));
+	vmt->SetBool("$vertexalpha", 1);
+	vmt->SetBool("gammaColorRead", 1);
+	vmt->SetBool("linearWrite", 1);
+	vmt->SaveToFile(filesystem, CFmtStr("%s.vmt", filenamebase));
+	
+	//reload the file
+	g_pMaterialSystem->ReloadMaterials(CFmtStr("%s", filenamebase + Q_strlen("materials/")));
+
+	//enable color correction again
+	colorcorrection->EnableColorCorrection(true);
+
+	//hack: call newgamepanel->DoDayCheck() to reload the current page's image
+	newgamepanel->DoDayCheck();
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: finds the cfg folder containing a chapter*.cfg that references the current map
+//----------------------------------------------------------------------------------------------------
+static int FindChapterCfgForMap(char* outFolder, int outLen)
+{
+	FileFindHandle_t hCfgRoot;
+	const char* pszFolder = filesystem->FindFirstEx("cfg/*", "MOD", &hCfgRoot);
+
+	while (pszFolder)
+	{
+		//skip current / parent
+		if (!Q_stricmp(pszFolder, ".") || !Q_stricmp(pszFolder, ".."))
+		{
+			pszFolder = filesystem->FindNext(hCfgRoot);
+			continue;
+		}
+
+		//build search path: cfg/<folder>/chapter*.cfg
+		char chapterSearch[MAX_PATH];
+		Q_snprintf(chapterSearch, sizeof(chapterSearch), "cfg/%s/chapter*.cfg", pszFolder);
+
+		FileFindHandle_t hChapter;
+		const char* pszChapterFile = filesystem->FindFirstEx(chapterSearch, "MOD", &hChapter);
+
+		while (pszChapterFile)
+		{
+			//extract chapter number from filename: chapterX.cfg
+			int chapterNumber = -1;
+			sscanf(pszChapterFile, "chapter%d.cfg", &chapterNumber);
+
+			//build full path to cfg file
+			char fullPath[MAX_PATH];
+			Q_snprintf(fullPath, sizeof(fullPath), "cfg/%s/%s", pszFolder, pszChapterFile);
+
+			//open file
+			FileHandle_t fh = filesystem->Open(fullPath, "r", "MOD");
+			if (fh)
+			{
+				char buffer[1024];
+				while (filesystem->ReadLine(buffer, sizeof(buffer), fh))
+				{
+					//check for 'map' first
+					char* p = Q_strstr(buffer, "map");
+					if (!p)
+						continue;
+
+					p = p + Q_strlen("map");
+
+					//eat white spaces
+					while (*p && isspace((unsigned char)*p))
+						p++;
+
+					//check p
+					if (!*p)
+						continue;
+
+					//check for current map name
+					if (!Q_strnicmp(p, szMapName, Q_strlen(szMapName)))
+					{
+						//copy folder name to output
+						Q_strncpy(outFolder, pszFolder, outLen);
+
+						filesystem->Close(fh);
+						filesystem->FindClose(hChapter);
+						filesystem->FindClose(hCfgRoot);
+
+						return chapterNumber;
+					}
+				}
+
+				filesystem->Close(fh);
+			}
+
+			pszChapterFile = filesystem->FindNext(hChapter);
+		}
+
+		filesystem->FindClose(hChapter);
+		pszFolder = filesystem->FindNext(hCfgRoot);
+	}
+
+	filesystem->FindClose(hCfgRoot);
+	return -1;
+}
+
+//writes a screenshot for the current config
+CON_COMMAND(amod_write_game_screenshot_current_config, "")
+{
+	//go through each folder in the cfg directory and look for a .cfg that starts the same mapname
+	//as the current map name.
+	char gamefolder[512] = { 0 };
+	int chapter = FindChapterCfgForMap(gamefolder, sizeof(gamefolder));;
+
+	//cehck for invalid chapter
+	if (chapter == -1)
+	{
+		ConWarning("Failed to find .cfg config file with the name of the current map name!\n");
+		return;
+	}
+
+	//check for map_properties_editor_load_mod
+	char mod[128];
+	extern ConVar map_properties_editor_load_mod;
+	if (map_properties_editor_load_mod.GetString()[0])
+	{
+		Q_strncpy(mod, map_properties_editor_load_mod.GetString(), sizeof(mod));
+	}
+	else
+	{
+		//get the current mod folder
+		extern ConVar amod_timeinfo_load_directory;
+		Q_strncpy(mod, amod_timeinfo_load_directory.GetString(), sizeof(mod));
+
+		//search for the 1st / (i know its not called a dash but dash sounds cooler)
+		char* dash = Q_strstr(mod, "/");
+		if (dash)
+		{
+			//read the next dash
+			dash = Q_strstr(dash + 1, "/");
+			if (dash)
+			{
+				//read the mod folder
+				char* tempdash = Q_strstr(dash + 1, "/");
+				if (tempdash)
+					*tempdash = '\0';
+
+				//copy over to mod
+				Q_strncpy(mod, dash + 1, sizeof(mod));
+			}
+			else
+				mod[0] = '\0';
+		}
+		else
+			mod[0] = '\0';
+	}
+
+	//call amod_write_game_screenshot
+	CCommand _args;
+	_args.Tokenize(CFmtStr("amod_write_game_screenshot \"%s\" \"%s\" %d %d", mod, gamefolder, chapter, IsDaytimeEnabled()));
+	amod_write_game_screenshot(_args);
+}
 
 float ScaleFOVByWidthRatio( float fovDegrees, float ratio )
 {

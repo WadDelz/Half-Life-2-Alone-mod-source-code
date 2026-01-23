@@ -1,8 +1,59 @@
 #include "cbase.h"
 #include "MapPropertiesEditorMenuPanel.h"
 
-ConVar map_properties_editor_load_mod("map_properties_editor_load_mod", "", 0/*FCVAR_DEVELOPMENTONLY*/, "The path inside resource/time_editor/<map_properties_editor_load_mod>/* that will get edited instead of resource/time_editor/*");
+//convars
+ConVar map_properties_editor_load_mod("map_properties_editor_load_mod", "", FCVAR_DEVELOPMENTONLY, "The path inside resource/time_editor/<map_properties_editor_load_mod>/* that will get edited instead of resource/time_editor/*");
 extern ConVar amod_timeinfo_load_directory;
+
+
+
+
+
+
+//add more themes if you would like
+TimePropertyTheme_t g_TimePropertyThemes[NUM_TIME_PROPERTY_THEMES] = {
+	{"Dark Theme", "resource/panels/MapPropertiesEditor/MapPropertiesEditorDarkScheme.res", "MapPropertiesEditorDarkScheme"},
+	{"Light Theme", "resource/panels/MapPropertiesEditor/MapPropertiesEditorLightScheme.res", "MapPropertiesEditorLightScheme"},
+	{"Default Theme", "resource/panels/MapPropertiesEditor/MapPropertiesEditorDefaultScheme.res", "MapPropertiesEditorDefaultScheme"},
+};
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Called when the amod_time_properties_editor_theme convar is changed
+//----------------------------------------------------------------------------------------------------
+void AmodTimePropertiesThemeChangeCallback(IConVar* convar, const char*, float)
+{
+	//check for s_MapPropertiesEditorPanel
+	if (s_MapPropertiesEditorPanel)
+	{
+		s_MapPropertiesEditorPanel->SetScheme(GetTimePropertiesScheme());
+		s_MapPropertiesEditorPanel->InvalidateLayout(false, true);
+	}
+
+	//check for g_MapPropertiesPanel
+	if (g_MapPropertiesPanel)
+	{
+		g_MapPropertiesPanel->SetScheme(GetTimePropertiesScheme());
+		g_MapPropertiesPanel->InvalidateLayout(false, true);
+	}
+}
+
+//returns the current theme of the time properties editor
+ConVar amod_time_properties_editor_theme("amod_time_properties_editor_theme", "0", FCVAR_ARCHIVE, "0 = dark, 1 = light, 2 = default vgui theme", true, 0, true, NUM_TIME_PROPERTY_THEMES, AmodTimePropertiesThemeChangeCallback);
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Returns the scheme using the amod_time_properties_editor_theme convar
+//----------------------------------------------------------------------------------------------------
+HScheme GetTimePropertiesScheme()
+{
+	TimePropertyTheme_t& theme = g_TimePropertyThemes[amod_time_properties_editor_theme.GetInt()];
+	return scheme()->LoadSchemeFromFile(theme.filename, theme.tag);
+}
+
+
+
+
+
+
 
 //command to open the map time properties editor
 CON_COMMAND(open_map_time_properties_editor, "")

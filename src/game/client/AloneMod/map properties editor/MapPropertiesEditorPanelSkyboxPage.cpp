@@ -1,5 +1,6 @@
 #include "cbase.h"
 #include "MapPropertiesEditorPanelSkyboxPage.h"
+#include "MapPropertiesEditorMenuPanel.h"
 
 //-------------------------------------------------------------------------------------------------------
 // Purpose: Constructor for the skybox filter page
@@ -15,13 +16,13 @@ CMapPropertiesPanelSkyboxFiltersPage::CMapPropertiesPanelSkyboxFiltersPage(Panel
 		m_SkyboxForeground = new CStretchingImage(this, "SkyboxForeground");
 
 		//skies combo box
-		m_SkyboxNames = new ComboBox(this, "SkyboxComboBox", 14, false);
+		m_SkyboxNames = new CMapPropertiesEditorComboBox(this, "SkyboxComboBox", 14, false);
 	}
 
 	//post processing
 	{
 		//intensity combo box
-		m_FilterComboBox = new ComboBox(this, "FilterComboBox", 14, false);
+		m_FilterComboBox = new CMapPropertiesEditorComboBox(this, "FilterComboBox", 14, false);
 
 		//intensity text
 		m_FilterIntensityText = new Label(this, "FilterIntensitySlider", "");
@@ -170,11 +171,7 @@ void CMapPropertiesPanelSkyboxFiltersPage::Paint()
 	BaseClass::Paint();
 
 	//draw the colors
-	Color color = m_CloudColor;
-	if (color.r() == 255 && color.g() == 255 && color.b() == 255 && color.a() == 255)
-		color = Color(51, 103, 153, 255);
-
-	surface()->DrawSetColor(color);
+	surface()->DrawSetColor(m_CloudColor);
 	surface()->DrawFilledRect(m_CloudColorRect.x, m_CloudColorRect.y, m_CloudColorRect.x + m_CloudColorRect.width, m_CloudColorRect.y + m_CloudColorRect.height);
 }
 

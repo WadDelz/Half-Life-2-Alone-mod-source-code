@@ -124,8 +124,9 @@ void PlayRandomThunder()
 
 	const char* origin = tmpvec[random->RandomInt(0, tmpvec.Count() >= 1 ? tmpvec.Count() - 1 : 0)]->GetString();
 
+	//TODO: DONT HARD CODE THIS
 	CCommand args;
-	args.Tokenize(CFmtStr("playgamesound weather.thunder%d \"%s\"", random->RandomInt(1, 3), origin));
+	args.Tokenize(CFmtStr("playgamesound weather.thunder%d \"%s\"", random->RandomInt(1, 4), origin));
 	playgamesound->Dispatch(args);
 }
 

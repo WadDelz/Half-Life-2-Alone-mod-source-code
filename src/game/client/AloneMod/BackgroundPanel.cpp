@@ -1,3 +1,5 @@
+//this code below is the first thing i changed. At the moment i can not be bothered changing it!
+
 #include "cbase.h"
 #include "fmtstr.h"
 #include "filesystem.h"
@@ -224,7 +226,7 @@ void CBackgroundPanel::OnTick()
 		BackgroundPic->SetImage(v_MapPics[MapNames->GetActiveItem()]);
 	else
 	{
-		if (IsDaytimeEnabled() && !CMaterialReference(CFmtStr("vgui/%s_day", v_MapPics[MapNames->GetActiveItem()]), TEXTURE_GROUP_VGUI, false)->IsErrorMaterial())
+		if (!CMaterialReference(CFmtStr("vgui/%s_day", v_MapPics[MapNames->GetActiveItem()]), TEXTURE_GROUP_VGUI, false)->IsErrorMaterial() && IsDaytimeEnabled())
 			BackgroundPic->SetImage(CFmtStr("%s_day", v_MapPics[MapNames->GetActiveItem()]));
 		else
 			BackgroundPic->SetImage(v_MapPics[MapNames->GetActiveItem()]);

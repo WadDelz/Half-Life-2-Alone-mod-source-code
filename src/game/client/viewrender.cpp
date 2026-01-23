@@ -57,7 +57,12 @@
 //alone mod stuff
 #include "AloneMod/AmodCvars.h"
 #include "AloneMod/DynamicSky.h"
+#include "AloneMod/ColorPicker.h"
 #include "debugoverlay_shared.h"
+#include "shaderapi/ishaderapi.h"
+#include "vgui/IInput.h"
+
+extern IShaderAPI* g_pShaderAPI;
 
 #ifdef PORTAL
 //#include "C_Portal_Player.h"
@@ -1566,7 +1571,7 @@ static void GetFogColor(fogparams_t* pFogParams, float* pColor)
 
 		//draw a debug overlay if needed
 		extern const bool IsMapPropertiesPanelOpen();
-		if (IsMapPropertiesPanelOpen())
+		if (IsMapPropertiesPanelOpen() && fog_blendangle.GetInt() != -1)
 		{
 			//get the text positions
 			Vector eyePos = pbp->EyePosition();
@@ -1839,7 +1844,7 @@ static void GetSkyboxFogColor(float* pColor)
 
 		//draw a debug overlay if needed
 		extern const bool IsMapPropertiesPanelOpen();
-		if (IsMapPropertiesPanelOpen())
+		if (IsMapPropertiesPanelOpen() && fog_blendangleskybox.GetInt() != -1)
 		{
 			//get the positions
 			Vector eyePos = pbp->EyePosition();
@@ -1847,12 +1852,12 @@ static void GetSkyboxFogColor(float* pColor)
 			Vector secondaryPos = eyePos - dir * 64.0f;
 
 			//move up 
-			primaryPos += Vector(0, 0, 2);
-			secondaryPos += Vector(0, 0, 2);
+			primaryPos += Vector(0, 0, 4);
+			secondaryPos += Vector(0, 0, 4);
 
 			//show the text
-			NDebugOverlay::Text(primaryPos, "PRIMARY FOG POSITION", false, 0.01);
-			NDebugOverlay::Text(secondaryPos, "SECONDARY FOG POSITION", false, 0.01);
+			NDebugOverlay::Text(primaryPos, "PRIMARY SKYBOX FOG POSITION", false, 0.01);
+			NDebugOverlay::Text(secondaryPos, "SECONDARY SKYBOX FOG POSITION", false, 0.01);
 		}
 	}
 	else
@@ -2449,7 +2454,6 @@ void CViewRender::RenderView(const CViewSetup& viewtmp, int nClearFlags, int wha
 		// We can still use the 'current view' stuff set up in ViewDrawScene
 		s_bCanAccessCurrentView = true;
 
-
 		engine->DrawPortals();
 
 		DisableFog();
@@ -2572,6 +2576,21 @@ void CViewRender::RenderView(const CViewSetup& viewtmp, int nClearFlags, int wha
 				DoEnginePostProcessing(view.x, view.y, view.width, view.height, bFlashlightIsOn);
 			}
 			pRenderContext.SafeRelease();
+		}
+		
+		//get the color for the color picker if we need to
+		if (g_bShouldSetColorPicker)
+		{
+			int mx, my;
+			vgui::input()->GetCursorPosition(mx, my);
+
+			//get the color at the pos
+			unsigned char colors[4];
+			g_pShaderAPI->ReadPixels(mx, my, 1, 1, colors, IMAGE_FORMAT_RGBA8888);
+
+			//insert into the color picker
+			s_ColorPickerModal->SetColor(colors[0], colors[1], colors[2], 255);
+			g_bShouldSetColorPicker = false;
 		}
 
 		// And here are the screen-space effects

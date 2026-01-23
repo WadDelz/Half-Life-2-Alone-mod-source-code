@@ -178,6 +178,7 @@ extern vgui::IInputInternal *g_InputInternal;
 
 //alone mod
 #include "AloneMod/ISongPanel.h"
+#include "shaderapi/ishaderapi.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -1267,6 +1268,7 @@ ConVar modbase_dynamic_skybox("modbase_dynamic_skybox", "1", FCVAR_HIDDEN);
 
 //-----------------------------------------------------------------------------
 ISourceVirtualReality *g_pSourceVR = NULL;
+IShaderAPI* g_pShaderAPI;
 
 // Purpose: Called when the DLL is first loaded.
 // Input  : engineFactory - 
@@ -1347,6 +1349,8 @@ int CHLClient::Init( CreateInterfaceFn appSystemFactory, CreateInterfaceFn physi
 	if ( ( gamestatsuploader = (IUploadGameStats *)appSystemFactory( INTERFACEVERSION_UPLOADGAMESTATS, NULL )) == NULL )
 		return false;
 #endif
+
+	g_pShaderAPI = (IShaderAPI*)appSystemFactory(SHADERAPI_INTERFACE_VERSION, NULL);
 
 #if defined( REPLAY_ENABLED )
 	if ( IsPC() && (g_pEngineReplay = (IEngineReplay *)appSystemFactory( ENGINE_REPLAY_INTERFACE_VERSION, NULL )) == NULL )

@@ -54,9 +54,6 @@ public:
 	void LevelInitPreEntity()
 	{
 		szMapName = MapName();
-
-		//enable/disable the skybox button/panel for the options panel if needed
-		optionspanel->SetSkyboxButtonEnabled(!IsInvalidChangeMap(szMapName));
 	}
 	
 	//called on game shutdown

@@ -1,5 +1,6 @@
 #include "cbase.h"
 #include "MapPropertiesEditorPanel.h"
+#include "MapPropertiesEditorMenuPanel.h"
 #include <vgui_controls/PropertySheet.h>
 
 //static map properties panel
@@ -19,6 +20,7 @@ CMapPropertiesPanel::CMapPropertiesPanel(Panel* parent) : BaseClass(nullptr, "Ma
 	memset(m_PreviousFilterConvarValue, 0, sizeof(m_PreviousFilterConvarValue));
 	memset(m_PreviousFilterIntensityConvarValue, 0, sizeof(m_PreviousFilterIntensityConvarValue));
 	memset(m_PreviousGodConvarValue, 0, sizeof(m_PreviousGodConvarValue));
+	memset(m_PreviousEpicFilterConvarValue, 0, sizeof(m_PreviousEpicFilterConvarValue));
 
 	//reset our coppied steps
 	memset(s_UndoSteps, 0, sizeof(s_UndoSteps));
@@ -40,19 +42,37 @@ CMapPropertiesPanel::CMapPropertiesPanel(Panel* parent) : BaseClass(nullptr, "Ma
 	SetFadeEffectDisableOverride(true);
 	Activate();
 
+	//set our scheme
+	SetScheme(GetTimePropertiesScheme());
+
 	//tell our property sheet to shut up. 
 	//edit: nevermind. This also disables keyboard input to combo boxes and sliders :(
 	//GetPropertySheet()->SetKeyBoardInputEnabled(false);
 
 	//set our ok button command
-	SetOKButtonText("Apply");
+	SetOKButtonText("Save");
 	_okButton->SetCommand(COMMAND_APPLY_PAGE_SETTINGS);
+
+	//set the cancel text
+	SetCancelButtonText("Cancel");
 
 	//set our pos
 	SetPos(0, 0);
 
 	//disable mouselook so keyboard look can be used
 	cl_mouselook.SetValue(false);
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Applies the scheme settings
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanel::ApplySchemeSettings(IScheme* scheme)
+{
+	//call the base func first
+	BaseClass::ApplySchemeSettings(scheme);
+
+	//set the bg color of the property sheet
+	_propertySheet->SetBgColor(scheme->GetColor("PropertySheet.BgColor", _propertySheet->GetBgColor()));
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -186,6 +206,7 @@ CMapPropertiesPanel::~CMapPropertiesPanel()
 	if (m_PreviousCloudsColorValue[0]) ConVarRef("amod_clouds_color").SetValue(m_PreviousCloudsColorValue);
 	if (m_PreviousCloudsShowValue[0]) ConVarRef("amod_clouds").SetValue(m_PreviousCloudsShowValue);
 	if (m_PreviousGodConvarValue[0]) ConVarRef("amod_enable_god").SetValue(m_PreviousGodConvarValue);
+	if (m_PreviousEpicFilterConvarValue[0]) ConVarRef("amod_epic_filter").SetValue(m_PreviousEpicFilterConvarValue);
 	ConVarRef(m_bNightTimeMode ? "amod_epic_filter_night_filename" : "amod_epic_filter_day_filename").SetValue(m_PreviousFilterConvarValue);
 	ConVarRef(m_bNightTimeMode ? "amod_epic_filter_night_intensity" : "amod_epic_filter_day_intensity").SetValue(m_PreviousFilterIntensityConvarValue);
 
@@ -207,16 +228,6 @@ CMapPropertiesPanel::~CMapPropertiesPanel()
 	engine->ClientCmd("-lookdown");
 	engine->ClientCmd("-right");
 	engine->ClientCmd("-use");
-}
-
-//----------------------------------------------------------------------------------------------------
-// Purpose: Paints the panel
-//----------------------------------------------------------------------------------------------------
-void CMapPropertiesPanel::Paint()
-{
-	//set our new bg color
-	SetBgColor(Color(150, 150, 150, 150));
-	BaseClass::Paint();
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -302,9 +313,10 @@ void CMapPropertiesPanel::Init(MapTimeInfo_t& info, bool IsNightPage)
 	Q_strncpy(m_PreviousCloudsOverrideValue, ConVarRef("amod_clouds_color_override").GetString(), sizeof(m_PreviousCloudsOverrideValue));
 	Q_strncpy(m_PreviousCloudsColorValue, ConVarRef("amod_clouds_color").GetString(), sizeof(m_PreviousCloudsColorValue));
 	Q_strncpy(m_PreviousCloudsShowValue, ConVarRef("amod_clouds").GetString(), sizeof(m_PreviousCloudsShowValue));
+	Q_strncpy(m_PreviousGodConvarValue, ConVarRef("amod_enable_god").GetString(), sizeof(m_PreviousGodConvarValue));
+	Q_strncpy(m_PreviousEpicFilterConvarValue, ConVarRef("amod_epic_filter").GetString(), sizeof(m_PreviousEpicFilterConvarValue));
 	Q_strncpy(m_PreviousFilterConvarValue, ConVarRef(IsNightPage ? "amod_epic_filter_night_filename" : "amod_epic_filter_day_filename").GetString(), sizeof(m_PreviousFilterConvarValue));
 	Q_strncpy(m_PreviousFilterIntensityConvarValue, ConVarRef(IsNightPage ? "amod_epic_filter_night_intensity" : "amod_epic_filter_day_intensity").GetString(), sizeof(m_PreviousFilterIntensityConvarValue));
-	Q_strncpy(m_PreviousGodConvarValue, ConVarRef("amod_enable_god").GetString(), sizeof(m_PreviousGodConvarValue));
 
 	//set these convars ALWAYS
 	engine->ClientCmd("amod_enable_god 1");
