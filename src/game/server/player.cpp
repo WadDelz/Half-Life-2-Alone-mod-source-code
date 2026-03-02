@@ -4020,7 +4020,7 @@ void CBasePlayer::PreThink(void)
 {	
 	if ( g_fGameOver || m_iPlayerLocked )
 		return;         // intermission or finale
-
+	
 	if ( Hints() )
 	{
 		Hints()->Update();
@@ -4794,7 +4794,8 @@ struct WeatherInfo_t
 	const char* m_CurrentWeather;
 };
 
-//returns the weather info
+//returns the weather info. 
+//OBSOLETE (i think)
 WeatherInfo_t GetWeatherMessageInfo(CBasePlayer* pPlayer)
 {
 	WeatherInfo_t info;
@@ -4905,43 +4906,8 @@ WeatherInfo_t GetWeatherMessageInfo(CBasePlayer* pPlayer)
 	return info;
 }
 
-
-CBaseEntity* helicopter = nullptr;
-
-CON_COMMAND(helicopter_test, "")
-{
-	if (!helicopter)
-	{
-		CBaseEntity::PrecacheModel("models/combine_helicopter.mdl");
-		helicopter = CreateEntityByName("prop_dynamic");
-		helicopter->SetName(AllocPooledString("bob"));
-		helicopter->SetModel("models/combine_helicopter.mdl");
-		helicopter->Precache();
-		DispatchSpawn(helicopter);
-		helicopter->Activate();
-	}
-	else
-	{
-		helicopter = gEntList.FindEntityByName(nullptr, "bob");
-	}
-
-	QAngle ang = UTIL_GetLocalPlayer()->EyeAngles();
-	Vector origin = UTIL_GetLocalPlayer()->GetAbsOrigin();
-
-	Vector forawrd;
-	AngleVectors(ang, &forawrd);
-
-	helicopter->SetAbsOrigin(origin + (forawrd * atoi(args.Arg(1))));
-	helicopter->SetAbsAngles(ang);
-
-	variant_t vt;
-	vt.SetString(AllocPooledString("idle"));
-	helicopter->AcceptInput("SetAnimation", nullptr, nullptr, vt, 0);
-}
-
 void CBasePlayer::PostThink()
 {
-	if (helicopter)
 	if (g_bInSoundscapePositionEditor)
 	{
 		do {
@@ -8648,9 +8614,15 @@ int CMovementSpeedMod::GetDisabledButtonMask( void )
 	return nMask;
 }
 
+extern ConVar __amod_in_prop_editor;
+
 void CMovementSpeedMod::InputSpeedMod(inputdata_t &data)
 {
 	CBasePlayer *pPlayer = NULL;
+
+	//check
+	if (__amod_in_prop_editor.GetBool() && data.value.Float() <= 0)
+		return;
 
 	if ( data.pActivator && data.pActivator->IsPlayer() )
 	{

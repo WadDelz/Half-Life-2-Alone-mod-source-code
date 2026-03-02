@@ -41,6 +41,8 @@ private:
 	Color m_CurrentColor;
 	Color m_DefaultColor;
 
+	//TODO: FIX FOCUS ISSUE
+
 	//for proportionate scaling
 	int m_previewX;
 	int m_previewY;
@@ -51,6 +53,10 @@ private:
 
 	//internal setters
 	void UpdateTextEntries();
+
+	//next close time
+	float m_CloseTime = 0.0f;
+	bool m_ShouldClose = false;
 };
 
 //all color pickers should be modals. This is the current modal

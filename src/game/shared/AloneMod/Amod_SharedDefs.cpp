@@ -142,14 +142,8 @@ bool IsDaytimeEnabled()
 	if (!amod_day)
 		return false;
 
-#ifdef CLIENT_DLL
-	const char* mapname = szMapName;
-#else
-	const char* mapname = gpGlobals->mapname.ToCStr();
-#endif
-
 	//get the current time info
-	MapTimeInfo_t& info = GetMapTimeInfo(mapname);
+	MapTimeInfo_t& info = GetCurrentMapTimeInfo();
 
 	//check to see if both are disabled
 	if (!info.AllowDaytime && !info.AllowNightTime)

@@ -2,6 +2,7 @@
 #include "ColorPicker.h"
 #include "fmtstr.h"
 #include <vgui/ISurface.h>
+#include "vgui/IInput.h"
 
 using namespace vgui;
 
@@ -24,6 +25,9 @@ static const char* const s_CommonColorCmdPrefix = "PresetColor_";
 CColorPicker* s_ColorPickerModal = nullptr;
 bool g_bShouldSetColorPicker = false;				//should we get the color of the pixel at the mouse position for CViewRender::RenderView(...)
 
+//declerations
+void EnablePropertiesEditorInput(bool enable);
+
 //-----------------------------------------------------------------------
 // Purpose: Color picker window constructor
 //-----------------------------------------------------------------------
@@ -31,11 +35,14 @@ CColorPicker::CColorPicker(vgui::VPANEL parent) : BaseClass(nullptr, "CColorPick
 {
 	s_ColorPickerModal = this;
 
+	//HACK: disable focus for the properties editor panel because if we dont and the user presses the left or right arrow keys, The game will enter a messed up state
+	EnablePropertiesEditorInput(false);
+
 	//parent funcs
 	SetParent(parent);
 	SetSize(630, 290);
 	SetMinimumSize(630, 290);
-	SetTitle("RGBA Color Picker", true);
+	SetTitle("#ColorPicker_Title", true);
 	SetKeyBoardInputEnabled(true);
 	SetMouseInputEnabled(true);
 	SetDeleteSelfOnClose(true);
@@ -58,7 +65,7 @@ CColorPicker::CColorPicker(vgui::VPANEL parent) : BaseClass(nullptr, "CColorPick
 	}
 
 	//create the common colors
-	m_commonColorsLabel = new Label(this, "CommonColorsLabel", "Common Colors");
+	m_commonColorsLabel = new Label(this, "CommonColorsLabel", "#ColorPicker_CommonColorsLabel");
 	for (int i = 0; i < 10; i++)
 	{
 		m_colorButtons[i] = new Button(this, s_CommonColorNames[i], s_CommonColorNames[i]);
@@ -66,10 +73,10 @@ CColorPicker::CColorPicker(vgui::VPANEL parent) : BaseClass(nullptr, "CColorPick
 	}
 
 	//create the select + set color things
-	m_selectButton = new Button(this, "SelectColor", "Select Color");
+	m_selectButton = new Button(this, "SelectColor", "#ColorPicker_SetColorButton");
 	m_selectButton->SetCommand("select_color");
 
-	m_setDefaultButton = new Button(this, "SetDefaultColor", "Set Default");
+	m_setDefaultButton = new Button(this, "SetDefaultColor", "#ColorPicker_SetDefaultButton");
 	m_setDefaultButton->SetCommand("set_default_color");
 
 	//update the text entries
@@ -81,6 +88,8 @@ CColorPicker::CColorPicker(vgui::VPANEL parent) : BaseClass(nullptr, "CColorPick
 //-----------------------------------------------------------------------
 CColorPicker::~CColorPicker()
 {
+	EnablePropertiesEditorInput(true);
+
 	s_ColorPickerModal = nullptr;
 }
 

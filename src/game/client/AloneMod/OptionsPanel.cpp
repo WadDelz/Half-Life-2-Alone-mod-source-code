@@ -113,8 +113,8 @@ CAModCreditsPanel::CAModCreditsPanel(Panel* parent) : vgui::Frame(parent, "Alone
 	//create the actual credits text box
 	RichText* CreditsText = new RichText(this, "Credits");
 	CreditsText->SetBounds(10, 25, 225, 330);
-	CreditsText->SetVerticalScrollbar(false);
-	CreditsText->SetText("Creator: Waddelz\n\nGame: Valve\n\nSoundtrack:\n portal ->\n Self Esteem Fund, Android Hell\n Stop What You Are Doing,\n HL2 Episode 2 ->\n Dark Inverval\n\nHuge Thanks To dominicb\nFor The Song: Gone\nAnd TheAR3Guy For The Song\nEnd\n\nMirrored Source Code: NvC-DmN-CH\n\nModdb: For Containing The Mod\n\n");
+	CreditsText->SetVerticalScrollbar(true);
+	CreditsText->SetText("#Amod_CreditsPanel_Credits");
 }
 
 //------------------------------------------------------------------------------------------
@@ -241,20 +241,20 @@ CAModWeatherPanel::CAModWeatherPanel() : vgui::Frame(nullptr, "CAModWeatherPanel
 	m_CurrentCloudsColor.SetColor(cloudscolor[0], cloudscolor[1], cloudscolor[2], cloudscolor[3]);
 
 	//create the 'Show weather info' check button
-	m_cbClouds = new CheckButton(this, "ShowClouds", "Show Moving Clouds");
+	m_cbClouds = new CheckButton(this, "ShowClouds", "#Amod_WeatherPanel_ShowMovingClouds");
 	m_cbClouds->SetSelected(amod_clouds.GetBool());
-	m_cbClouds->SetBounds(2, 21, 150, 25);
+	m_cbClouds->SetBounds(2, 21, 190, 25);
 	m_cbClouds->GetTooltip()->SetText("Shows moving clouds on maps that allow for clouds in them!");
 	m_cbClouds->GetTooltip()->SetTooltipDelay(100);
 	m_cbClouds->GetTooltip()->SetTooltipFormatToMultiLine();
 
-	m_cbCloudsOverrideColor = new vgui::CheckButton(this, "OverrideCloudsColor", "Override Cloud Colors");
-	m_cbCloudsOverrideColor->SetBounds(2, 46, 163, 20);
+	m_cbCloudsOverrideColor = new vgui::CheckButton(this, "OverrideCloudsColor", "#Amod_WeatherPanel_OverrideCloudColors");
+	m_cbCloudsOverrideColor->SetBounds(2, 46, 190, 20);
 	m_cbCloudsOverrideColor->SetSelected(amod_clouds_color_override.GetBool());
 	m_cbCloudsOverrideColor->SetCommand(WEATHER_PANEL_COMMAND_CLOUDS_OVERRIDE);
 
 	//create the clouds color button
-	m_ButtonCloudsColor = new vgui::Button(this, "ButtonCloudsColor", "Set Clouds Color", this, WEATHER_PANEL_COMMAND_CLOUDS_COLOR);
+	m_ButtonCloudsColor = new vgui::Button(this, "ButtonCloudsColor", "#Amod_WeatherPanel_SetCloudColors", this, WEATHER_PANEL_COMMAND_CLOUDS_COLOR);
 	m_ButtonCloudsColor->SetBounds(7, 68, 163, 20);
 	m_ButtonCloudsColor->SetEnabled(amod_clouds_color_override.GetBool());
 
@@ -263,44 +263,44 @@ CAModWeatherPanel::CAModWeatherPanel() : vgui::Frame(nullptr, "CAModWeatherPanel
 	CloudsDivider->SetBounds(-2, 93, 200, 1);
 
 	//create the 'show player's breath' check button
-	m_cbBreaths = new CheckButton(this, "ShowPlayersBreath", "Show Players Breath");
+	m_cbBreaths = new CheckButton(this, "ShowPlayersBreath", "#Amod_WeatherPanel_ShowPlayersBreath");
 	m_cbBreaths->SetSelected(amod_do_breathing.GetBool());
 	m_cbBreaths->SetBounds(2, 95, 150, 25);
-	m_cbBreaths->GetTooltip()->SetText("Show the players breaths to show that it is currently cold.\nNote: you have to stand still for the breaths to show");
+	m_cbBreaths->GetTooltip()->SetText("#Amod_WeatherPanel_ShowPlayersBreath_Tooltip");
 	m_cbBreaths->GetTooltip()->SetTooltipDelay(100);
 	m_cbBreaths->GetTooltip()->SetTooltipFormatToMultiLine();
 
 	//create the 'enable rain' check button
-	m_cbEnable = new CheckButton(this, "CheckButtonEnableRain", "Enable Rain");
+	m_cbEnable = new CheckButton(this, "CheckButtonEnableRain", "#Amod_WeatherPanel_EnableRain");
 	m_cbEnable->SetSelected(amod_rain_enable.GetBool());
 	m_cbEnable->SetBounds(2, 117, 150, 25);
 
 	//create the 'enable thunder sounds' check button
-	m_cbThunder = new CheckButton(this, "CheckButtonEnableThunder", "Enable Thunder Sounds");
+	m_cbThunder = new CheckButton(this, "CheckButtonEnableThunder", "#Amod_WeatherPanel_EnableThunderSounds");
 	m_cbThunder->SetSelected(amod_rain_thunder.GetBool());
 	m_cbThunder->SetBounds(2, 138, 175, 25);
 
 	//create the splashes check button
-	m_cbSplashes = new CheckButton(this, "CheckButtonEnableSplashes", "Show Rain Splash Particles");
+	m_cbSplashes = new CheckButton(this, "CheckButtonEnableSplashes", "#Amod_WeatherPanel_ShowSplashParticles");
 	m_cbSplashes->SetSelected(amod_rain_splashes.GetBool());
 	m_cbSplashes->SetBounds(2, 159, 175, 25);
 	m_cbSplashes->SetEnabled(amod_rain_enable.GetBool());
 
 	//create 'rain Options' label
-	Label* RainType = new Label(this, "RainTypeLabel", "Rain Options");
+	Label* RainType = new Label(this, "RainTypeLabel", "#Amod_WeatherPanel_RainOptions");
 	RainType->SetBounds(55, 186, 160, 20);
 
 	//create the type of rain rain button
 	m_cbType = new ComboBox(this, "RainTypeComboBox", 10, false);
 	m_cbType->SetBounds(7, 206, 187, 22);
-	m_cbType->AddItem("Rain Intensity: Very Light", nullptr);
-	m_cbType->AddItem("Rain Intensity: Light", nullptr);
-	m_cbType->AddItem("Rain Intensity: Medium", nullptr);
-	m_cbType->AddItem("Rain Intensity: Heavy", nullptr);
-	m_cbType->AddItem("Rain Intensity: Very Heavy", nullptr);
+	m_cbType->AddItem("#Amod_WeatherPanel_RainIntensity_VeryLight", nullptr);
+	m_cbType->AddItem("#Amod_WeatherPanel_RainIntensity_Light", nullptr);
+	m_cbType->AddItem("#Amod_WeatherPanel_RainIntensity_Medium", nullptr);
+	m_cbType->AddItem("#Amod_WeatherPanel_RainIntensity_Heavy", nullptr);
+	m_cbType->AddItem("#Amod_WeatherPanel_RainIntensity_VeryHeavy", nullptr);
 	m_cbType->SetEnabled(amod_rain_enable.GetBool());
 	m_cbType->ActivateItem(2);
-	m_cbType->GetTooltip()->SetText("Note that 'Very Heavy' and 'Heavy' rain CAN (rarely) crash the game!");
+	m_cbType->GetTooltip()->SetText("#Amod_WeatherPanel_RainIntensity_Tooltip");
 	m_cbType->GetTooltip()->SetTooltipDelay(100);
 	m_cbType->GetTooltip()->SetTooltipFormatToMultiLine();
 
@@ -317,8 +317,8 @@ CAModWeatherPanel::CAModWeatherPanel() : vgui::Frame(nullptr, "CAModWeatherPanel
 	//create the rain mode button
 	m_cbMode = new ComboBox(this, "RainModeComboBox", 2, false);
 	m_cbMode->SetBounds(7, 234, 187, 22);
-	m_cbMode->AddItem("Always Rain", nullptr);
-	m_cbMode->AddItem("Rain In Random Intervals", nullptr);
+	m_cbMode->AddItem("#Amod_WeatherPanel_RainIntervals_AlwaysRain", nullptr);
+	m_cbMode->AddItem("#Amod_WeatherPanel_RainIntervals_RainInIntervals", nullptr);
 	m_cbMode->ActivateItem(amod_rain_type.GetInt() ? amod_rain_type.GetInt() - 1 : 0);
 	m_cbMode->SetEnabled(amod_rain_enable.GetBool());
 
@@ -343,12 +343,13 @@ CAModWeatherPanel::CAModWeatherPanel() : vgui::Frame(nullptr, "CAModWeatherPanel
 	m_RainWaitTimeMaxSlider->SetValue(amod_rain_wait_max.GetInt());
 
 	//make the apply button
-	Button* ApplyButton = new Button(this, "_ApplyButtonWeatherPanel", "Apply Settings");
+	Button* ApplyButton = new Button(this, "_ApplyButtonWeatherPanel", "#Amod_OptionsPanel_ApplySettings");
 	ApplyButton->SetBounds(5, 354, 187, 20);
 	ApplyButton->SetCommand(WEATHER_PANEL_COMMAND_APPLY);
 
 	//create a tick signal for this panel so every 100ms the OnTick function gets called
 	vgui::ivgui()->AddTickSignal(GetVPanel(), 100);
+	OnTick();	//update everything now
 }
 
 //------------------------------------------------------------------------------------------
@@ -361,9 +362,18 @@ void CAModWeatherPanel::OnTick()
 	m_cbType->SetEnabled(m_cbEnable->IsSelected());
 	m_cbMode->SetEnabled(m_cbEnable->IsSelected());
 
-	//set the texts
-	m_RainWaitTimeMinLabel->SetText(CFmtStr("Rain Wait Time Min: %ds", m_RainWaitTimeMinSlider->GetValue()));
-	m_RainWaitTimeMaxLabel->SetText(CFmtStr("Rain Wait Time Max: %ds", m_RainWaitTimeMaxSlider->GetValue()));
+	//format the wait time min
+	wchar_t* waitstr = g_pVGuiLocalize->Find("Amod_WeatherPanel_WaitTimeMin");
+	wchar_t output[128];
+	swprintf(output, SIZE_OF_ARRAY(output), L"%ws %ds", waitstr, m_RainWaitTimeMinSlider->GetValue());
+
+	m_RainWaitTimeMinLabel->SetText(output);
+
+	//format the wait time max
+	waitstr = g_pVGuiLocalize->Find("Amod_WeatherPanel_WaitTimeMax");
+	swprintf(output, SIZE_OF_ARRAY(output), L"%ws %ds", waitstr, m_RainWaitTimeMaxSlider->GetValue());
+
+	m_RainWaitTimeMaxLabel->SetText(output);
 
 	//enable/disable sliders
 	m_RainWaitTimeMinSlider->SetEnabled(m_cbEnable->IsSelected() && m_cbMode->GetActiveItem() == 1);
@@ -438,7 +448,7 @@ void CAModWeatherPanel::OnCommand(const char* command)
 	{
 		//create the color picker window
 		m_CloudsColorPicker = new CColorPicker(GetVPanel());
-		m_CloudsColorPicker->SetTitle("Set Clouds Color (255 255 255 255 = default clouds color)", true);
+		m_CloudsColorPicker->SetTitle("#Amod_WeatherPanel_ColorPicker_CloudsColor", true);
 		m_CloudsColorPicker->SetColor(m_CurrentCloudsColor);
 		m_CloudsColorPicker->DoModal();
 		return;
@@ -636,7 +646,7 @@ CAModSkyboxPanel::CAModSkyboxPanel(Panel* parent) : vgui::Frame(parent, "AloneMo
 	vgui::ivgui()->AddTickSignal(GetVPanel(), 100);
 
 	//set the bounds and title of the panel
-	SetTitle("Skybox Panel", false);
+	SetTitle("#Amod_SkyboxPanel_Title", false);
 	SetSize(250, 432);
 	MoveToCenterOfScreen();
 
@@ -678,8 +688,8 @@ CAModSkyboxPanel::CAModSkyboxPanel(Panel* parent) : vgui::Frame(parent, "AloneMo
 		m_skyComboBox->SetBounds(10, 282, 230, 20);
 
 		//always add "" as the starting item
-		m_skyComboBox->AddItem("use the maps default skybox", nullptr);
-		m_Skyboxes.AddToTail(m_bDaytime ? "sky_day02_09" : "sky_borealis01");
+		m_skyComboBox->AddItem("#Amod_SkyboxPanel_UseDefaultSkybox", nullptr);
+		m_Skyboxes.AddToTail(m_bDaytime ? "sky_day01_01" : "sky_borealis01");
 
 		//go through each sky and add it
 		const char* amod_sky_value = amod_sky.GetString();
@@ -713,7 +723,7 @@ CAModSkyboxPanel::CAModSkyboxPanel(Panel* parent) : vgui::Frame(parent, "AloneMo
 		//filter text above this
 		Label* FilterText = new Label(this, "FilterText", "");
 		FilterText->SetBounds(5, 318, 240, 50);
-		FilterText->SetText("Post Processing Filter Settings.\nRequires post processing filter enabled");
+		FilterText->SetText("#Amod_SkyboxPanel_PostProcessing_Title");
 		FilterText->SetContentAlignment(Label::Alignment::a_north);
 		FilterText->SetCenterWrap(true);
 
@@ -722,7 +732,7 @@ CAModSkyboxPanel::CAModSkyboxPanel(Panel* parent) : vgui::Frame(parent, "AloneMo
 		m_filterComboBox->SetBounds(10, 361, 230, 20);
 
 		//always 
-		m_filterComboBox->AddItem("Use the maps default filter", new KeyValues(""));
+		m_filterComboBox->AddItem("#Amod_SkyboxPanel_UseDefaultFilter", new KeyValues(""));
 
 		//get the stuff
 		int index = 0, current = 1;
@@ -774,7 +784,7 @@ CAModSkyboxPanel::CAModSkyboxPanel(Panel* parent) : vgui::Frame(parent, "AloneMo
 		m_intensitiesComboBox->SetBounds(10, 383, 230, 20);
 
 		//always 
-		m_intensitiesComboBox->AddItem("Use the maps default intensity", new KeyValues(""));
+		m_intensitiesComboBox->AddItem("#Amod_SkyboxPanel_UseDefaultFilterIntensity", new KeyValues(""));
 		
 		int index = 0, current = 1;
 
@@ -799,13 +809,13 @@ CAModSkyboxPanel::CAModSkyboxPanel(Panel* parent) : vgui::Frame(parent, "AloneMo
 	}
 
 	//make the fog disable button
-	m_FogDisable = new CheckButton(this, "", "Disable Fog");
+	m_FogDisable = new CheckButton(this, "", "#Amod_SkyboxPanel_DisableFog");
 	m_FogDisable->SetBounds(5, 260, 105, 20);
 	m_FogDisable->SetSelected(amod_fog_disabled.GetBool());
 	
 	//make the sun disable button
 	ConVarRef amod_sun_disable("amod_sun_disable");
-	m_SunDisableButton = new CheckButton(this, "", "Disable The Sun");
+	m_SunDisableButton = new CheckButton(this, "", "#Amod_SkyboxPanel_DisableSun");
 	m_SunDisableButton->SetBounds(115, 260, 135, 20);
 	m_SunDisableButton->SetEnabled(m_bDaytime);
 	m_SunDisableButton->SetSelected(amod_sun_disable.GetBool());
@@ -835,7 +845,7 @@ CAModSkyboxPanel::CAModSkyboxPanel(Panel* parent) : vgui::Frame(parent, "AloneMo
 	}
 
 	//make the apply button
-	Button* SetButton = new Button(this, "SetButton", "Update Settings");
+	Button* SetButton = new Button(this, "SetButton", "#Amod_SkyboxPanel_UpdateSettings");
 	SetButton->SetBounds(10, 407, 230, 20);
 	SetButton->SetCommand(SKYBOX_COMMAND_SET_BUTTON);
 
@@ -1228,13 +1238,13 @@ if (!name)																									\
 if (element && element->GetTooltip() && keyvalues->GetBool("ToolTipEnabled"))		\
 {																					\
 	element->GetTooltip()->SetTooltipDelay(keyvalues->GetInt("TooltipDelay"));		\
+	element->GetTooltip()->SetText(keyvalues->GetString("TooltipText"));			\
 																					\
 	if (keyvalues->GetBool("ToolTipMultiline"))										\
 		element->GetTooltip()->SetTooltipFormatToMultiLine();						\
 	else																			\
 		element->GetTooltip()->SetTooltipFormatToSingleLine();						\
 																					\
-	element->GetTooltip()->SetText(keyvalues->GetString("TooltipText"));			\
 }
 
 //------------------------------------------------------------------------------------------
@@ -1381,58 +1391,68 @@ void COptionsPanel::Init()
 	m_DisableFootstepsCheckButton = new CheckButton(this, "CheckButtonDisableFootsteps", DisableFootstepSoundsCheckButtonKV->GetString("Text"));
 	m_DisableFootstepsCheckButton->SetBounds(DisableFootstepSoundsCheckButtonKV->GetInt("XPos"), DisableFootstepSoundsCheckButtonKV->GetInt("YPos"), DisableFootstepSoundsCheckButtonKV->GetInt("Wide"), DisableFootstepSoundsCheckButtonKV->GetInt("Tall"));
 	m_DisableFootstepsCheckButton->SetSelected(!sv_footstep.GetInt());
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_DisableFootstepsCheckButton, DisableFootstepSoundsCheckButtonKV);
 
 	//hidehud
 	ConVarRef hidehud("hidehud");
 	m_NoHudCheckButton = new CheckButton(this, "DisableHudCheckButton", DisableHudCheckButtonKV->GetString("Text"));
 	m_NoHudCheckButton->SetBounds(DisableHudCheckButtonKV->GetInt("XPos"), DisableHudCheckButtonKV->GetInt("YPos"), DisableHudCheckButtonKV->GetInt("Wide"), DisableHudCheckButtonKV->GetInt("Tall"));
 	m_NoHudCheckButton->SetSelected(hidehud.GetInt() == 8 ? true : false);
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_NoHudCheckButton, DisableHudCheckButtonKV);
 
 	//mirrored view check button
 	m_MirroredCheckButton = new CheckButton(this, "MirroredCB", MirroredViewCheckButtonKv->GetString("Text", ""));
 	m_MirroredCheckButton->SetBounds(MirroredViewCheckButtonKv->GetInt("XPos"), MirroredViewCheckButtonKv->GetInt("YPos"), MirroredViewCheckButtonKv->GetInt("Wide"), MirroredViewCheckButtonKv->GetInt("Tall"));
 	m_MirroredCheckButton->SetSelected(amod_mirrored.GetBool());
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_MirroredCheckButton, MirroredViewCheckButtonKv);
 
 	//vignette
 	m_VignetteCheckButton = new CheckButton(this, "VignetteCheckButton", VignetteCheckButtonKv->GetString("Text", ""));
 	m_VignetteCheckButton->SetBounds(VignetteCheckButtonKv->GetInt("XPos"), VignetteCheckButtonKv->GetInt("YPos"), VignetteCheckButtonKv->GetInt("Wide"), VignetteCheckButtonKv->GetInt("Tall"));
 	m_VignetteCheckButton->SetSelected(amod_vignette.GetInt());
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_VignetteCheckButton, VignetteCheckButtonKv);
 
 	//view bobbing
 	ConVarRef amod_viewbob_enabled("amod_viewbob_enabled");
 	m_ViewBobCheckButton = new CheckButton(this, "ViewBobCheckButton", ViewBobCheckButtonKv->GetString("Text", ""));
 	m_ViewBobCheckButton->SetBounds(ViewBobCheckButtonKv->GetInt("XPos"), ViewBobCheckButtonKv->GetInt("YPos"), ViewBobCheckButtonKv->GetInt("Wide"), ViewBobCheckButtonKv->GetInt("Tall"));
 	m_ViewBobCheckButton->SetSelected(amod_viewbob_enabled.GetInt());
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_ViewBobCheckButton, ViewBobCheckButtonKv);
 
 	//stand bob
 	ConVarRef amod_standbob_enabled("amod_standbob_enabled");
 	m_StandBobCheckButton = new CheckButton(this, "StandBobCheckButton", StandBobCheckButtonKv->GetString("Text", ""));
 	m_StandBobCheckButton->SetBounds(StandBobCheckButtonKv->GetInt("XPos"), StandBobCheckButtonKv->GetInt("YPos"), StandBobCheckButtonKv->GetInt("Wide"), StandBobCheckButtonKv->GetInt("Tall"));
 	m_StandBobCheckButton->SetSelected(amod_standbob_enabled.GetBool());
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_StandBobCheckButton, StandBobCheckButtonKv);
 
 	//jump viewpunch
 	ConVarRef amod_jump_punch_enable("amod_jump_punch_enable");
 	m_JumpViewpunchCheckButton = new CheckButton(this, "JumpViewpunch", JumpViewpunchCheckButtonKv->GetString("Text", ""));
 	m_JumpViewpunchCheckButton->SetBounds(JumpViewpunchCheckButtonKv->GetInt("XPos"), JumpViewpunchCheckButtonKv->GetInt("YPos"), JumpViewpunchCheckButtonKv->GetInt("Wide"), JumpViewpunchCheckButtonKv->GetInt("Tall"));
 	m_JumpViewpunchCheckButton->SetSelected(amod_jump_punch_enable.GetInt());
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_JumpViewpunchCheckButton, JumpViewpunchCheckButtonKv);
 
 	//land viewpunch
 	ConVarRef amod_land_punch_enable("amod_land_punch_enable");
 	m_LandViewpunchCheckButton = new CheckButton(this, "LandViewpunch", LandViewpunchCheckButtonKv->GetString("Text", ""));
 	m_LandViewpunchCheckButton->SetBounds(LandViewpunchCheckButtonKv->GetInt("XPos"), LandViewpunchCheckButtonKv->GetInt("YPos"), LandViewpunchCheckButtonKv->GetInt("Wide"), LandViewpunchCheckButtonKv->GetInt("Tall"));
 	m_LandViewpunchCheckButton->SetSelected(amod_land_punch_enable.GetInt());
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_LandViewpunchCheckButton, LandViewpunchCheckButtonKv);
 
 	//roll angle check button
 	ConVarRef sv_rollangle("sv_rollangle");
 	m_RollAngleCheckButton = new CheckButton(this, "RollAngleSlider", RollAngleCheckButtonKv->GetString("Text", ""));
 	m_RollAngleCheckButton->SetBounds(RollAngleCheckButtonKv->GetInt("XPos"), RollAngleCheckButtonKv->GetInt("YPos"), RollAngleCheckButtonKv->GetInt("Wide"), RollAngleCheckButtonKv->GetInt("Tall"));
 	m_RollAngleCheckButton->SetSelected(sv_rollangle.GetInt());
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_RollAngleCheckButton, RollAngleCheckButtonKv);
 
 	//roll angle slider
 	m_RollAngleSlider = new Slider(this, "RollAngleSlider");
 	m_RollAngleSlider->SetBounds(RollAngleSliderKv->GetInt("XPos"), RollAngleSliderKv->GetInt("YPos"), RollAngleSliderKv->GetInt("Wide"), RollAngleSliderKv->GetInt("Tall"));
 	m_RollAngleSlider->SetRange(RollAngleSliderKv->GetInt("Min"), RollAngleSliderKv->GetInt("Max"));
 	m_RollAngleSlider->SetValue(sv_rollangle.GetInt());
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_RollAngleSlider, RollAngleSliderKv);
 
 	//roll angle label
 	Label* RollAnglelabel = new Label(this, "RollAngleLabel", RollAngleLabelKv->GetString("Text"));
@@ -1620,8 +1640,8 @@ void COptionsPanel::Init()
 
 	//make the ending combo box
 	m_EndingComboBox = new ComboBox(this, "EndingComboBox", 2, false);
-	m_EndingComboBox->AddItem("Mod Ending: Ending 1", nullptr);
-	m_EndingComboBox->AddItem("Mod Ending: Ending 2", nullptr);
+	m_EndingComboBox->AddItem("#Amod_OptionsPanel_Ending1", nullptr);
+	m_EndingComboBox->AddItem("#Amod_OptionsPanel_Ending2", nullptr);
 	m_EndingComboBox->ActivateItem(0);
 	m_EndingComboBox->SetBounds(EndingButtonKV->GetInt("XPos"), EndingButtonKV->GetInt("YPos"), EndingButtonKV->GetInt("Wide"), EndingButtonKV->GetInt("Tall"));
 

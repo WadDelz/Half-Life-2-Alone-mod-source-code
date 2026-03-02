@@ -158,13 +158,13 @@ CPlaylistSavePanel::CPlaylistSavePanel(vgui::VPANEL parent)
 
 	SetSize(250, 100);
 	MoveToCenterOfScreen();
-	SetTitle("Save Playlist.", false);
+	SetTitle("#Amod_SongPanel_Playlist_Save_PlaylistTitle", false);
 
 	//set the panel scheme
 	SetScheme(vgui::scheme()->LoadSchemeFromFile("resource/SourceScheme.res", "SourceScheme"));
 
 	//make the elements
-	Label* PlaylistNameLabel = new Label(this, "PlaylistNameLabel", "Playlist Name:");
+	Label* PlaylistNameLabel = new Label(this, "PlaylistNameLabel", "#Amod_SongPanel_Playlist_Save_PlaylistName");
 	PlaylistNameLabel->SetBounds(5, 20, 240, 20);
 	PlaylistNameLabel->SetContentAlignment(Label::Alignment::a_center);
 
@@ -172,7 +172,7 @@ CPlaylistSavePanel::CPlaylistSavePanel(vgui::VPANEL parent)
 	m_PlaylistFilename->SetBounds(5, 40, 240, 25);
 	m_PlaylistFilename->SetMaximumCharCount(64);
 
-	Button* SaveButton = new Button(this, "SavePlaylist", "Save Playlist");
+	Button* SaveButton = new Button(this, "SavePlaylist", "#Amod_SongPanel_Playlist_Save_SaveButton");
 	SaveButton->SetBounds(5, 70, 240, 25);
 	SaveButton->SetCommand(PLAYLIST_SAVE_COMMAND);
 
@@ -199,7 +199,7 @@ void CPlaylistSavePanel::OnCommand(const char* pszCommand)
 		if (m_PlaylistFilename->GetTextLength() <= 0)
 		{
 			//show error
-			QueryBox* box = new QueryBox("Error", "Got empty playlist filename!", this);
+			QueryBox* box = new QueryBox("#Amod_Panel_Error", "#Amod_SongPanel_Playlist_Save_EmptyFilename", this);
 			box->DoModal(this);
 			box->Activate();
 			return;
@@ -269,13 +269,13 @@ CPlaylistLoadPanel::CPlaylistLoadPanel(vgui::VPANEL parent)
 
 	SetSize(250, 100);
 	MoveToCenterOfScreen();
-	SetTitle("Load Playlist.", false);
+	SetTitle("#Amod_SongPanel_Playlist_Load_PlaylistTitle", false);
 
 	//set the panel scheme
 	SetScheme(vgui::scheme()->LoadSchemeFromFile("resource/SourceScheme.res", "SourceScheme"));
 
 	//make the elements
-	Label* PlaylistNameLabel = new Label(this, "PlaylistNameLabel", "Playlist Name:");
+	Label* PlaylistNameLabel = new Label(this, "PlaylistNameLabel", "#Amod_SongPanel_Playlist_Load_PlaylistName");
 	PlaylistNameLabel->SetBounds(5, 20, 240, 20);
 	PlaylistNameLabel->SetContentAlignment(Label::Alignment::a_center);
 
@@ -296,7 +296,7 @@ CPlaylistLoadPanel::CPlaylistLoadPanel(vgui::VPANEL parent)
 
 	m_PlaylistFilename->ActivateItem(0);
 
-	Button* SaveButton = new Button(this, "LoadPlaylist", "Load Playlist");
+	Button* SaveButton = new Button(this, "LoadPlaylist", "#Amod_SongPanel_Playlist_Load_LoadButton");
 	SaveButton->SetBounds(5, 70, 240, 25);
 	SaveButton->SetCommand(PLAYLIST_LOAD_COMMAND);
 
@@ -356,7 +356,7 @@ void CPlaylistLoadPanel::OnCommand(const char* pszCommand)
 		if (m_PlaylistFilename->GetTextLength() <= 0)
 		{
 			//show error
-			QueryBox* box = new QueryBox("Error", "Got empty playlist filename!", this);
+			QueryBox* box = new QueryBox("#Amod_Panel_Error", "#Amod_SongPanel_Playlist_Save_EmptyFilename", this);
 			box->DoModal(this);
 			box->Activate();
 			return;
@@ -404,7 +404,7 @@ void PlaylistLoadPanel_Open(vgui::Frame* songpanel)
 	if (!g_PlaylistLoadPanel)
 	{
 		//error
-		QueryBox* box = new QueryBox("Error", "Got 0 saved playlists!", songpanel);
+		QueryBox* box = new QueryBox("#Amod_Panel_Error", "#Amod_SongPanel_Playlist_Load_IsEmpty", songpanel);
 		box->DoModal(songpanel);
 		box->Activate();
 	}
@@ -754,7 +754,7 @@ CSongPlaylist::CSongPlaylist(Panel* parent, const char* name)
 	: BaseClass(parent, name)
 {
 	//create playlist label
-	Label* PlaylistLabel = new Label(this, "PlaylistLabel", "Playlist:");
+	Label* PlaylistLabel = new Label(this, "PlaylistLabel", "#Amod_SongPanel_PlaylistTitle");
 	PlaylistLabel->SetBounds(5, 2, 200, 20);
 }
 
@@ -772,12 +772,12 @@ void CSongPlaylist::CreateElements()
 	m_ScrollBar->AddActionSignalTarget(this);
 
 	//create bottom buttons
-	vgui::Button* SaveButton = new Button(this, "SaveButton", "Save Playlist");
+	vgui::Button* SaveButton = new Button(this, "SaveButton", "#Amod_SongPanel_Playlist_SaveButton");
 	SaveButton->SetBounds(0, tall - 24, wide / 2, 22);
 	SaveButton->AddActionSignalTarget(this);
 	SaveButton->SetCommand(PLAYLIST_COMMAND_SAVE);
 
-	vgui::Button* LoadButton = new Button(this, "LoadButton", "Load Playlist");
+	vgui::Button* LoadButton = new Button(this, "LoadButton", "#Amod_SongPanel_Playlist_LoadButton");
 	LoadButton->SetBounds(wide / 2, tall - 24, wide / 2, 22);
 	LoadButton->AddActionSignalTarget(this);
 	LoadButton->SetCommand(PLAYLIST_COMMAND_LOAD);
@@ -830,7 +830,7 @@ void CSongPlaylist::RemoveSelectedSong()
 	if (index == -1)
 	{
 		//show error
-		QueryBox* box = new QueryBox("Error", "No song currently selected!", GetParent());
+		QueryBox* box = new QueryBox("#Amod_Panel_Error", "#Amod_SongPanel_NoSongsSelected", GetParent());
 		box->DoModal(dynamic_cast<Frame*>(GetParent()));
 		box->Activate();
 
@@ -925,7 +925,7 @@ void CSongPlaylist::ChangeSelectedSong(AloneModSong_t* song)
 	if (index == -1)
 	{
 		//show error
-		QueryBox* box = new QueryBox("Error", "No song currently selected!", GetParent());
+		QueryBox* box = new QueryBox("#Amod_Panel_Error", "#Amod_SongPanel_NoSongsSelected", GetParent());
 		box->DoModal(dynamic_cast<Frame*>(GetParent()));
 		box->Activate();
 		return;
@@ -994,7 +994,7 @@ void CSongPlaylist::MoveSelectedSong(bool up)
 	if (index == -1)
 	{
 		//show error
-		QueryBox* box = new QueryBox("Error", "No song currently selected!", GetParent());
+		QueryBox* box = new QueryBox("#Amod_Panel_Error", "#Amod_SongPanel_NoSongsSelected", GetParent());
 		box->DoModal(dynamic_cast<Frame*>(GetParent()));
 		box->Activate();
 		return;
@@ -1183,7 +1183,7 @@ void CSongPlaylist::OnCommand(const char* pszCommand)
 		//check playlist size
 		if (m_Buttons.Count() <= 0)
 		{
-			QueryBox* box = new QueryBox("Error", "Playlist is empty!", GetParent());
+			QueryBox* box = new QueryBox("#Amod_Panel_Error", "#Amod_SongPanel_Playlist_Save_IsEmpty", GetParent());
 			box->DoModal(dynamic_cast<Frame*>(GetParent()));
 			box->Activate();
 			return;
@@ -2028,7 +2028,7 @@ void CSongPanel::SavePlaylist(const char* filename)
 	if (!file->SaveToFile(filesystem, CFmtStr("playlists/%s.txt", filename), "MOD"))
 	{
 		//show error
-		QueryBox* box = new QueryBox("Error", CFmtStr("Failed to write playlist to file: \"playlists/%s.txt\"!", filename), this);
+		QueryBox* box = new QueryBox("#Amod_Panel_Error", CFmtStr("Failed to write playlist to file: \"playlists/%s.txt\"!", filename), this);
 		box->DoModal(this);
 		box->Activate();
 	}
@@ -2049,7 +2049,7 @@ void CSongPanel::LoadPlaylist(const char* filename)
 	if (!file->LoadFromFile(filesystem, CFmtStr("playlists/%s.txt", filename)))
 	{
 		//show error
-		QueryBox* box = new QueryBox("Error", CFmtStr("Failed to load playlist file: \"playlists/%s.txt\"!", filename), this);
+		QueryBox* box = new QueryBox("#Amod_Panel_Error", CFmtStr("Failed to load playlist file: \"playlists/%s.txt\"!", filename), this);
 		box->DoModal(this);
 		box->Activate();
 
@@ -2175,7 +2175,7 @@ void CSongPanel::OnTick()
 	PreviousVolume = Volume;
 
 	//compare the previous and current pitch slider value
-	if (Pitch != PreviousPitch)
+	if (Pitch != PreviousPitch || !m_CurrPlaying)
 	{
 		enginesound->EmitAmbientSound(m_CurrPlaying, Volume, Pitch, SND_CHANGE_PITCH | SND_SHOULDPAUSE);
 
@@ -2340,7 +2340,7 @@ void CSongPanel::OnCommand(const char* pcCommand)
 		//check for empty playlist
 		if (g_QueuedSongs.Count() <= 0)
 		{
-			QueryBox* error = new QueryBox("Empty Playlist", "Got empty playlist!", this);
+			QueryBox* error = new QueryBox("#Amod_Panel_Error", "Amod_SongPanel_Playlist_Save_IsEmpty", this);
 			error->DoModal(this);
 			error->Activate();
 			return;

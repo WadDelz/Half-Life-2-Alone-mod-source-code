@@ -241,7 +241,7 @@ void CMapPropertiesPanelSkyboxFiltersPage::OnCommand(const char* pszCommand)
 	{
 		//create the skybox fog color dialog
 		m_ColorPicker = new CColorPicker(GetVPanel());
-		m_ColorPicker->SetTitle("Set Clouds Color (255 255 255 255 = default)", true);
+		m_ColorPicker->SetTitle("#MapProperties_SkyboxPage_ColorPicker_CloudsColor", true);
 		m_ColorPicker->SetUsesAlpha(true);
 		m_ColorPicker->SetColor(m_CloudColor);
 		m_ColorPicker->DoModal();

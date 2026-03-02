@@ -3,7 +3,7 @@
 #include <vgui_controls/PropertySheet.h>
 
 extern ConVar map_properties_editor_load_mod;
-extern ConVar amod_timeinfo_load_directory;
+extern ConVar amod_timeinfo_load_mod;
 
 //panel singleton
 CMapPropertiesEditorPanel* s_MapPropertiesEditorPanel;
@@ -57,7 +57,7 @@ public:
 		}
 
 		//play error sound
-		surface()->PlaySound("resource/warning.wav");
+		//surface()->PlaySound("resource/warning.wav");
 	}
 };
 
@@ -108,7 +108,7 @@ CSaveToFolderPanel::CSaveToFolderPanel(Panel* parent, const char* name) : BaseCl
 	SetSize(300, 85);
 	MoveToCenterOfScreen();
 	Activate();
-	SetTitle("Save Theme", true);
+	SetTitle("#MapProperties_SaveDialog_Title", true);
 
 	//create the text entry
 	m_TextEntry = new CSaveToFolderTextEntry(this, "SaveToFolderTextEntry");
@@ -116,11 +116,11 @@ CSaveToFolderPanel::CSaveToFolderPanel(Panel* parent, const char* name) : BaseCl
 	m_TextEntry->SetMaximumCharCount(64);
 
 	//create the Save and Cancel button
-	Button* m_SaveButton = new Button(this, "SaveButton", "Save");
+	Button* m_SaveButton = new Button(this, "SaveButton", "#MapProperties_Button_Save");
 	m_SaveButton->SetBounds(5, 55, 142, 25);
 	m_SaveButton->SetCommand("Save");
 
-	Button* m_CancelButton = new Button(this, "CancelButton", "Cancel");
+	Button* m_CancelButton = new Button(this, "CancelButton", "#MapProperties_Button_Cancel");
 	m_CancelButton->SetBounds(152, 55, 142, 25);
 	m_CancelButton->SetCommand("Close");
 }
@@ -202,7 +202,7 @@ CLoadFromFolderPanel::CLoadFromFolderPanel(Panel* parent, const char* name) : Ba
 	SetSize(300, 85);
 	MoveToCenterOfScreen();
 	Activate();
-	SetTitle("Load Theme", true);
+	SetTitle("#MapProperties_LoadDialog_Title", true);
 
 	//create the text entry
 	m_ComboBoxList = new CMapPropertiesEditorComboBox(this, "LoadFromFolderList", 10, false);
@@ -350,14 +350,14 @@ CMapPropertiesEditorPanel::CMapPropertiesEditorPanel(VPANEL parent) : BaseClass(
 	SetTitle(CFmtStr("Map Properties Editor: %s", map_properties_editor_load_mod.GetString()), false);
 	SetApplyButtonVisible(true);
 	SetDeleteSelfOnClose(true);
-	SetFadeEffectDisableOverride(true);
+	SetRoundedCorners(0);
 
 	//set our scheme
 	SetScheme(GetTimePropertiesScheme());
 
 	//add the pages
-	AddPage(m_NightPage = new CMapPropertiesEditorNightPage(this), "Night Map Properties");
-	AddPage(m_DayPage = new CMapPropertiesEditorDayPage(this), "Day Map Properties");
+	AddPage(m_NightPage = new CMapPropertiesEditorNightPage(this), "#MapProperties_ButtomTitle_NightMapProperties");
+	AddPage(m_DayPage = new CMapPropertiesEditorDayPage(this), "#MapProperties_ButtomTitle_DayMapProperties");
 	GetPropertySheet()->SetActivePage(ConVarRef("amod_day").GetBool() ? (Panel*)m_DayPage : (Panel*)m_NightPage);
 	GetPropertySheet()->SetKeyBoardInputEnabled(false);
 
@@ -382,16 +382,16 @@ CMapPropertiesEditorPanel::CMapPropertiesEditorPanel(VPANEL parent) : BaseClass(
 void CMapPropertiesEditorPanel::InitButtons()
 {
 	//set our apply button
-	SetApplyButtonText("Reload");
+	SetApplyButtonText("#MapProperties_Button_Reload");
 	_applyButton->SetEnabled(true);
 	_applyButton->SetCommand(COMMAND_RELOAD_SCRIPTS);
 
 	//set our reload button
-	SetCancelButtonText("Load");
+	SetCancelButtonText("#MapProperties_Button_Load");
 	_cancelButton->SetCommand(COMMAND_LOAD_FROM_FILE);
 
 	//set our save button
-	SetOKButtonText("Save");
+	SetOKButtonText("#MapProperties_Button_Save");
 	_okButton->SetCommand(COMMAND_SAVE_TO_FILE);
 
 	//delete _saveAsButton if needed
@@ -404,7 +404,7 @@ void CMapPropertiesEditorPanel::InitButtons()
 	//create our save button if needed
 	if (map_properties_editor_load_mod.GetString()[0] && !_saveAsButton)
 	{
-		_saveAsButton = new Button(this, "_saveAsButton", "Save As");
+		_saveAsButton = new Button(this, "_saveAsButton", "#MapProperties_Button_SaveAs");
 		_saveAsButton->SetCommand(COMMAND_SAVE_AS_FILE);
 	}
 }
@@ -461,7 +461,7 @@ void CMapPropertiesEditorPanel::OnFileSaved(KeyValues* data)
 	if (!filename || !*filename)
 	{
 		surface()->PlaySound("resource/warning.wav");
-		QueryBox* modal = new QueryBox("Error?", "The text entry was empty for the save dialog!", this);
+		QueryBox* modal = new QueryBox("#Amod_Panel_Error", "The text entry was empty for the save dialog!", this);
 		modal->MoveToCenterOfScreen();
 		modal->DoModal(this);
 		modal->Activate();
@@ -583,7 +583,7 @@ void CMapPropertiesEditorPanel::OnCommand(const char* pszCommand)
 		{
 			//set our convar + title
 			map_properties_editor_load_mod.SetValue(filename);
-			amod_timeinfo_load_directory.SetValue(CFmtStr("resource/time_info/%s", filename));
+			amod_timeinfo_load_mod.SetValue(filename);
 			SetTitle(CFmtStr("Map Properties Editor: %s", filename), false);
 
 			//reset our buttons
@@ -597,7 +597,7 @@ void CMapPropertiesEditorPanel::OnCommand(const char* pszCommand)
 	//check for COMMAND_RELOAD_SCRIPTS
 	else if (!Q_stricmp(pszCommand, COMMAND_RELOAD_SCRIPTS))
 	{
-		QueryBox* modal = new QueryBox("Are you sure?", CFmtStr("Are you sure you want to reload the \"resource/time_info/%s\" script files?\nAny unsaved data will be lost!", map_properties_editor_load_mod.GetString()), this);
+		QueryBox* modal = new QueryBox("#Amod_Panel_AreYouSure", CFmtStr("Are you sure you want to reload the \"resource/time_info/%s\" script files?\nAny unsaved data will be lost!", map_properties_editor_load_mod.GetString()), this);
 		modal->MoveToCenterOfScreen();
 		modal->DoModal(this);
 		modal->Activate();
@@ -624,8 +624,8 @@ void CMapPropertiesEditorPanel::OnCommand(const char* pszCommand)
 			delete g_MapPropertiesPanel;
 
 		//add the pages
-		AddPage(m_NightPage = new CMapPropertiesEditorNightPage(this), "Night Map Properties");
-		AddPage(m_DayPage = new CMapPropertiesEditorDayPage(this), "Day Map Properties");
+		AddPage(m_NightPage = new CMapPropertiesEditorNightPage(this), "#MapProperties_Button_NightMapProperties");
+		AddPage(m_DayPage = new CMapPropertiesEditorDayPage(this), "#MapProperties_Button_DayMapProperties");
 		GetPropertySheet()->SetActivePage(activepage ? (Panel*)m_DayPage : (Panel*)m_NightPage);
 	}
 

@@ -3,7 +3,7 @@
 
 //convars
 ConVar map_properties_editor_load_mod("map_properties_editor_load_mod", "", FCVAR_DEVELOPMENTONLY, "The path inside resource/time_editor/<map_properties_editor_load_mod>/* that will get edited instead of resource/time_editor/*");
-extern ConVar amod_timeinfo_load_directory;
+extern ConVar amod_timeinfo_load_mod;
 
 
 
@@ -12,9 +12,9 @@ extern ConVar amod_timeinfo_load_directory;
 
 //add more themes if you would like
 TimePropertyTheme_t g_TimePropertyThemes[NUM_TIME_PROPERTY_THEMES] = {
-	{"Dark Theme", "resource/panels/MapPropertiesEditor/MapPropertiesEditorDarkScheme.res", "MapPropertiesEditorDarkScheme"},
-	{"Light Theme", "resource/panels/MapPropertiesEditor/MapPropertiesEditorLightScheme.res", "MapPropertiesEditorLightScheme"},
-	{"Default Theme", "resource/panels/MapPropertiesEditor/MapPropertiesEditorDefaultScheme.res", "MapPropertiesEditorDefaultScheme"},
+	{"#MapProperties_DarkTheme", "resource/panels/MapPropertiesEditor/MapPropertiesEditorDarkScheme.res", "MapPropertiesEditorDarkScheme"},
+	{"#MapProperties_LightTheme", "resource/panels/MapPropertiesEditor/MapPropertiesEditorLightScheme.res", "MapPropertiesEditorLightScheme"},
+	{"#MapProperties_DefaultTheme", "resource/panels/MapPropertiesEditor/MapPropertiesEditorDefaultScheme.res", "MapPropertiesEditorDefaultScheme"},
 };
 
 //----------------------------------------------------------------------------------------------------
@@ -53,7 +53,8 @@ HScheme GetTimePropertiesScheme()
 
 
 
-
+//has the time properties panel been opened
+bool g_bHasTimePropertiesPanelBeenOpen = false;
 
 //command to open the map time properties editor
 CON_COMMAND(open_map_time_properties_editor, "")
@@ -73,26 +74,26 @@ CON_COMMAND(open_map_time_properties_editor, "")
 
 	//get the folder
 	const char* mod = map_properties_editor_load_mod.GetString();
-	const char* folder = CFmtStr("resource/time_info%s%s", mod[0] ? "/" : "", mod);
 
-	//we always want to modify the map properties in the "resource/time_info" directory (or resource/time_info/<map_properties_editor_load_mod>). Incase 'amod_timeinfo_load_directory' isnt 
-	//that. Then Set it to that.
-	while (Q_stricmp(amod_timeinfo_load_directory.GetString(), folder))
+	//we always want to modify the map properties in the "resource/time_info" directory (or resource/time_info/<map_properties_editor_load_mod> directory if specified). 
+	//Incase 'amod_timeinfo_load_mod' isnt "" or map_properties_editor_load_mod. Then Set it to that.
+	while (Q_stricmp(amod_timeinfo_load_mod.GetString(), mod))
 	{
 		//check the folder exists
+		const char* folder = CFmtStr("resource/time_info%s%s", mod[0] ? "/" : "", mod);
 		if (!filesystem->IsDirectory(folder, "MOD"))
 		{
 			//reset map_properties_editor_load_mod (obviously its an invalid path)
 			map_properties_editor_load_mod.SetValue("");
 
-			//check the amod_timeinfo_load_directory isnt resource/time_info
-			folder = "resource/time_info";
-			if (!Q_stricmp(amod_timeinfo_load_directory.GetString(), folder))
+			//check the amod_timeinfo_load_mod isnt empty
+			mod = "";
+			if (!Q_stricmp(amod_timeinfo_load_mod.GetString(), mod))
 				break;
 		}
 
 		//reload the timeinfo
-		amod_timeinfo_load_directory.SetValue(folder);
+		amod_timeinfo_load_mod.SetValue(mod);
 		cvar->FindCommand("amod_timeinfo_reset")->Dispatch(CCommand{});
 
 		//we need to delete the panel now so the data gets reset
@@ -110,6 +111,9 @@ CON_COMMAND(open_map_time_properties_editor, "")
 		s_MapPropertiesEditorPanel = new CMapPropertiesEditorPanel(enginevgui->GetPanel(VGuiPanel_t::PANEL_TOOLS));
 
 	s_MapPropertiesEditorPanel->Activate();
+
+	//we have been open
+	g_bHasTimePropertiesPanelBeenOpen = true;
 }
 
 //----------------------------------------------------------------------------------------------------

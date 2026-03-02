@@ -29,14 +29,6 @@
 using namespace vgui;
 
 
-//fog array helpers
-const char* FindFogInfoFromArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, const char* key, const char* def = "");
-void AddOrUpdateFogInfoInArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, UtlSymId_t key, UtlSymId_t value);
-void AddOrUpdateFogInfoInArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, const char* key, const char* value);
-
-//sun array helpers
-const char* FindSunInfoFromArray(CUtlVector<MapTimeInfo_t::DayInfo_t::SunInfo_t>& info, const char* key, const char* def = "");
-void AddOrUpdateSunInfoInArray(CUtlVector<MapTimeInfo_t::DayInfo_t::SunInfo_t>& info, const char* key, const char* value);
 
 //finds the map path
 bool FindMapPath(const char* base, const char* find, char* output, int outputsize);
@@ -111,7 +103,7 @@ class CMapPropertiesPanelSlider : public WheelSlider
 	DECLARE_CLASS_SIMPLE(CMapPropertiesPanelSlider, WheelSlider);
 
 public:
-	CMapPropertiesPanelSlider(Panel* parent, const char* name, int wheeldelta = 1);
+	CMapPropertiesPanelSlider(Panel* parent, const char* name, int wheeldelta = 1, bool handleundo = true);
 
 	virtual void OnMouseReleased(MouseCode code);
 	virtual void OnMousePressed(MouseCode code);
@@ -131,6 +123,10 @@ public:
 private:
 	//previous value before the mouse button was presseed down
 	int m_PreviousValue = 0;
+
+	//handle undo steps?
+	bool m_HandleUndo;
+	friend void AddUndo_SetSlider(Slider* slider, int previousValue);
 };
 
 
@@ -171,6 +167,9 @@ class CMapPropertiesPanelPageBase : public PropertyPage
 public:
 	CMapPropertiesPanelPageBase(Panel* parent, const char* name, const char* keyvaluesfile);
 	~CMapPropertiesPanelPageBase();
+
+	//scheme
+	virtual void ApplySchemeSettings(IScheme* scheme);
 
 	//format functions
 	virtual void ApplySettingsToPanel(KeyValues* subkey, Panel* panel);

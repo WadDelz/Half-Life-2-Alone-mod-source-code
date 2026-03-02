@@ -187,7 +187,7 @@ void CMapPropertiesPanelSunPage::OnCommand(const char* pszCommand)
 	{
 		//create the skybox fog color dialog
 		m_ColorPicker = new CColorPicker(GetVPanel());
-		m_ColorPicker->SetTitle("Set Sun Color", true);
+		m_ColorPicker->SetTitle("#MapProperties_SunPage_ColorPicker_SunColor", true);
 		m_ColorPicker->SetUsesAlpha(false);
 		m_ColorPicker->SetColor(m_SunColor);
 		m_ColorPicker->DoModal();
@@ -198,7 +198,7 @@ void CMapPropertiesPanelSunPage::OnCommand(const char* pszCommand)
 	{
 		//create the skybox fog color dialog
 		m_ColorPicker = new CColorPicker(GetVPanel());
-		m_ColorPicker->SetTitle("Set Sun Overlay Color", true);
+		m_ColorPicker->SetTitle("#MapProperties_SunPage_ColorPicker_SunOverlayColor", true);
 		m_ColorPicker->SetUsesAlpha(false);
 		m_ColorPicker->SetColor(m_SunOverlayColor);
 		m_ColorPicker->DoModal();

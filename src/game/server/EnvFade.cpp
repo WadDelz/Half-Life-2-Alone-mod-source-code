@@ -66,12 +66,16 @@ void CEnvFade::Spawn( void )
 {
 }
 
+extern ConVar __amod_in_prop_editor;
 
 //-----------------------------------------------------------------------------
 // Purpose: Input handler that does the screen fade.
 //-----------------------------------------------------------------------------
 void CEnvFade::InputFade( inputdata_t &inputdata )
 {
+	if (__amod_in_prop_editor.GetBool())
+		return;
+
 	if (!Q_strcmp(STRING(gpGlobals->mapname), "ep2_outland_12a_d") && !Q_strcmp(STRING(GetEntityName()), "f_portal"))
 	{
 		ConCommand* cc = cvar->FindCommand("amod_outrotest");

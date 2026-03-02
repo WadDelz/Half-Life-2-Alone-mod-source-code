@@ -6,13 +6,22 @@
 //static map properties panel
 CMapPropertiesPanel* g_MapPropertiesPanel;
 
+//----------------------------------------------------------------------------------------------------
+// Purpose: Focus funcs for the properties panel
+//----------------------------------------------------------------------------------------------------
+void EnablePropertiesEditorInput(bool enable)
+{
+	if (g_MapPropertiesPanel)
+		g_MapPropertiesPanel->SetKeyBoardInputEnabled(enable);
+}
+
 extern ConVar cl_mouselook;
 
 //----------------------------------------------------------------------------------------------------
 // Purpose: Constructor for map properties panel
 //----------------------------------------------------------------------------------------------------
 CMapPropertiesPanel::CMapPropertiesPanel(Panel* parent) : BaseClass(nullptr, "MapPropertiesPanel")
-{
+{	
 	//clear the previous convar values
 	memset(m_PreviousCloudsOverrideValue, 0, sizeof(m_PreviousCloudsOverrideValue));
 	memset(m_PreviousCloudsColorValue, 0, sizeof(m_PreviousCloudsColorValue));
@@ -21,6 +30,9 @@ CMapPropertiesPanel::CMapPropertiesPanel(Panel* parent) : BaseClass(nullptr, "Ma
 	memset(m_PreviousFilterIntensityConvarValue, 0, sizeof(m_PreviousFilterIntensityConvarValue));
 	memset(m_PreviousGodConvarValue, 0, sizeof(m_PreviousGodConvarValue));
 	memset(m_PreviousEpicFilterConvarValue, 0, sizeof(m_PreviousEpicFilterConvarValue));
+
+	//set our convar
+	ConVarRef("__amod_in_prop_editor").SetValue(true);
 
 	//reset our coppied steps
 	memset(s_UndoSteps, 0, sizeof(s_UndoSteps));
@@ -31,6 +43,7 @@ CMapPropertiesPanel::CMapPropertiesPanel(Panel* parent) : BaseClass(nullptr, "Ma
 	//set our settings
 	g_MapPropertiesPanel = this;
 	m_bNightTimeMode = true;
+	m_bClosed = false;
 
 	SetParent(enginevgui->GetPanel(VGuiPanel_t::PANEL_TOOLS));
 	SetKeyBoardInputEnabled(true);
@@ -39,7 +52,7 @@ CMapPropertiesPanel::CMapPropertiesPanel(Panel* parent) : BaseClass(nullptr, "Ma
 	SetEnabled(true);
 	SetSizeable(false);
 	SetDeleteSelfOnClose(true);
-	SetFadeEffectDisableOverride(true);
+	SetRoundedCorners(0);
 	Activate();
 
 	//set our scheme
@@ -50,17 +63,25 @@ CMapPropertiesPanel::CMapPropertiesPanel(Panel* parent) : BaseClass(nullptr, "Ma
 	//GetPropertySheet()->SetKeyBoardInputEnabled(false);
 
 	//set our ok button command
-	SetOKButtonText("Save");
+	SetOKButtonText("#MapProperties_Button_Save");
 	_okButton->SetCommand(COMMAND_APPLY_PAGE_SETTINGS);
 
 	//set the cancel text
-	SetCancelButtonText("Cancel");
+	SetCancelButtonText("#MapProperties_Button_Cancel");
 
 	//set our pos
 	SetPos(0, 0);
 
 	//disable mouselook so keyboard look can be used
 	cl_mouselook.SetValue(false);
+
+	//show the intro modal
+	static bool s_ShowedIntroModal = false;
+	if (!s_ShowedIntroModal)
+	{
+		PostMessage(this, new KeyValues("Command", "command", "ShowIntroModal"), 0.0f);
+		s_ShowedIntroModal = true;
+	}
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -145,6 +166,15 @@ void CMapPropertiesPanel::OnKeyCodePressed(KeyCode code)
 		UndoStep_Apply(shiftdown == false);
 	}
 
+#if FOG_CUBE_TRIGGER_TEST
+	//check our page + shift keys
+	if ((code == KeyCode::KEY_LSHIFT || code == KeyCode::KEY_RSHIFT) && m_FogTriggersPage->IsInSizeEditor())
+	{
+		m_FogTriggersPage->OnKeyCodePressed(code);
+		return;
+	}
+#endif
+
 	BaseClass::OnKeyCodePressed(code);
 }
 
@@ -210,6 +240,10 @@ CMapPropertiesPanel::~CMapPropertiesPanel()
 	ConVarRef(m_bNightTimeMode ? "amod_epic_filter_night_filename" : "amod_epic_filter_day_filename").SetValue(m_PreviousFilterConvarValue);
 	ConVarRef(m_bNightTimeMode ? "amod_epic_filter_night_intensity" : "amod_epic_filter_day_intensity").SetValue(m_PreviousFilterIntensityConvarValue);
 
+	//set our convar
+	ConVarRef("__amod_in_prop_editor").SetValue(false);
+
+	//write our config
 	void Amod_WriteConfig();
 	Amod_WriteConfig();
 
@@ -235,14 +269,23 @@ CMapPropertiesPanel::~CMapPropertiesPanel()
 //----------------------------------------------------------------------------------------------------
 void CMapPropertiesPanel::OnThink()
 {
+	if (m_bClosed)
+		goto end;
+
 	//call each pages Update function
 	m_FogPage->Update();
+
+#if FOG_CUBE_TRIGGER_TEST
+	m_FogTriggersPage->Update();
+#endif
+
 	m_SkyboxFilterPage->Update();
 
 	//only update the sun page if not using the daytime panel
 	if (!m_bNightTimeMode)
 		m_SunPage->Update();
 
+end:
 	BaseClass::OnThink();
 }
 
@@ -251,11 +294,16 @@ void CMapPropertiesPanel::OnThink()
 //----------------------------------------------------------------------------------------------------
 void CMapPropertiesPanel::OnClose()
 {
+	//when we close our panel, it doesnt cause our pages Update() function to stop for abit after we close. This can be an issue
+	//because sometimes the Update() functions reset the vars we set inside the _amod_day_do call below. So dont do anything for the OnThink function
+	//if this panel is currently closed
+	m_bClosed = true;
+
 	//check our s_NeedSave
 	if (s_NeedSave)
 	{
 		//show confirm
-		QueryBox* modal = new QueryBox("Close?", "Are you sure you would like to close this dialog without saving?", this);
+		QueryBox* modal = new QueryBox("#MapProperties_Query_Close_Title", "#MapProperties_Query_Close_Desc", this);
 		modal->MoveToCenterOfScreen();
 		modal->Activate();
 		modal->DoModal();
@@ -294,11 +342,27 @@ void CMapPropertiesPanel::OnCommand(const char* pszCommand)
 	}
 
 	//resets this panels modal state
-	else if (!Q_stricmp(pszCommand, "DoModal"))
+	else if (!Q_stricmp(pszCommand, "DoModal"))	
 	{
+		//if this is the current app surfaces then return.
+		if (vgui::input()->GetAppModalSurface() == GetVPanel())
+			return;
+
 		m_hPreviousModal = vgui::input()->GetAppModalSurface();
 		vgui::input()->SetAppModalSurface(GetVPanel());
 		return;
+	}
+
+	//check for ShowIntroModal
+	else if (!Q_stricmp(pszCommand, "ShowIntroModal"))
+	{
+		//show first time dialog
+		QueryBox* modal = new QueryBox("#MapProperties_Query_FirstTime_Title", "#MapProperties_Query_FirstTime_Desc", this);
+		modal->MoveToCenterOfScreen();
+		modal->Activate();
+		modal->DoModal();
+		modal->SetOKCommand(new KeyValues("Command", "command", "DoModal"));
+		modal->SetCancelCommand(new KeyValues("Command", "command", "DoModal"));
 	}
 
 	BaseClass::OnCommand(pszCommand);
@@ -327,10 +391,15 @@ void CMapPropertiesPanel::Init(MapTimeInfo_t& info, bool IsNightPage)
 	m_bNightTimeMode = IsNightPage;
 
 	//create and set our pages
-	AddPage(m_FogPage = new CMapPropertiesPanelFogPage(this, "FogPage"), "Fog Settings");
+	AddPage(m_FogPage = new CMapPropertiesPanelFogPage(this, "FogPage"), "#MapProperties_FogPage_Title");
 	m_FogPage->InitFogInfo(info, IsNightPage);
+	
+#if FOG_CUBE_TRIGGER_TEST
+	AddPage(m_FogTriggersPage = new CMapPropertiesPanelFogTriggersPage(this, "FogTriggersPage"), "#MapProperties_FogTriggersPage_Title");
+	m_FogTriggersPage->InitFogTriggerInfo(info, IsNightPage);
+#endif
 
-	AddPage(m_SkyboxFilterPage = new CMapPropertiesPanelSkyboxFiltersPage(this, "SkyboxFilterPage"), "Skybox + Filter Settings");
+	AddPage(m_SkyboxFilterPage = new CMapPropertiesPanelSkyboxFiltersPage(this, "SkyboxFilterPage"), "#MapProperties_SkyboxPage_Title");
 	m_SkyboxFilterPage->InitSkyboxAndFilter(info, IsNightPage);
 
 	//only add the sun page if it isnt the daytime panel
@@ -355,6 +424,11 @@ void CMapPropertiesPanel::Init(MapTimeInfo_t& info, bool IsNightPage)
 void CMapPropertiesPanel::GetData(MapTimeInfo_t& info)
 {
 	m_FogPage->GetFogInfo(info);
+
+#if FOG_CUBE_TRIGGER_TEST
+	m_FogTriggersPage->GetFogTriggerInfo(info);
+#endif
+
 	m_SkyboxFilterPage->GetSkyboxFilterInfo(info);
 
 	//dont get the sun data if this is the night page

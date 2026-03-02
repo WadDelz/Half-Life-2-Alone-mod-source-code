@@ -2,6 +2,12 @@
 #ifndef __ALONEMODTIMEINFO_H
 #define __ALONEMODTIMEINFO_H
 
+#ifdef CLIENT_DLL
+#define FOG_CUBE_TRIGGER_TEST 0		//1
+#else
+#define FOG_CUBE_TRIGGER_TEST 0		//always 0. This is not needed for the server
+#endif
+
 //map times info
 struct MapTimeInfo_t
 {
@@ -13,6 +19,37 @@ struct MapTimeInfo_t
 		UtlSymId_t value;
 	};
 
+#ifdef FOG_CUBE_TRIGGER_TEST
+	//fog cube triggers
+	struct FogCubeTrigger_t
+	{
+		//cube trigger value
+		struct Value_t
+		{
+			float a;
+			float b;
+			float c;
+		};
+
+		//fog name
+		char name[256];
+
+		//bounds
+		Vector mins, maxs;
+
+		//fog array
+		CUtlVector<FogInfo_t> foginfo;
+
+		//lerp stuff
+		bool inlerp;
+		float lerptime;
+		float lerpstarttime;
+		float lerpendtime;
+
+		//is this active
+		bool active = false;
+	};
+#endif
 
 	//night info
 	struct NightInfo_t
@@ -20,6 +57,11 @@ struct MapTimeInfo_t
 		//fog info stuff
 		bool FogEnabled = false;
 		CUtlVector<FogInfo_t> FogInfo;
+
+#ifdef FOG_CUBE_TRIGGER_TEST
+		//fog cube triggers
+		CUtlVector<FogCubeTrigger_t> FogCubeTriggers;
+#endif
 
 		UtlSymId_t DefaultNightSky;		//the default night sky name
 
@@ -51,6 +93,11 @@ struct MapTimeInfo_t
 		//fog info stuff
 		bool FogEnabled = false;
 		CUtlVector<FogInfo_t> FogInfo;
+
+#ifdef FOG_CUBE_TRIGGER_TEST
+		//fog cube triggers
+		CUtlVector<FogCubeTrigger_t> FogCubeTriggers;
+#endif
 
 		//the sun info
 		bool SunInfoEnabled = false;
@@ -92,6 +139,10 @@ CUtlVector<MapTimeInfoBase_t>& GetDayNightInfo();
 bool IsDaytimeEnabled();
 MapTimeInfo_t& GetMapTimeInfo(const char* mapname);
 
+//returns the current day night info
+extern MapTimeInfo_t* g_CurrentDayNightInfo;
+MapTimeInfo_t& GetCurrentMapTimeInfo();
+
 //returns the string from the index
 const char* StringFromMapTimeStringTableIndex(UtlSymId_t id);
 UtlSymId_t StringToMapTimeStringTableIndex(const char* string);
@@ -105,5 +156,16 @@ void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool copynight = t
 
 //Returns if the current map is invalid for the day/night sky change
 void InitalizeDayNightInfo(bool reload = false);		//initalizes the day/night info
+
+//fog array helpers
+const char* FindFogInfoFromArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, const char* key, const char* def = "");
+int AddOrUpdateFogInfoInArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, UtlSymId_t key, UtlSymId_t value);
+int AddOrUpdateFogInfoInArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, const char* key, const char* value);
+int AddOrUpdateFogInfoInArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, UtlSymId_t key, MapTimeInfo_t::FogCubeTrigger_t::Value_t value);
+void RemoveFogInfoInArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, const char* key);
+
+//sun array helpers
+const char* FindSunInfoFromArray(CUtlVector<MapTimeInfo_t::DayInfo_t::SunInfo_t>& info, const char* key, const char* def = "");
+void AddOrUpdateSunInfoInArray(CUtlVector<MapTimeInfo_t::DayInfo_t::SunInfo_t>& info, const char* key, const char* value);
 
 #endif //__ALONEMODTIMEINFO_H

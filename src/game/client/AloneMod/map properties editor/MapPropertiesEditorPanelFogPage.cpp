@@ -414,7 +414,7 @@ void CMapPropertiesPanelFogPage::OnCommand(const char* pszCommand)
 	{
 		//create the fog color dialog
 		m_ColorPicker = new CColorPicker(GetVPanel());
-		m_ColorPicker->SetTitle("Set Fog Color", true);
+		m_ColorPicker->SetTitle("#MapProperties_FogPage_ColorPicker_Color", true);
 		m_ColorPicker->SetUsesAlpha(false);
 		m_ColorPicker->SetColor(m_FogColor);
 		m_ColorPicker->DoModal();
@@ -427,7 +427,7 @@ void CMapPropertiesPanelFogPage::OnCommand(const char* pszCommand)
 	{
 		//create the skybox fog color dialog
 		m_ColorPicker = new CColorPicker(GetVPanel());
-		m_ColorPicker->SetTitle("Set Skybox Fog Color", true);
+		m_ColorPicker->SetTitle("#MapProperties_FogPage_ColorPicker_SkyboxColor", true);
 		m_ColorPicker->SetUsesAlpha(false);
 		m_ColorPicker->SetColor(m_FogSkyboxColor);
 		m_ColorPicker->DoModal();
@@ -440,7 +440,7 @@ void CMapPropertiesPanelFogPage::OnCommand(const char* pszCommand)
 	{
 		//create the skybox fog color dialog
 		m_ColorPicker = new CColorPicker(GetVPanel());
-		m_ColorPicker->SetTitle("Set Fog Blend Color", true);
+		m_ColorPicker->SetTitle("#MapProperties_FogPage_ColorPicker_BlendTitle", true);
 		m_ColorPicker->SetUsesAlpha(false);
 		m_ColorPicker->SetColor(m_FogBlendColor);
 		m_ColorPicker->DoModal();
@@ -453,7 +453,7 @@ void CMapPropertiesPanelFogPage::OnCommand(const char* pszCommand)
 	{
 		//create the skybox fog color dialog
 		m_ColorPicker = new CColorPicker(GetVPanel());
-		m_ColorPicker->SetTitle("Set Fog Blend Color", true);
+		m_ColorPicker->SetTitle("#MapProperties_FogPage_ColorPicker_SkyboxBlendTitle", true);
 		m_ColorPicker->SetUsesAlpha(false);
 		m_ColorPicker->SetColor(m_FogBlendColor);
 		m_ColorPicker->DoModal();

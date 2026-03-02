@@ -66,7 +66,7 @@ void AmodCloudsChangeCallback(IConVar* var, const char*, float)
 	else
 	{
 		//get the string
-		MapTimeInfo_t& info = GetMapTimeInfo(V_GetFileName(gpGlobals->mapname.ToCStr()));
+		MapTimeInfo_t& info = GetCurrentMapTimeInfo();
 		const char* color = StringFromMapTimeStringTableIndex(IsDaytimeEnabled() ? info.DayInfo.CloudsColor : info.NightInfo.CloudsColor);
 
 		//get the color now
@@ -164,7 +164,7 @@ void AmodEpicFilterCallback(IConVar* var, const char*, float)
 		return;
 
 	//get the map info
-	MapTimeInfo_t& info = GetMapTimeInfo(V_GetFileName(gpGlobals->mapname.ToCStr()));
+	MapTimeInfo_t& info = GetCurrentMapTimeInfo();
 
 	//set the color correction differently if daytime
 	if (IsDaytimeEnabled())
@@ -267,7 +267,7 @@ void AmodSunChangeCallback(IConVar* var, const char*, float)
 	}
 	else
 	{
-		SetSunForDaytime(GetMapTimeInfo(V_GetFileName(gpGlobals->mapname.ToCStr())));
+		SetSunForDaytime(GetCurrentMapTimeInfo());
 	}
 }
 
@@ -280,6 +280,11 @@ class CAmodAutoGameSystem : public CAutoGameSystem
 public:
 	void LevelInitPreEntity()
 	{
+		//set g_CurrentDayNightInfo. There used to be a seperate system to call this but i removed
+		//that because i only really need to set it here.
+		g_CurrentDayNightInfo = &GetMapTimeInfo(gpGlobals->mapname.ToCStr());
+
+		//check for the sv_skyname convar
 		static ConVar* sname = cvar->FindVar("sv_skyname");
 		if (!sname)
 			return;
@@ -312,7 +317,7 @@ public:
 		clientengine->ClientCmd_Unrestricted("r_farz -1");
 
 		//get the time info
-		MapTimeInfo_t& info = GetMapTimeInfo(V_GetFileName(gpGlobals->mapname.ToCStr()));
+		MapTimeInfo_t& info = GetCurrentMapTimeInfo();
 
 		//enable bloom
 		if (daytime)
@@ -370,7 +375,7 @@ public:
 		CBaseEntity* cc = CreateEpicFilter();
 
 		//get the map info
-		MapTimeInfo_t& info = GetMapTimeInfo(V_GetFileName(gpGlobals->mapname.ToCStr()));
+		MapTimeInfo_t& info = GetCurrentMapTimeInfo();
 
 		//set the color correction differently if daytime
 		if (IsDaytimeEnabled())

@@ -2,87 +2,6 @@
 #include "MapPropertiesEditorPanelBasePage.h"
 
 //----------------------------------------------------------------------------------------------------
-// Purpose: Finds the string from the fog info array
-//----------------------------------------------------------------------------------------------------
-const char* FindFogInfoFromArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, const char* key, const char* def)
-{
-	for (int i = 0; i < info.Count(); i++)
-	{
-		if (!Q_stricmp(StringFromMapTimeStringTableIndex(info[i].convar), key))
-			return StringFromMapTimeStringTableIndex(info[i].value);
-	}
-
-	return def;
-}
-
-//----------------------------------------------------------------------------------------------------
-// Purpose: Adds a key/value to the fog info array, or updates the value if the key already exists
-//----------------------------------------------------------------------------------------------------
-void AddOrUpdateFogInfoInArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, UtlSymId_t key, UtlSymId_t value)
-{
-	//search for existing key
-	for (int i = 0; i < info.Count(); i++)
-	{
-		if (info[i].convar == key)
-		{
-			//update existing value
-			info[i].value = value;
-			return;
-		}
-	}
-
-	//key not found, add new entry
-	MapTimeInfo_t::FogInfo_t& newInfo = info[info.AddToTail()];
-	newInfo.convar = key;
-	newInfo.value = value;
-}
-
-//----------------------------------------------------------------------------------------------------
-// Purpose: Adds a key/value to the fog info array, or updates the value if the key already exists
-//----------------------------------------------------------------------------------------------------
-void AddOrUpdateFogInfoInArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, const char* key, const char* value)
-{
-	AddOrUpdateFogInfoInArray(info, StringToMapTimeStringTableIndex(key), StringToMapTimeStringTableIndex(value));
-}
-
-//----------------------------------------------------------------------------------------------------
-// Purpose: Finds the string from the sun info array
-//----------------------------------------------------------------------------------------------------
-const char* FindSunInfoFromArray(CUtlVector<MapTimeInfo_t::DayInfo_t::SunInfo_t>& info, const char* key, const char* def)
-{
-	for (int i = 0; i < info.Count(); i++)
-	{
-		if (!Q_stricmp(StringFromMapTimeStringTableIndex(info[i].key), key))
-			return StringFromMapTimeStringTableIndex(info[i].value);
-	}
-
-	return def;
-}
-
-//----------------------------------------------------------------------------------------------------
-// Purpose: Adds a key/value to the sun info array, or updates the value if the key already exists
-//----------------------------------------------------------------------------------------------------
-void AddOrUpdateSunInfoInArray(CUtlVector<MapTimeInfo_t::DayInfo_t::SunInfo_t>& info, const char* key, const char* value)
-{
-	//search for existing key
-	for (int i = 0; i < info.Count(); i++)
-	{
-		if (!Q_stricmp(StringFromMapTimeStringTableIndex(info[i].key), key))
-		{
-			//update existing value
-			info[i].value = StringToMapTimeStringTableIndex(value);
-			return;
-		}
-	}
-
-	//key not found, add new entry
-	MapTimeInfo_t::DayInfo_t::SunInfo_t& newInfo = info[info.AddToTail()];
-	newInfo.key = StringToMapTimeStringTableIndex(key);
-	newInfo.value = StringToMapTimeStringTableIndex(value);
-}
-
-
-//----------------------------------------------------------------------------------------------------
 // Purpose: finds the map path from the input (looks inside directories)
 //----------------------------------------------------------------------------------------------------
 bool FindMapPath(const char* base, const char* find, char* output, int outputsize)
@@ -186,6 +105,10 @@ static void AddUndoStep(UndoStep_t::StepType_e type, const UndoStep_t& data)
 //-----------------------------------------------------------------------------
 void AddUndo_SetSlider(Slider* slider, int previousValue)
 {
+	//check the slider handles undo steps
+	if (dynamic_cast<CMapPropertiesPanelSlider*>(slider) && !dynamic_cast<CMapPropertiesPanelSlider*>(slider)->m_HandleUndo)
+		return;
+
 	UndoStep_t data;
 	data.m_Data.SliderData.m_SetSlider = slider;
 	data.m_Data.SliderData.m_GetValue = previousValue;
@@ -390,10 +313,7 @@ public:
 	void OnKeyTyped(wchar_t code) override
 	{
 		if (code < '0' || code > '9')
-		{
-			surface()->PlaySound("resource/warning.wav");
 			return;
-		}
 
 		BaseClass::OnKeyTyped(code);
 	}
@@ -507,8 +427,8 @@ static int g_bHasValueCoppied = INT_MAX;
 //----------------------------------------------------------------------------------------------------
 // Purpose: Constructor for the map properties panel slider
 //----------------------------------------------------------------------------------------------------
-CMapPropertiesPanelSlider::CMapPropertiesPanelSlider(Panel* parent, const char* name, int wheeldelta)
-	: BaseClass(parent, name, wheeldelta)
+CMapPropertiesPanelSlider::CMapPropertiesPanelSlider(Panel* parent, const char* name, int wheeldelta, bool handleundo)
+	: BaseClass(parent, name, wheeldelta), m_HandleUndo(handleundo)
 {
 }
 
@@ -760,6 +680,7 @@ CMapPropertiesPanelPageBase::CMapPropertiesPanelPageBase(Panel* parent, const ch
 {
 	//init our keyvalues and attempt to load our file
 	m_KeyValuesFile = new KeyValues("PropertiesPanelDialog");
+	m_KeyValuesFile->UsesEscapeSequences(true);
 	if (!m_KeyValuesFile->LoadFromFile(filesystem, keyvaluesfile, "MOD"))
 	{
 		ConWarning("Error: Failed to load page: \"%s\"\n", keyvaluesfile);
@@ -799,6 +720,24 @@ CMapPropertiesPanelPageBase::~CMapPropertiesPanelPageBase()
 		m_KeyValuesFile->deleteThis();
 
 	m_KeyValuesFile = nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Applies the scheme settings to this panel
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelPageBase::ApplySchemeSettings(IScheme* scheme)
+{
+	BaseClass::ApplySchemeSettings(scheme);
+
+	//set our tooltip
+	extern vgui::DHANDLE< TextEntry > s_TooltipWindow;
+	if (s_TooltipWindow.Get())
+	{
+		s_TooltipWindow->SetBgColor(s_TooltipWindow->GetSchemeColor("Tooltip.BgColor", s_TooltipWindow->GetBgColor(), scheme));
+		s_TooltipWindow->SetFgColor(s_TooltipWindow->GetSchemeColor("Tooltip.TextColor", s_TooltipWindow->GetFgColor(), scheme));
+		s_TooltipWindow->SetBorder(scheme->GetBorder("ToolTipBorder"));
+		s_TooltipWindow->SetFont(scheme->GetFont("DefaultSmall", s_TooltipWindow->IsProportional()));
+	}
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -856,6 +795,20 @@ void CMapPropertiesPanelPageBase::ApplySettingsToPanel(KeyValues* subkey, Panel*
 	int w = subkey->GetInt("w");
 	int h = subkey->GetInt("h");
 	panel->SetBounds(x, y, w, h);
+
+	//handle tooltops
+	KeyValues* tooltip = subkey->FindKey("TooltipData");
+	if (tooltip)
+	{
+		panel->GetTooltip()->SetEnabled(tooltip->GetBool("Enabled"));
+		panel->GetTooltip()->SetTooltipDelay(tooltip->GetInt("DelayInMS"));
+		panel->GetTooltip()->SetText(tooltip->GetString("Text"));
+
+		if (tooltip->GetBool("TooltipMultiline"))
+			panel->GetTooltip()->SetTooltipFormatToMultiLine();
+		else
+			panel->GetTooltip()->SetTooltipFormatToSingleLine();
+	}
 
 	//check for zpos
 	KeyValues* zpos = subkey->FindKey("zpos");

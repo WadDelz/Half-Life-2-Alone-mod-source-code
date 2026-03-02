@@ -631,10 +631,12 @@ void C_SoundscapeSystem::StartSubSoundscape( KeyValues *pSoundscape, subsoundsca
 		}
 		else if ( !Q_strcasecmp( pKey->GetName(), "dsp_volume" ) )
 		{
-			if ( params.allowDSP )
+			if (params.allowDSP)
 			{
-				ProcessDSPVolume( pKey, params );
+				ProcessDSPVolume(pKey, params);
 			}
+			else
+				m_pDSPVolumeVar->SetValue(0);
 		}
 		// add new commands here
 		else

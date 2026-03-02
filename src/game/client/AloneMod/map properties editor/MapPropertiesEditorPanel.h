@@ -2,6 +2,7 @@
 #define __MAPPROPERTIESEDITORPANEL_H
 
 #include "MapPropertiesEditorPanelFogPage.h"
+#include "MapPropertiesEditorPanelFogTriggersPage.h"
 #include "MapPropertiesEditorPanelSkyboxPage.h"
 #include "MapPropertiesEditorPanelSunPage.h"
 #include <vgui_controls/PropertyDialog.h>
@@ -42,10 +43,14 @@ public:
 private:
 	//pages
 	CMapPropertiesPanelFogPage* m_FogPage;
+	CMapPropertiesPanelFogTriggersPage* m_FogTriggersPage;
 	CMapPropertiesPanelSkyboxFiltersPage* m_SkyboxFilterPage;
 	CMapPropertiesPanelSunPage* m_SunPage;
 
 private:
+	//have we closed?
+	bool m_bClosed;
+
 	//day or night?
 	bool m_bNightTimeMode;
 

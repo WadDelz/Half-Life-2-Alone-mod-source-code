@@ -1218,7 +1218,7 @@ CON_COMMAND(amod_write_game_screenshot_current_config, "")
 	//go through each folder in the cfg directory and look for a .cfg that starts the same mapname
 	//as the current map name.
 	char gamefolder[512] = { 0 };
-	int chapter = FindChapterCfgForMap(gamefolder, sizeof(gamefolder));;
+	int chapter = FindChapterCfgForMap(gamefolder, sizeof(gamefolder));
 
 	//cehck for invalid chapter
 	if (chapter == -1)
@@ -1237,35 +1237,13 @@ CON_COMMAND(amod_write_game_screenshot_current_config, "")
 	else
 	{
 		//get the current mod folder
-		extern ConVar amod_timeinfo_load_directory;
-		Q_strncpy(mod, amod_timeinfo_load_directory.GetString(), sizeof(mod));
-
-		//search for the 1st / (i know its not called a dash but dash sounds cooler)
-		char* dash = Q_strstr(mod, "/");
-		if (dash)
-		{
-			//read the next dash
-			dash = Q_strstr(dash + 1, "/");
-			if (dash)
-			{
-				//read the mod folder
-				char* tempdash = Q_strstr(dash + 1, "/");
-				if (tempdash)
-					*tempdash = '\0';
-
-				//copy over to mod
-				Q_strncpy(mod, dash + 1, sizeof(mod));
-			}
-			else
-				mod[0] = '\0';
-		}
-		else
-			mod[0] = '\0';
+		extern ConVar amod_timeinfo_load_mod;
+		Q_strncpy(mod, amod_timeinfo_load_mod.GetString(), sizeof(mod));
 	}
 
 	//call amod_write_game_screenshot
 	CCommand _args;
-	_args.Tokenize(CFmtStr("amod_write_game_screenshot \"%s\" \"%s\" %d %d", mod, gamefolder, chapter, IsDaytimeEnabled()));
+	_args.Tokenize(CFmtStr("amod_write_game_screenshot \"%s\" \"%s\" %d %d", mod, gamefolder, chapter, args.ArgC() > 1 ? atoi(args.Arg(1)) : IsDaytimeEnabled()));
 	amod_write_game_screenshot(_args);
 }
 

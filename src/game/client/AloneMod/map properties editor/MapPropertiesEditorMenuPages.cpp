@@ -227,8 +227,15 @@ void CMapPropertiesEditorPageBase::Populate(CUtlVector<MapTimeInfo_t>& base)
 		//create the divider
 		Divider* divider = new Divider(this, "ButtonFrame");
 
+		//get the map text
+		wchar_t mapnameUnicode[256];
+		g_pVGuiLocalize->ConvertANSIToUnicode(base[i].mapname, mapnameUnicode, sizeof(mapnameUnicode));
+
+		wchar_t text[256];
+		swprintf(text, SIZE_OF_ARRAY(text), L"%ls: %ls", g_pVGuiLocalize->Find("MapProperties_MapLabel_Text"), mapnameUnicode);
+
 		//create the mapname text
-		Label* maptext = new Label(divider, "MapText", CFmtStr("Map: %s", base[i].mapname));
+		Label* maptext = new Label(divider, "MapText", text);
 		maptext->SetBounds(10, 5, 365, 40);
 		maptext->SetFont(m_MapTextFont);
 		maptext->SetContentAlignment(Label::Alignment::a_northwest);
@@ -282,26 +289,26 @@ void CMapPropertiesEditorPageBase::Populate(CUtlVector<MapTimeInfo_t>& base)
 		}
 
 		//create the enabled check button
-		CheckButton* enabledCheckButton = new CheckButton(divider, "enabledCheckButton", CFmtStr("Allow %s", m_bIsNightPage ? "Night time" : "Day time"));
+		CheckButton* enabledCheckButton = new CheckButton(divider, "enabledCheckButton", m_bIsNightPage ? "#MapProperties_CheckButton_AllowNightTime" : "#MapProperties_CheckButton_AllowDayTime");
 		enabledCheckButton->SetBounds(4, MAP_CONTAINER_HEIGHT - 92, 218, 24);
 		enabledCheckButton->SetCommand(CFmtStr(ENABLE_MAP_PREFIX "%d", i));
 		enabledCheckButton->AddActionSignalTarget(this);
 		enabledCheckButton->SetSelected(enabled);
 		
 		//create the copy map settings button
-		Button* copyButton = new Button(divider, "copyButton", "Copy Map State");
+		Button* copyButton = new Button(divider, "copyButton", "#MapProperties_Button_CopyState");
 		copyButton->SetBounds(4, MAP_CONTAINER_HEIGHT - 61, 105, 24);
 		copyButton->SetCommand(CFmtStr(COPY_MAP_STATE_PREFIX "%d", i));
 		copyButton->AddActionSignalTarget(this);
 
 		//create the paste map settings button
-		Button* pasteButton = new Button(divider, "pasteButton", "Paste Map State");
+		Button* pasteButton = new Button(divider, "pasteButton", "#MapProperties_Button_PasteState");
 		pasteButton->SetBounds(114, MAP_CONTAINER_HEIGHT - 61, 105, 24);
 		pasteButton->SetCommand(CFmtStr(PASTE_MAP_STATE_PREFIX"%d", i));
 		pasteButton->AddActionSignalTarget(this);
 
 		//create the modify map settings button
-		Button* modifyButton = new Button(divider, "ModifyMapSettings", "Modify Map Settings");
+		Button* modifyButton = new Button(divider, "ModifyMapSettings", "#MapProperties_Button_ModifyMapState");
 		modifyButton->SetBounds(4, MAP_CONTAINER_HEIGHT - 35, 355, 24);
 		modifyButton->SetCommand(CFmtStr(MODIFY_MAP_PREFIX "%d", i));
 		modifyButton->AddActionSignalTarget(this);
@@ -510,7 +517,7 @@ void CMapPropertiesEditorPageBase::OnCommand(KeyValues* data)
 			//play a sound and show the query box
 			surface()->PlaySound("ui/buttonclickrelease.wav");
 
-			QueryBox* modal = new QueryBox("Both times are disabled!", "Currently, both the day and night time modes for this map are not enabled/selected.\nWhen this happens, the game treats both time modes as enabled.\nThis will now check and enable the time states for both the day and night version of this map!", this);
+			QueryBox* modal = new QueryBox("#MapProperties_EnableTime_BothDisabled_Title", "#MapProperties_EnableTime_BothDisabled_Description", this);
 			modal->MoveToCenterOfScreen();
 			modal->Activate();
 			modal->DoModal();

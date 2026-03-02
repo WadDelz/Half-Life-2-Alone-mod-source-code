@@ -1265,6 +1265,8 @@ enum
 	TRANSITION_VOLUME_PASSED = 2,
 };
 
+//time properties editor convar
+ConVar __amod_in_prop_editor("__amod_in_prop_editor", "0", FCVAR_HIDDEN);
 
 //------------------------------------------------------------------------------
 // Reesponsible for changing levels when the player touches it
@@ -1555,6 +1557,9 @@ void CChangeLevel::WarnAboutActiveLead( void )
 
 void CChangeLevel::ChangeLevelNow( CBaseEntity *pActivator )
 {
+	if (__amod_in_prop_editor.GetBool())
+		return;
+
 	CBaseEntity	*pLandmark;
 	levellist_t	levels[16];
 
@@ -2963,6 +2968,9 @@ void CTriggerCamera::InputDisable( inputdata_t &inputdata )
 //-----------------------------------------------------------------------------
 void CTriggerCamera::Enable( void )
 {
+	if (__amod_in_prop_editor.GetBool())
+		return;
+
 	m_state = USE_ON;
 
 	if ( !m_hPlayer || !m_hPlayer->IsPlayer() )

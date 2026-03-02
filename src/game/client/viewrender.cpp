@@ -138,25 +138,24 @@ ConVar r_worldlistcache("r_worldlistcache", "1");
 //-----------------------------------------------------------------------------
 // set any of these to use the maps fog
 ConVar fog_override("fog_override", "0", FCVAR_CHEAT);
-static ConVar fog_start("fog_start", "-1", FCVAR_CHEAT);
-static ConVar fog_end("fog_end", "-1", FCVAR_CHEAT);
-static ConVar fog_color("fog_color", "-1 -1 -1", FCVAR_CHEAT);
-static ConVar fog_enable("fog_enable", "1", FCVAR_CHEAT);
-static ConVar fog_startskybox("fog_startskybox", "-1", FCVAR_CHEAT);
-static ConVar fog_endskybox("fog_endskybox", "-1", FCVAR_CHEAT);
-static ConVar fog_maxdensityskybox("fog_maxdensityskybox", "-1", FCVAR_CHEAT);
-static ConVar fog_colorskybox("fog_colorskybox", "-1 -1 -1", FCVAR_CHEAT);
-static ConVar fog_enableskybox("fog_enableskybox", "1", FCVAR_CHEAT);
-static ConVar fog_maxdensity("fog_maxdensity", "-1", FCVAR_CHEAT);
+ConVar fog_start("fog_start", "-1", FCVAR_CHEAT);
+ConVar fog_end("fog_end", "-1", FCVAR_CHEAT);
+ConVar fog_color("fog_color", "-1 -1 -1", FCVAR_CHEAT);
+ConVar fog_enable("fog_enable", "1", FCVAR_CHEAT);
+ConVar fog_startskybox("fog_startskybox", "-1", FCVAR_CHEAT);
+ConVar fog_endskybox("fog_endskybox", "-1", FCVAR_CHEAT);
+ConVar fog_maxdensityskybox("fog_maxdensityskybox", "-1", FCVAR_CHEAT);
+ConVar fog_colorskybox("fog_colorskybox", "-1 -1 -1", FCVAR_CHEAT);
+ConVar fog_enableskybox("fog_enableskybox", "1", FCVAR_CHEAT);
+ConVar fog_maxdensity("fog_maxdensity", "-1", FCVAR_CHEAT);
 
 //alone mod
-static ConVar fog_blend("fog_blend", "-1", FCVAR_CHEAT);
-static ConVar fog_blendangle("fog_blendangle", "-1", FCVAR_CHEAT);
-static ConVar fog_blendcolor("fog_blendcolor", "-1 -1 -1", FCVAR_CHEAT);
-
-static ConVar fog_blendskybox("fog_blendskybox", "-1", FCVAR_CHEAT);
-static ConVar fog_blendangleskybox("fog_blendangleskybox", "-1", FCVAR_CHEAT);
-static ConVar fog_blendcolorskybox("fog_blendcolorskybox", "-1 -1 -1", FCVAR_CHEAT);
+ConVar fog_blend("fog_blend", "-1", FCVAR_CHEAT);
+ConVar fog_blendangle("fog_blendangle", "-1", FCVAR_CHEAT);
+ConVar fog_blendcolor("fog_blendcolor", "-1 -1 -1", FCVAR_CHEAT);
+ConVar fog_blendskybox("fog_blendskybox", "-1", FCVAR_CHEAT);
+ConVar fog_blendangleskybox("fog_blendangleskybox", "-1", FCVAR_CHEAT);
+ConVar fog_blendcolorskybox("fog_blendcolorskybox", "-1 -1 -1", FCVAR_CHEAT);
 
 //-----------------------------------------------------------------------------
 // Water-related convars
@@ -2526,14 +2525,14 @@ void CViewRender::RenderView(const CViewSetup& viewtmp, int nClearFlags, int wha
 			int width, height;
 			g_pMaterialSystem->GetBackBufferDimensions(width, height);
 
-			float barWidth = amod_view_square_width.GetFloat();
-			float barHeight = amod_view_square_height.GetFloat();
+			float barWidth = amod_view_square_width.GetFloat() + 0.01;
+			float barHeight = amod_view_square_height.GetFloat() + 0.01;
 
-			DrawBar(m_screenBlackMaterial, width, height, -1.0f, -1.0f + barWidth);
-			DrawBar(m_screenBlackMaterial, width, height, 1.0f - barWidth, 1.0f);
+			DrawBar(m_screenBlackMaterial, width, height, -1.01f, -1.01f + barWidth);
+			DrawBar(m_screenBlackMaterial, width, height, 1.01f - barWidth, 1.01f);
 
-			DrawTopBar(m_screenBlackMaterial, width, height, -1.0f, -1.0f + barHeight);
-			DrawTopBar(m_screenBlackMaterial, width, height, 1.0f - barHeight, 1.0f);
+			DrawTopBar(m_screenBlackMaterial, width, height, -1.01f, -1.01f + barHeight);
+			DrawTopBar(m_screenBlackMaterial, width, height, 1.01f - barHeight, 1.01f);
 		}
 
 		if (amod_view_blur.GetBool())

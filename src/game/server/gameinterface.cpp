@@ -93,6 +93,8 @@
 //alone mod 
 #include "cdll_int.h"
 
+#define USE_NAV_MESH
+
 #ifdef TF_DLL
 #include "gc_clientsystem.h"
 #include "econ_item_inventory.h"
@@ -107,7 +109,7 @@ extern ConVar tf_mm_servermode;
 #endif
 
 #ifdef USE_NAV_MESH
-#include "nav_mesh.h"
+#include "AloneMOd/Nav Mesh/nav_mesh.h"
 #endif
 
 #ifdef NEXT_BOT
@@ -130,6 +132,25 @@ extern ConVar tf_mm_servermode;
 #if defined( REPLAY_ENABLED )
 #include "replay/ireplaysystem.h"
 #endif
+
+#ifdef USE_NAV_MESH
+CNavMesh* NavMeshFactory(void)
+{
+#ifdef TERROR
+	return new TerrorNavMesh;
+#endif
+
+#ifdef TF_DLL
+	return new CTFNavMesh;
+#endif
+
+#ifdef CSTRIKE_DLL
+	return new CSNavMesh;
+#endif
+
+	return new CNavMesh;
+}
+#endif //USE_NAV_MESH
 
 extern IToolFrameworkServer *g_pToolFrameworkServer;
 extern IParticleSystemQuery *g_pParticleSystemQuery;

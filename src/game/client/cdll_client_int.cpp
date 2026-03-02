@@ -148,6 +148,7 @@
 #include "fbxsystem/fbxsystem.h"
 #endif
 
+
 extern vgui::IInputInternal *g_InputInternal;
 
 //=============================================================================
@@ -390,13 +391,6 @@ const bool IsSteamDeck()
 {
 	if (CommandLine()->FindParm("-gamepadui"))
 		return true;
-
-	if (CommandLine()->FindParm("-nogamepadui"))
-		return false;
-
-	const char* pszSteamDeckEnv = getenv("SteamDeck");
-	if (pszSteamDeckEnv && *pszSteamDeckEnv)
-		return atoi(pszSteamDeckEnv) != 0;
 
 	return false;
 }
@@ -1488,6 +1482,13 @@ int CHLClient::Init( CreateInterfaceFn appSystemFactory, CreateInterfaceFn physi
 	C_BaseTempEntity::PrecacheTempEnts();
 
 	input->Init_All();
+
+	//alone mod: add localize files
+	if (!g_pVGuiLocalize->AddFile("resource/localization/alone_mod_%language%.txt", "MOD", true))
+	{
+		ConWarning("\ng_pVGuiLocalize->AddFile(\"resource/localization/alone_mod_english.txt\", \"MOD\", true) FAILED.\nResorting back to \"resource/localization/alone_mod_english.txt\"\n\n");
+		g_pVGuiLocalize->AddFile("resource/localization/alone_mod_english.txt", "MOD", true);
+	}
 
 	VGui_CreateGlobalPanels();
 

@@ -8,8 +8,11 @@
 #include "vgui_controls/Button.h"
 #include "vgui_controls/Label.h"
 #include "vgui_controls/ComboBox.h"
+#include "vgui_controls/QueryBox.h"
 #include "AloneMod/IOptionsPanel.h"
 #include "AloneMod/DynamicSky.h"
+#include "vgui/ILocalize.h"
+#include "ienginevgui.h"
 
 //new game panel game list struct
 struct GameListInfo_t
@@ -23,20 +26,22 @@ struct GameListInfo_t
 	//has themes?
 	bool UsesThemes = true;
 
-	//day info
-	struct DayInfo_t
+	//chapter image info
+	struct ChapterImageInfo_t
 	{
-		ConVar* convar;
-		int min;
-		int max;
+		bool allowDay;		//show day
+		bool allowNight;	//show night
+
+		int min;			//min/start chapter
+		int max;			//max/end chapter
 	};
-	CUtlVector<DayInfo_t> m_DayInfo;
+	CUtlVector<ChapterImageInfo_t> m_ChapterImageInfo;
 };
 
-#define COMMAND_CHAPTER_PREFIX "LoadChapter"
 #define COMMAND_CHAPTER_1 COMMAND_CHAPTER_PREFIX "1"
 #define COMMAND_CHAPTER_2 COMMAND_CHAPTER_PREFIX "2"
 #define COMMAND_CHAPTER_3 COMMAND_CHAPTER_PREFIX "3"
+#define COMMAND_CHAPTER_PREFIX "LoadChapter"
 #define COMMAND_PREV "PrevChapter"
 #define COMMAND_NEXT "NextChapter"
 
@@ -87,6 +92,9 @@ private:
 
 	//the themes combo box
 	vgui::ComboBox* m_ThemesComboBox;
+
+	//m_bShouldShowChangeModal
+	bool m_bShouldShowChangeModal = true;
 };
 
 //-----------------------------------------------------------------------
@@ -111,7 +119,7 @@ CNewGamePanel::CNewGamePanel(vgui::VPANEL parent) : BaseClass(nullptr, "NewGameP
 	SetVisible(true);
 
 	//set title
-	SetTitle("Chapter Select", false);
+	SetTitle("#Amod_NewGamePanel_Title", false);
 	SetSize(520, 215);
 	MoveToCenterOfScreen();
 
@@ -150,6 +158,9 @@ CNewGamePanel::CNewGamePanel(vgui::VPANEL parent) : BaseClass(nullptr, "NewGameP
 	//select the current game
 	m_GameComboBox->ActivateItem(m_SelectedGameIndex);
 	ActivateGame(m_SelectedGameIndex);
+
+	//set m_bShouldShowChangeModal
+	m_bShouldShowChangeModal = false;
 }
 
 //-----------------------------------------------------------------------
@@ -204,12 +215,12 @@ void CNewGamePanel::InitElements()
 	m_ChapterButtons[2]->SetCommand(COMMAND_CHAPTER_3);
 
 	//create the next and previous button
-	m_PrevButton = new vgui::Button(this, "PreviousButton", "Previous");
+	m_PrevButton = new vgui::Button(this, "PreviousButton", "#Amod_NewGamePanel_Previous");
 	m_PrevButton->SetBounds(10, 185, 80, 25);
 	m_PrevButton->SetCommand(COMMAND_PREV);
 	m_PrevButton->SetEnabled(false);
 
-	m_NextButton = new vgui::Button(this, "NextButton", "Next");
+	m_NextButton = new vgui::Button(this, "NextButton", "#Amod_NewGamePanel_Next");
 	m_NextButton->SetBounds(430, 185, 80, 25);
 	m_NextButton->SetCommand(COMMAND_NEXT);
 	m_NextButton->SetEnabled(false);
@@ -230,15 +241,14 @@ void CNewGamePanel::InitElements()
 //-----------------------------------------------------------------------
 void CNewGamePanel::InitThemesComboBox()
 {
-	//get the active item
-	char oldtext[128];
-	m_ThemesComboBox->GetText(oldtext, sizeof(oldtext));
-
 	//clear the combo box
 	m_ThemesComboBox->RemoveAll();
 
 	//ALWAYS load the default theme
-	m_ThemesComboBox->AddItem("THEME: Default", new KeyValues("resource/time_info"));
+	m_ThemesComboBox->AddItem("THEME: Default", new KeyValues(""));
+
+	//theme convar
+	extern ConVar amod_timeinfo_load_mod;
 
 	//active item
 	int index = 0, curr = 1;
@@ -269,13 +279,13 @@ void CNewGamePanel::InitThemesComboBox()
 			continue;
 		}
 
-		//check the text with the previous text
+		//check the amod_time_properties_load_mod with the previous text
 		const char* text = CFmtStr("THEME: %s", firstfile);
-		if (!Q_stricmp(oldtext, text))
+		if (!Q_stricmp(amod_timeinfo_load_mod.GetString(), firstfile))
 			index = curr;
 
 		//add the item
-		m_ThemesComboBox->AddItem(text, new KeyValues(CFmtStr("resource/time_info/%s", firstfile)));
+		m_ThemesComboBox->AddItem(text, new KeyValues(firstfile));
 		firstfile = filesystem->FindNext(handle);
 		curr++;
 	}
@@ -332,36 +342,33 @@ void CNewGamePanel::LoadNewGameInfo(const char* filename)
 		info.UsesThemes = game->GetBool("HasThemes", true);
 
 		//get the chapter names
-		for (int i = 1; i < MAX_CHAPTERS; i++)
+		int i = 1;
+		while (true)
 		{
 			//check for the string
-			const char* chapter = tokens->GetString(CFmtStr("%s_Chapter%d_Title", info.prefix, i), nullptr);
+			const char* chapter = tokens->GetString(CFmtStr("%s_Chapter%d_Title", info.prefix, i++), nullptr);
 			if (!chapter)
 				break;
 
 			info.ChapterNames.AddToTail(_strdup(chapter));
 		}
 
-		//get the day info
-		KeyValues* day = game->FindKey("DayInfo");
-		if (!day)
+		//get the chapter image info
+		KeyValues* ChapterImageInfo = game->FindKey("ChapterImageInfo");
+		if (!ChapterImageInfo)
 		{
 			AloneModEnglish->deleteThis();
 			continue;
 		}
 
-		FOR_EACH_TRUE_SUBKEY(day, days)
+		FOR_EACH_TRUE_SUBKEY(ChapterImageInfo, _info)
 		{
-			//check for the convar
-			ConVar* convar = cvar->FindVar(days->GetString("Convar"));
-			if (!convar)
-				continue;
-
 			//add the info
-			GameListInfo_t::DayInfo_t& dayinfo = info.m_DayInfo[info.m_DayInfo.AddToTail()];
-			dayinfo.min = days->GetInt("StartChapter");
-			dayinfo.max = days->GetInt("EndChapter");
-			dayinfo.convar = convar;
+			GameListInfo_t::ChapterImageInfo_t& chapter_info = info.m_ChapterImageInfo[info.m_ChapterImageInfo.AddToTail()];
+			chapter_info.min = _info->GetInt("StartChapter");
+			chapter_info.max = _info->GetInt("EndChapter");
+			chapter_info.allowDay = _info->GetBool("AllowShowDay");
+			chapter_info.allowNight = _info->GetBool("AllowShowNight");
 		}
 
 		//delete the alone mod resource config
@@ -438,18 +445,38 @@ void CNewGamePanel::SelectPage(int page)
 
 		//set the text + image + button text
 		m_ChapterNames[i]->SetText(m_CurrentSelectedGameInfo->ChapterNames[index + i]);
-		m_ChapterButtons[i]->SetText(CFmtStr("Load Chapter %d", realindex));
 
-		//check for daytime
-		const char* sDayTime = "";
-		for (int j = 0; j < m_CurrentSelectedGameInfo->m_DayInfo.Count(); j++)
+		//get the chapter text
+		{
+			wchar_t* chaptertext = g_pVGuiLocalize->Find("Amod_NewGamePanel_LoadChapter");
+			wchar_t buf[128];
+			swprintf(buf, SIZE_OF_ARRAY(buf), L"%ws %d", chaptertext, realindex);
+
+			m_ChapterButtons[i]->SetText(buf);
+		}
+
+		//get the suffex 
+		extern ConVar amod_day;
+		bool daytime = amod_day.GetBool();
+		const char* sDayTime = daytime ? "_day" : "";
+
+		//check the chapter image info
+		for (int j = 0; j < m_CurrentSelectedGameInfo->m_ChapterImageInfo.Count(); j++)
 		{
 			//check the info
-			GameListInfo_t::DayInfo_t& info = m_CurrentSelectedGameInfo->m_DayInfo[j];
+			GameListInfo_t::ChapterImageInfo_t& info = m_CurrentSelectedGameInfo->m_ChapterImageInfo[j];
 			
-			if (info.convar->GetBool() && (realindex >= info.min && realindex <= info.max))
+			if ((realindex >= info.min && realindex <= info.max))
 			{
-				sDayTime = "_day";
+				//check to see if both day and night are disabled. If so then just do what it would do if both were enabled
+				if (!info.allowDay && !info.allowNight)
+					continue;
+
+				if (!info.allowDay)
+					sDayTime = "";
+				else
+					sDayTime = "_day";
+
 				break;
 			}
 		}
@@ -491,6 +518,9 @@ void CNewGamePanel::SelectPage(int page)
 		m_ThemesComboBox->SetEnabled(true);
 }
 
+#define COMMAND_CHANGE_THEME "ConfirmThemeChange"
+#define COMMAND_CHANGE_THEME_CONFIRM "ConfirmThemeChangeConfirm"
+
 //-----------------------------------------------------------------------
 // Purpose: Called on command
 //-----------------------------------------------------------------------
@@ -508,25 +538,71 @@ void CNewGamePanel::OnCommand(const char* pszCommand)
 		SelectPage(m_CurrentSelectedGameInfo->CurrentChapterIndex - 1);
 		return;
 	}
-	
+
 	//check for COMMAND_CHAPTER_PREFIX
 	else if (!Q_strnicmp(pszCommand, COMMAND_CHAPTER_PREFIX, Q_strlen(COMMAND_CHAPTER_PREFIX)))
 	{
 		//load the theme
-		extern ConVar amod_timeinfo_load_directory;
+		extern ConVar amod_timeinfo_load_mod;
+
+		//store the previous amod_timeinfo_load_mod value
+		char prev[128];
+		Q_strncpy(prev, amod_timeinfo_load_mod.GetString(), sizeof(prev));
 
 		//check for UsesThemes
-		if (m_CurrentSelectedGameInfo->UsesThemes)
-			amod_timeinfo_load_directory.SetValue(m_ThemesComboBox->GetActiveItemUserData()->GetName());
+		if (m_CurrentSelectedGameInfo->UsesThemes && m_ThemesComboBox->GetActiveItem() != 0)
+			amod_timeinfo_load_mod.SetValue(m_ThemesComboBox->GetActiveItemUserData()->GetName());
 		else
-			amod_timeinfo_load_directory.SetValue("resource/time_info");
+			amod_timeinfo_load_mod.SetValue("");
 
-		//reload the time info
-		engine->ClientCmd("amod_timeinfo_reset_noreload");
+		//compare and see if we need to reload
+		if (Q_stricmp(prev, amod_timeinfo_load_mod.GetString()))
+			engine->ClientCmd("amod_timeinfo_reset_noreload");
 
 		//get and exec the map
 		int index = Q_atoi(pszCommand + Q_strlen(COMMAND_CHAPTER_PREFIX));
 		engine->ClientCmd(CFmtStr("exec \"%s/chapter%d", m_CurrentSelectedGameInfo->prefix, (m_CurrentSelectedGameInfo->CurrentChapterIndex * 3) + index));
+		return;
+	}
+
+	//check for CONFIRM_THEME_CHANGE_COMMAND
+	else if (!Q_stricmp(pszCommand, COMMAND_CHANGE_THEME))
+	{
+		extern ConVar amod_timeinfo_load_mod;
+
+		//ask if the user wants to reload the theme now
+		if (!engine->IsLevelMainMenuBackground() && Q_stricmp(amod_timeinfo_load_mod.GetString(), m_ThemesComboBox->GetActiveItemUserData()->GetName()))
+		{
+			//show the modal
+			QueryBox* modal = new QueryBox("#Amod_NewGamePanel_ReloadThemeNow_Title", "#Amod_NewGamePanel_ReloadThemeNow_Desc", this);
+			modal->MoveToCenterOfScreen();
+			modal->Activate();
+			modal->DoModal();
+			modal->SetOKCommand(new KeyValues("Command", "command", COMMAND_CHANGE_THEME_CONFIRM));
+			modal->AddActionSignalTarget(this);
+		}
+
+		return;
+	}
+
+	//check for COMMAND_CHANGE_THEME_CONFIRM
+	else if (!Q_stricmp(pszCommand, COMMAND_CHANGE_THEME_CONFIRM))
+	{
+		//set our theme
+		//load the theme
+		extern ConVar amod_timeinfo_load_mod;
+
+		//store the previous amod_timeinfo_load_mod value
+		char prev[128];
+		Q_strncpy(prev, amod_timeinfo_load_mod.GetString(), sizeof(prev));
+
+		//check for UsesThemes
+		amod_timeinfo_load_mod.SetValue(m_ThemesComboBox->GetActiveItemUserData()->GetName());
+
+		//compare and see if we need to reload
+		if (Q_stricmp(prev, amod_timeinfo_load_mod.GetString()))
+			engine->ClientCmd("amod_timeinfo_reset");
+
 		return;
 	}
 	
@@ -552,13 +628,38 @@ void CNewGamePanel::OnTextChanged(KeyValues* kv)
 	//the theme uses its own custom chapter images.
 	else if (kv->GetPtr("Panel") == m_ThemesComboBox)
 	{
-		//select the active page
+		//select the active page to reset the theme
 		if (m_CurrentSelectedGameInfo)
 			SelectPage(m_CurrentSelectedGameInfo->CurrentChapterIndex);
 
 		//remove this panels focus IMMEDIATLY so when we close the newgamepanel it doesnt reset the combo box
 		m_NextButton->RequestFocus();
 
+		//hack
+		if (!m_bShouldShowChangeModal)
+		{
+			m_bShouldShowChangeModal = true;
+			return;
+		}
+
+		//check for g_bHasTimePropertiesPanelBeenOpen
+		extern bool g_bHasTimePropertiesPanelBeenOpen;
+		static bool bShown = false;
+		if (g_bHasTimePropertiesPanelBeenOpen && !bShown)
+		{
+			bShown = true;
+
+			//show the modal
+			QueryBox* modal = new QueryBox("#Amod_NewGamePanel_TimePropertiesWarning_Title", "#Amod_NewGamePanel_TimePropertiesWarning_Desc", this);
+			modal->MoveToCenterOfScreen();
+			modal->Activate();
+			modal->DoModal();
+			modal->SetCancelCommand(new KeyValues("OnCommand", "Command", COMMAND_CHANGE_THEME));
+			modal->SetOKCommand(new KeyValues("OnCommand", "Command", COMMAND_CHANGE_THEME));
+			return;
+		}
+
+		OnCommand(COMMAND_CHANGE_THEME);
 		return;
 	}
 
@@ -628,10 +729,31 @@ CON_COMMAND(togglenewgamepanel, "Toggles the alone mod new game panel")
 }
 
 //-----------------------------------------------------------------------
+// Purpose: Debug to reset the new game panel
+//-----------------------------------------------------------------------
+CON_COMMAND(amod_reset_newgamepanel, "Resets the new game panel for debug purposes")
+{
+	g_sNewGamePanelInterface.Destroy();
+	g_sNewGamePanelInterface.Create(enginevgui->GetPanel(VGuiPanel_t::PANEL_GAMEUIDLL));
+	g_sNewGamePanelInterface.Activate();
+}
+
+#if FOG_CUBE_TRIGGER_TEST
+//bool for time info triggers
+extern bool g_bJustStartedLevel;
+#endif
+
+//-----------------------------------------------------------------------
 // Purpose: Alone mod day change callbacks
 //-----------------------------------------------------------------------
 void AmodDayChangeCallback(IConVar* var, const char* olds, float oldf)
 {
+#if FOG_CUBE_TRIGGER_TEST
+	//reset the cube trigger active states
+	void ResetCubeTriggerData();
+	ResetCubeTriggerData();
+#endif
+
 	//reset the skybox panel
 	skyboxpanel->ResetPanel();
 
@@ -660,4 +782,876 @@ void AmodDayChangeCallback(IConVar* var, const char* olds, float oldf)
 		engine->ClientCmd("save __tmpquick01; load __tmpquick01");
 	}
 
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//new game editor panel. This code below is VERY rushed so its pretty garbage but it works and i need to release the next update very soon.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#include <vgui_controls/ListPanel.h>
+#include <vgui_controls/TreeView.h>
+#include <vgui_controls/CheckButton.h>
+#include <vgui_controls/Slider.h>
+#include "effects panel/EffectsPanel.h"
+
+//game editor struct
+struct GameListInfoEditor_t
+{
+	//prefix and name
+	char name[128];
+	char prefix[32];
+
+	//resource filename
+	char resourceFilename[256];
+
+	//resoruce strings
+	CUtlVector<char*> resourceStrings;
+
+	//has themes?
+	bool UsesThemes = true;
+	bool isDefault = true;
+
+	//chapter image info
+	struct ChapterImageInfo_t
+	{
+		char name[128];		//name of this info
+
+		bool allowDay;		//show day
+		bool allowNight;	//show night
+
+		int min;			//min/start chapter
+		int max;			//max/end chapter
+	};
+	CUtlVector<ChapterImageInfo_t> m_ChapterImageInfo;
+};
+
+//game editor base struct
+struct GameListInfoEditorBase_t
+{
+	char filename[256];
+	CUtlVector<GameListInfoEditor_t> info;
+};
+
+//tree view node type
+enum class TreeViewNodeClass_e {
+	Node_Name,
+	Node_AllowDay,
+	Node_AllowNight,
+	Node_StartChapter,
+	Node_EndChapter,
+};
+
+
+
+#define DATA_CHECK_BUTTON_COMMAND "DataCheckButton"
+#define DATA_ADD_COMMAND "AddChapterInfoCommand"
+#define DATA_REMOVE_COMMAND "RemoveChapterInfoCommand"
+#define SAVE_NEW_GAME_PANEL_COMMAND "SaveConfigSettings"
+#define RELOAD_NEW_GAME_PANEL_COMMAND "ReloadNewGamePanel"
+#define HAS_THEMES_COMMAND "HasThemesCommand"
+
+//new game editor panel
+class CNewGameEditorPanel : public Frame
+{
+	DECLARE_CLASS_SIMPLE(CNewGameEditorPanel, Frame)
+public:
+	CNewGameEditorPanel();
+	~CNewGameEditorPanel();
+
+	//loads a new game info
+	void LoadNewGameInfo(const char* filename);
+
+	//command funcs
+	void OnCommand(const char* pszCommand);
+
+	//called on think
+	void PerformLayout();
+	void OnThink();
+
+	//add
+	int AddGameInfoToTreeView(GameListInfoEditor_t::ChapterImageInfo_t& item, GameListInfoEditor_t* info, int root);
+
+	//called when an item is selected
+	MESSAGE_FUNC_PARAMS(OnItemSelected, "ItemSelected", data);
+	MESSAGE_FUNC_PARAMS(OnItemDeselected, "ItemDeselected", data);
+	MESSAGE_FUNC_PARAMS(OnSliderValueChanged, "SliderMoved", data);
+	MESSAGE_FUNC_PARAMS(OnTreeViewItemSelected, "TreeViewItemSelected", data);
+	MESSAGE_FUNC_PARAMS(OnTreeViewItemDeselected, "TreeViewItemSelectionCleared", data);
+	MESSAGE_FUNC_PARAMS(OnTextChanged, "TextChanged", data);
+private:
+	//game lists
+	vgui::ListPanel* m_GameList;
+
+	//game chapter image info tree view
+	vgui::TreeView* m_ChapterImageInfo;
+
+	//bottom data label + others
+	Label* m_DataLabel;
+
+	TextEntry* m_DataTextEntry;
+	CheckButton* m_DataCheckButton;
+	WheelSlider* m_DataSlider;
+
+	//add + remove button
+	Button* m_AddButton, *m_RemoveButton;
+
+	//save + reload new game panel
+	Button* m_SaveButton, *m_ResetNewGamePanelButton;
+
+	//allow themes check button
+	CheckButton* m_HasThemesCheckButton;
+
+	//the base file data
+	CUtlVector<GameListInfoEditorBase_t> m_GameListInfo;
+
+	//the file data used for the game list + reading + writing
+	CUtlVector<GameListInfoEditor_t*> m_ReadWriteGameListInfo;
+
+	//current selected range's new game image
+	ImagePanel* m_CurrentNewGameImage, *m_CurrentNewGameImageDay;
+
+	//current selected file data + file mode + others
+	GameListInfoEditor_t* m_CurrentSelectedList = nullptr;
+	GameListInfoEditor_t::ChapterImageInfo_t* m_CurrentSelectedData = nullptr;
+	TreeViewNodeClass_e m_CurrentSelectedType;
+	int m_CurrentNodeIndex = 0;
+};
+
+//singleton
+static CNewGameEditorPanel* s_NewGameEditor = nullptr;
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Constructor for the new game editor panel
+//----------------------------------------------------------------------------------------------------
+CNewGameEditorPanel::CNewGameEditorPanel() : BaseClass(nullptr, "CNewGameEditorPanel")
+{
+	SetParent(enginevgui->GetPanel(VGuiPanel_t::PANEL_GAMEUIDLL));
+
+	//set our stuff
+	SetKeyBoardInputEnabled(true);
+	SetMouseInputEnabled(true);
+
+	SetProportional(false);
+	SetTitleBarVisible(true);
+	SetMinimizeButtonVisible(false);
+	SetMaximizeButtonVisible(false);
+	SetCloseButtonVisible(true);
+	SetSizeable(false);
+	SetMoveable(true);
+	SetVisible(true);
+
+	//set title
+	SetTitle("New Game Editor Panel", false);
+	SetSize(450, 600);
+	MoveToCenterOfScreen();
+
+	//make the list panel
+	m_GameList = new vgui::ListPanel(this, "ListView");
+	m_GameList->SetKeyBoardInputEnabled(false);
+	m_GameList->AddColumnHeader(0, "Game", "Game", m_GameList->GetWide(), 0);
+	m_GameList->SetMultiselectEnabled(false);
+	m_GameList->SetColumnSortable(0, false);
+
+	//create the chapter image info
+	m_ChapterImageInfo = new vgui::TreeView(this, "ChapterImageInfo");
+	m_ChapterImageInfo->MakeReadyForUse();
+	m_ChapterImageInfo->SetAllowMultipleSelections(false);		//well ur just fucking useless
+	m_ChapterImageInfo->SetMultipleItemDragEnabled(false);		//so are you cunt
+
+	//create our data stuff
+	m_DataLabel = new Label(this, "DataLabel", "");
+
+	m_DataTextEntry = new TextEntry(this, "DataText");
+	m_DataTextEntry->SetMaximumCharCount(32);
+	m_DataTextEntry->SetVisible(false);
+	m_DataTextEntry->AddActionSignalTarget(this);
+
+	m_DataCheckButton = new CheckButton(this, "DataCheckButton", "");
+	m_DataCheckButton->SetVisible(false);
+	m_DataCheckButton->SetCommand(DATA_CHECK_BUTTON_COMMAND);
+	m_DataCheckButton->SetText("Allowed?");
+
+	m_DataSlider = new WheelSlider(this, "DataSlider");
+	m_DataSlider->SetVisible(false);
+	m_DataSlider->SetRange(1, 250);
+		
+	//add the m_AddButton
+	m_AddButton = new Button(this, "AddButton", "Add Chapter Image Info");
+	m_AddButton->SetCommand(DATA_ADD_COMMAND);
+	m_AddButton->SetEnabled(false);
+
+	//make the remove button
+	m_RemoveButton = new Button(this, "RemoveButton", "Remove Chapter Image Info");
+	m_RemoveButton->SetCommand(DATA_REMOVE_COMMAND);
+	m_RemoveButton->SetEnabled(false);
+		
+	//add the save button
+	m_SaveButton = new Button(this, "SaveButton", "Save configs");
+	m_SaveButton->SetCommand(SAVE_NEW_GAME_PANEL_COMMAND);
+
+	//make the remove button
+	m_ResetNewGamePanelButton = new Button(this, "ResetNewGamePanelButton", "Reload new game panels");
+	m_ResetNewGamePanelButton->SetCommand(RELOAD_NEW_GAME_PANEL_COMMAND);
+
+	//create the themes check button
+	m_HasThemesCheckButton = new CheckButton(this, "HasThemesCheckButton", "Has Themes");
+	m_HasThemesCheckButton->SetEnabled(false);
+	m_HasThemesCheckButton->SetSelected(false);
+	m_HasThemesCheckButton->SetCommand(HAS_THEMES_COMMAND);
+
+	//make the chapter image
+	m_CurrentNewGameImage = new ImagePanel(this, "ChapterImage");
+	m_CurrentNewGameImage->SetVisible(false);
+
+	//make the 2nd image
+	m_CurrentNewGameImageDay = new ImagePanel(this, "ChapterImage");
+	m_CurrentNewGameImageDay->SetVisible(false);
+
+	//load all the new game lists in the games/* folder BUT always load resource/gamelist.txt first
+	{
+		LoadNewGameInfo("resource/gamelist.txt");
+
+		FileFindHandle_t handle;
+		const char* firstfile = filesystem->FindFirst("resource/games/*.txt", &handle);
+		while (firstfile)
+		{
+			//dont read the . filenames
+			if (!Q_stricmp(firstfile, ".") || !Q_stricmp(firstfile, ".."))
+			{
+				firstfile = filesystem->FindNext(handle);
+				continue;
+			}
+
+			//see if its a file or not
+			if (!filesystem->FindIsDirectory(handle) && strchr(firstfile, '.'))
+				LoadNewGameInfo(CFmtStr("resource/games/%s", firstfile));
+
+			firstfile = filesystem->FindNext(handle);
+		}
+
+		filesystem->FindClose(handle);
+	}
+	
+	//now load the m_ReadWriteGameListInfo onto the game list
+	m_ReadWriteGameListInfo.RemoveAll();
+	for (int i = 0; i < m_GameListInfo.Count(); i++)
+	{
+		for (int j = 0; j < m_GameListInfo[i].info.Count(); j++)
+		{
+			//add to the list view
+			KeyValues* item = new KeyValues("item");
+			item->SetString("Game", CFmtStr("%s = %s", m_GameListInfo[i].info[j].name, m_GameListInfo[i].filename + Q_strlen("resource/")));
+			m_GameList->AddItem(item, m_ReadWriteGameListInfo.Count(), false, false);
+
+			//add to the m_ReadWriteGameListInfo first
+			m_ReadWriteGameListInfo.AddToTail(&m_GameListInfo[i].info[j]);
+		}
+	}
+
+	//select index 0
+	m_GameList->SetSingleSelectedItem(0);
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Destructor for the new game editor panel
+//----------------------------------------------------------------------------------------------------
+CNewGameEditorPanel::~CNewGameEditorPanel()
+{
+	//delete all the game info
+	for (int g = 0; g < m_ReadWriteGameListInfo.Count(); g++)
+	{
+		for (int c = 0; c < m_ReadWriteGameListInfo[g]->resourceStrings.Count(); c++)
+			free((void*)m_ReadWriteGameListInfo[g]->resourceStrings[c]);
+	}
+
+	//clear our singleton
+	s_NewGameEditor = nullptr;
+} 
+
+//-----------------------------------------------------------------------
+// Purpose: Called when the panels layout is being performed
+//-----------------------------------------------------------------------
+void CNewGameEditorPanel::PerformLayout()
+{
+	//this looks terrible i know. Deal with it. Cant be bothered loading a file to do this
+	m_GameList->SetBounds(10, 30, 430, 200);
+	m_ChapterImageInfo->SetBounds(10, 240, 430, 200);
+	m_DataLabel->SetBounds(10, 450, 135, 20);
+	m_DataTextEntry->SetBounds(150, 450, 285, 20);
+	m_DataCheckButton->SetBounds(180, 450, 275, 20);
+	m_DataSlider->SetBounds(150, 450, 285, 20);
+	m_AddButton->SetBounds(10, 475, 214, 20);
+	m_RemoveButton->SetBounds(226, 475, 214, 20);
+	m_HasThemesCheckButton->SetBounds(170, 496, 150, 22);
+	m_CurrentNewGameImage->SetBounds(65, 518, 160, 90);
+	m_CurrentNewGameImageDay->SetBounds(235, 518, 160, 90);
+	m_SaveButton->SetBounds(10, m_CurrentNewGameImage->IsVisible() ? 613 : 518, 214, 20);
+	m_ResetNewGamePanelButton->SetBounds(226, m_CurrentNewGameImage->IsVisible() ? 613 : 518, 214, 20);
+	
+	//call the base func
+	BaseClass::PerformLayout();
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Adds a game info into the game info list
+//-----------------------------------------------------------------------
+int CNewGameEditorPanel::AddGameInfoToTreeView(GameListInfoEditor_t::ChapterImageInfo_t& item, GameListInfoEditor_t* info, int root)
+{
+	KeyValues* name = new KeyValues("ImageInfoName");
+	name->SetString("Text", item.name);
+	name->SetInt("Type", (int)TreeViewNodeClass_e::Node_Name);
+	name->SetPtr("Data", &item);
+	int newnode = m_ChapterImageInfo->AddItem(name, root);
+
+	//add the sub items (start, end, allow day, allow night)
+	{
+		KeyValues* allowday = new KeyValues("allowday");
+		allowday->SetString("Text", CFmtStr("Allowed To Show Day Images = %d", item.allowDay));
+		allowday->SetInt("Type", (int)TreeViewNodeClass_e::Node_AllowDay);
+		allowday->SetPtr("Data", &item);
+		m_ChapterImageInfo->AddItem(allowday, newnode);
+	}
+	{
+		KeyValues* allownight = new KeyValues("allownight");
+		allownight->SetString("Text", CFmtStr("Allowed To Show Night Images = %d", item.allowNight));
+		allownight->SetInt("Type", (int)TreeViewNodeClass_e::Node_AllowNight);
+		allownight->SetPtr("Data", &item);
+		m_ChapterImageInfo->AddItem(allownight, newnode);
+	}
+	{
+		KeyValues* startchapter = new KeyValues("allowday");
+		startchapter->SetString("Text", CFmtStr("Start Chapter = %s", info->resourceStrings[max(item.min - 1, 0)]));
+		startchapter->SetInt("Type", (int)TreeViewNodeClass_e::Node_StartChapter);
+		startchapter->SetPtr("Data", &item);
+		m_ChapterImageInfo->AddItem(startchapter, newnode);
+	}
+	{
+		KeyValues* endchapter = new KeyValues("allowday");
+		endchapter->SetString("Text", CFmtStr("Ending Chapter = %s", info->resourceStrings[max(item.max - 1, 0)]));		//how tf did this go under the radar for so long!! It used to be a %s and work?. EDIT: nevermind im dumb
+		endchapter->SetInt("Type", (int)TreeViewNodeClass_e::Node_EndChapter);
+		endchapter->SetPtr("Data", &item);
+		m_ChapterImageInfo->AddItem(endchapter, newnode);
+	}
+
+	return newnode;
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Called when an item is selected from the game list
+//-----------------------------------------------------------------------
+void CNewGameEditorPanel::OnItemSelected(KeyValues* data)
+{
+	//get the GameListInfoEditor_t. BUT do a range check first
+	unsigned short index = m_GameList->GetItemUserData(m_GameList->GetSelectedItem(0));
+	if (index < 0 || index >= m_ReadWriteGameListInfo.Count())
+		return;
+
+	m_CurrentNodeIndex = 0;
+
+	//get the info
+	GameListInfoEditor_t* info = m_ReadWriteGameListInfo[index];
+	m_CurrentSelectedList = info;
+	m_CurrentSelectedData = nullptr;
+
+	//set the m_HasThemesCheckButton
+	m_HasThemesCheckButton->SetEnabled(true);
+	m_HasThemesCheckButton->SetSelected(m_CurrentSelectedList->UsesThemes);
+
+	//enable the add button
+	m_AddButton->SetEnabled(true);
+	m_RemoveButton->SetEnabled(false);
+
+	//set the range of our slider
+	m_DataSlider->SetRange(1, info->resourceStrings.Count());
+
+	//reset the tree view
+	m_ChapterImageInfo->RemoveAll();
+	int root = m_ChapterImageInfo->AddItem(new KeyValues("Root", "Text", "Chapter Image Info"), -1);
+
+	//add all the items
+	for (int i = 0; i < info->m_ChapterImageInfo.Count(); i++)
+	{
+		//add the item
+		AddGameInfoToTreeView(info->m_ChapterImageInfo[i], info, root);
+	}
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Called when an item is deselected from the games list
+//-----------------------------------------------------------------------
+void CNewGameEditorPanel::OnItemDeselected(KeyValues* data)
+{
+	//if no item is selected then reset everything
+	if (m_GameList->GetSelectedItemsCount() <= 0)
+	{
+		m_ChapterImageInfo->RemoveAll();
+		m_CurrentNodeIndex = 0;
+		m_CurrentSelectedData = nullptr;
+		m_CurrentSelectedList = nullptr;
+		
+		//clear the elements
+		m_HasThemesCheckButton->SetEnabled(false);
+		m_HasThemesCheckButton->SetSelected(false);
+		m_AddButton->SetEnabled(false);
+		m_RemoveButton->SetEnabled(false);
+		m_DataSlider->SetVisible(false);
+		m_CurrentNewGameImage->SetVisible(false);
+		m_CurrentNewGameImageDay->SetVisible(false);
+		m_DataTextEntry->SetVisible(false);
+		m_DataCheckButton->SetVisible(false);
+		m_DataLabel->SetText("");
+	}
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Called when an item is de-selected from the tree view
+//-----------------------------------------------------------------------
+void CNewGameEditorPanel::OnTreeViewItemDeselected(KeyValues* data)
+{
+	//check the number of selected elements
+	if (m_ChapterImageInfo->GetSelectedItemCount() > 0)
+		return;
+
+	//clear (almost) everything
+	m_CurrentNodeIndex = 0;
+	m_RemoveButton->SetEnabled(false);
+	m_DataSlider->SetVisible(false);
+	m_CurrentNewGameImage->SetVisible(false);
+	m_CurrentNewGameImageDay->SetVisible(false);
+	m_DataTextEntry->SetVisible(false);
+	m_DataCheckButton->SetVisible(false);
+	m_DataLabel->SetText("");
+	m_CurrentSelectedData = nullptr;
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Called when an item is selected from the tree view
+//-----------------------------------------------------------------------
+void CNewGameEditorPanel::OnTreeViewItemSelected(KeyValues* data)
+{
+	//get the data
+	int index = data->GetInt("itemIndex");
+	KeyValues* userdata = m_ChapterImageInfo->GetItemData(index);
+
+	//hide everything
+	m_DataLabel->SetText("");
+	m_DataTextEntry->SetVisible(false);
+	m_DataCheckButton->SetVisible(false);
+	m_DataSlider->SetVisible(false);
+	m_CurrentNewGameImage->SetVisible(false);
+	m_CurrentNewGameImageDay->SetVisible(false);
+	m_RemoveButton->SetEnabled(false);
+
+	//if we are the root node then dont do anything
+	if (index == m_ChapterImageInfo->GetRootItemIndex())
+		return;
+
+	//only enable the remove button if the current selected nodes parent is the root node
+	m_RemoveButton->SetEnabled(m_ChapterImageInfo->GetItemParent(index) == m_ChapterImageInfo->GetRootItemIndex());
+
+	//set our current data
+	m_CurrentSelectedData = (GameListInfoEditor_t::ChapterImageInfo_t*)userdata->GetPtr("Data");
+	m_CurrentSelectedType = (TreeViewNodeClass_e)userdata->GetInt("Type");
+	m_CurrentNodeIndex = index;
+
+
+	//set the chapter images
+	bool min = m_CurrentSelectedType == TreeViewNodeClass_e::Node_StartChapter;
+	const char* image = CFmtStr("chapters/default/%s/chapter%d", m_CurrentSelectedList->prefix, min ? m_CurrentSelectedData->min : m_CurrentSelectedData->max);
+
+	m_CurrentNewGameImage->SetImage(image);
+	m_CurrentNewGameImageDay->SetImage(CFmtStr("%s_day", image));
+
+
+	//set our items text based on the type
+	switch (m_CurrentSelectedType)
+	{
+	case TreeViewNodeClass_e::Node_Name:
+		m_DataTextEntry->SetText(m_CurrentSelectedData->name);
+		m_DataTextEntry->SetVisible(true);
+		m_DataLabel->SetText("Image Info Name:");
+		break;
+	case TreeViewNodeClass_e::Node_AllowDay:
+		m_DataCheckButton->SetVisible(true);
+		m_DataCheckButton->SetSelected(m_CurrentSelectedData->allowDay);
+		m_DataLabel->SetText("Allowed To Show Day:");
+		break;
+	case TreeViewNodeClass_e::Node_AllowNight:
+		m_DataCheckButton->SetVisible(true);
+		m_DataCheckButton->SetSelected(m_CurrentSelectedData->allowNight);
+		m_DataLabel->SetText("Allow To Show Night:");
+		break;
+	case TreeViewNodeClass_e::Node_StartChapter:
+		m_CurrentNewGameImage->SetVisible(true);
+		m_CurrentNewGameImageDay->SetVisible(true);
+		m_DataSlider->SetVisible(true);
+		m_DataSlider->SetValue(m_CurrentSelectedData->min);
+		m_DataLabel->SetText("Starting Chapter:");
+		break;
+	case TreeViewNodeClass_e::Node_EndChapter:
+		m_CurrentNewGameImage->SetVisible(true);
+		m_CurrentNewGameImageDay->SetVisible(true);
+		m_DataSlider->SetVisible(true);
+		m_DataSlider->SetValue(m_CurrentSelectedData->max);
+		m_DataLabel->SetText("Ending Chapter:");
+		break;
+	}
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Called when text is changed inside the/a text entry
+//-----------------------------------------------------------------------
+void CNewGameEditorPanel::OnTextChanged(KeyValues* data)
+{
+	//check the current item
+	if (!m_CurrentSelectedData)
+		return;
+
+	//set the m_CurrentSelectedData->name
+	m_DataTextEntry->GetText(m_CurrentSelectedData->name, sizeof(m_CurrentSelectedData->name));
+
+	//change the nodes text
+	KeyValues* node_data = m_ChapterImageInfo->GetItemData(m_CurrentNodeIndex);
+	node_data->SetString("Text", m_CurrentSelectedData->name);
+	m_ChapterImageInfo->ModifyItem(m_CurrentNodeIndex, node_data);
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Called when a sliders value is changed
+//-----------------------------------------------------------------------
+void CNewGameEditorPanel::OnSliderValueChanged(KeyValues* data)
+{
+	//check the current data
+	if (!m_CurrentSelectedData)
+		return;
+
+	bool min = m_CurrentSelectedType == TreeViewNodeClass_e::Node_StartChapter;
+
+	//set the chapter images
+	const char* image = CFmtStr("chapters/default/%s/chapter%d", m_CurrentSelectedList->prefix, min ? m_CurrentSelectedData->min : m_CurrentSelectedData->max);
+	m_CurrentNewGameImage->SetImage(image);
+	m_CurrentNewGameImageDay->SetImage(CFmtStr("%s_day", image));
+
+	//set the internal data
+	if (min)
+	{
+		m_CurrentSelectedData->min = m_DataSlider->GetValue();
+	}
+	else
+	{
+		m_CurrentSelectedData->max = m_DataSlider->GetValue();
+	}
+
+	//re-name the node
+	KeyValues* node_data = m_ChapterImageInfo->GetItemData(m_CurrentNodeIndex);
+	node_data->SetString("Text", CFmtStr("%s Chapter = %s", min ? "Starting" : "Ending", m_CurrentSelectedList->resourceStrings[max(m_DataSlider->GetValue() - 1, 0)]));	//do m_DataSlider->GetValue() - 1 because the range starts at 1
+	m_ChapterImageInfo->ModifyItem(m_CurrentNodeIndex, node_data);
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Called on command
+//-----------------------------------------------------------------------
+void CNewGameEditorPanel::OnThink()
+{
+	//check the chapter image is visible
+	if (m_CurrentNewGameImage->IsVisible())
+	{
+		SetSize(450, 636);
+	}
+	else
+	{
+		SetSize(450, 542);
+	}
+
+	BaseClass::OnThink();
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Called on command
+//-----------------------------------------------------------------------
+void CNewGameEditorPanel::OnCommand(const char* pszCommand)
+{
+	//check for DATA_CHECK_BUTTON_COMMAND
+	if (!Q_stricmp(pszCommand, DATA_CHECK_BUTTON_COMMAND))
+	{
+		//check the current data
+		if (!m_CurrentSelectedData)
+			return;
+
+		bool nighttime = m_CurrentSelectedType == TreeViewNodeClass_e::Node_AllowNight;
+
+		//set the internal data
+		if (nighttime)
+			m_CurrentSelectedData->allowNight = m_DataCheckButton->IsSelected();
+		else
+			m_CurrentSelectedData->allowDay = m_DataCheckButton->IsSelected();
+
+		//re-name the node
+		KeyValues* data = m_ChapterImageInfo->GetItemData(m_CurrentNodeIndex);
+		data->SetString("Text", CFmtStr("Allowed To Show %s Images = %d", nighttime ? "Night" : "Day", m_DataCheckButton->IsSelected()));
+		m_ChapterImageInfo->ModifyItem(m_CurrentNodeIndex, data);
+		return;
+	}
+
+	//check for the remove command
+	else if (!Q_stricmp(pszCommand, DATA_REMOVE_COMMAND))
+	{
+		//the current selected nodes index must be the root node
+		int parent = m_ChapterImageInfo->GetRootItemIndex();
+		if (m_ChapterImageInfo->GetItemParent(m_CurrentNodeIndex) != parent || !m_CurrentSelectedList)
+			return;
+
+		//reomve the node;
+		m_ChapterImageInfo->RemoveItem(m_CurrentNodeIndex, false, true);
+		m_ChapterImageInfo->AddSelectedItem(m_CurrentNodeIndex - 1, true, true, true);
+
+		//remove from the array
+		int index = -1;
+		for (int i = 0; i < m_CurrentSelectedList->m_ChapterImageInfo.Count(); i++)
+		{
+			if (&m_CurrentSelectedList->m_ChapterImageInfo[i] == m_CurrentSelectedData)
+			{
+				index = i;
+				break;
+			}
+		}
+
+		if (index != -1)
+			m_CurrentSelectedList->m_ChapterImageInfo.Remove(index);
+
+		//reset the text entry by calling OnItemSelected
+		OnItemSelected(nullptr);
+
+		//select the current node - 5
+		m_ChapterImageInfo->AddSelectedItem(m_CurrentNodeIndex - 5, true, true, true);
+		m_ChapterImageInfo->ExpandItem(m_CurrentNodeIndex - 5, true);
+	}
+
+	//check for the add or remove command
+	else if (!Q_stricmp(pszCommand, DATA_ADD_COMMAND))
+	{
+		//check the current info
+		if (!m_CurrentSelectedList)
+			return;
+
+		//get the item
+		GameListInfoEditor_t::ChapterImageInfo_t& add = m_CurrentSelectedList->m_ChapterImageInfo[m_CurrentSelectedList->m_ChapterImageInfo.AddToTail()];
+		memset(&add, 0, sizeof(add));
+
+		//always set the min + max
+		add.min = 1;
+		add.max = 1;
+
+		Q_strncpy(add.name, "New Image Data", sizeof(add.name));
+
+		//add a node
+		int index = AddGameInfoToTreeView(add, m_CurrentSelectedList, m_ChapterImageInfo->GetRootItemIndex());
+
+		//add the item
+		m_ChapterImageInfo->AddSelectedItem(index, true, true, true);
+		m_ChapterImageInfo->ExpandItem(index, true);
+	}
+
+	//check for the HAS_THEMES_COMMAND
+	else if (!Q_stricmp(pszCommand, HAS_THEMES_COMMAND))
+	{
+		//must have our data
+		if (!m_CurrentSelectedList)
+			return;
+
+		m_CurrentSelectedList->UsesThemes = m_HasThemesCheckButton->IsSelected();
+		return;
+	}
+	
+	//check for the reload command
+	else if (!Q_stricmp(pszCommand, RELOAD_NEW_GAME_PANEL_COMMAND))
+	{
+		g_sNewGamePanelInterface.Destroy();
+		g_sNewGamePanelInterface.Create(enginevgui->GetPanel(VGuiPanel_t::PANEL_GAMEUIDLL));
+		g_sNewGamePanelInterface.Activate();
+		return;
+	}
+
+	//check for the save command
+	else if (!Q_stricmp(pszCommand, SAVE_NEW_GAME_PANEL_COMMAND))
+	{
+		for (int i = 0; i < m_GameListInfo.Count(); i++)
+		{
+			//write everything into the keyvalues
+			KeyValues* keyvalues = new KeyValues("GameList");
+
+			//get all the sub data
+			for (int j = 0; j < m_GameListInfo[i].info.Count(); j++)
+			{
+				//get the info
+				GameListInfoEditor_t* info = &m_GameListInfo[i].info[j];
+
+				//write the prefix + name
+				KeyValues* data = new KeyValues(info->name);
+				data->SetString("Prefix", info->prefix);
+				data->SetBool("HasThemes", info->UsesThemes);
+				data->SetBool("Default", info->isDefault);
+
+				//write the ChapterImageInfo
+				KeyValues* ChapterImageInfo = new KeyValues("ChapterImageInfo");
+
+				//write all the chapter infos
+				for (int z = 0; z < info->m_ChapterImageInfo.Count(); z++)
+				{
+					KeyValues* chapter = new KeyValues(info->m_ChapterImageInfo[z].name);
+					chapter->SetBool("AllowShowDay", info->m_ChapterImageInfo[z].allowDay);
+					chapter->SetBool("AllowShowNight", info->m_ChapterImageInfo[z].allowNight);
+					chapter->SetInt("StartChapter", info->m_ChapterImageInfo[z].min);
+					chapter->SetInt("EndChapter", info->m_ChapterImageInfo[z].max);
+					ChapterImageInfo->AddSubKey(chapter);
+				}
+
+				//add the chapter info to data
+				data->AddSubKey(ChapterImageInfo);
+
+				//add the data to the keyvalues
+				keyvalues->AddSubKey(data);
+			}
+
+			//save then delete the keyvalues
+			keyvalues->SaveToFile(filesystem, m_GameListInfo[i].filename, "MOD");
+			keyvalues->deleteThis();
+		}
+
+		return;
+	}
+
+	BaseClass::OnCommand(pszCommand);
+}
+
+//-----------------------------------------------------------------------
+// Purpose: Loads the new game info
+//-----------------------------------------------------------------------
+void CNewGameEditorPanel::LoadNewGameInfo(const char* filename)
+{
+	KeyValues* gamelist = new KeyValues("gamelist");
+	if (!gamelist->LoadFromFile(filesystem, filename, "MOD"))
+		return;
+
+	//make the base game list
+	GameListInfoEditorBase_t& base_info = m_GameListInfo[m_GameListInfo.AddToTail()];
+	Q_strncpy(base_info.filename, filename, sizeof(base_info.filename));
+
+	//go through each subkey
+	FOR_EACH_TRUE_SUBKEY(gamelist, game)
+	{
+		//load the resource file. I could call this before the for loop but cant be bothered changing it. This runs once on startup so it shouldnt be an issue
+		const char* resource = game->GetString("resource", "resource/HL2_AloneMod_english.txt");
+		KeyValues* AloneModEnglish = new  KeyValues("AloneModEnglish");
+		if (!AloneModEnglish->LoadFromFile(filesystem, resource, "MOD"))
+		{
+			ConWarning("Error: Failed to load the '%s' file for the new game editor panel!\n%s->%s\n", resource, filename, game->GetName());
+			AloneModEnglish->deleteThis();
+			continue;
+		}
+
+		//get the tokens
+		KeyValues* tokens = AloneModEnglish->FindKey("Tokens");
+		if (!tokens)
+		{
+			ConWarning("Error: Failed to find the 'Tokens' key for %s for the new game editor panel!\n%s\n", filename);
+			AloneModEnglish->deleteThis();
+			continue;
+		}
+
+		//get the actuall game list
+		GameListInfoEditor_t& info = base_info.info[base_info.info.AddToTail()];
+		Q_strncpy(info.name, game->GetName(), sizeof(info.name));
+		Q_strncpy(info.prefix, game->GetString("Prefix"), sizeof(info.prefix));
+
+		//get the resource file
+		Q_strncpy(info.resourceFilename, resource, sizeof(info.resourceFilename));
+		
+		//does this have themes?
+		info.UsesThemes = game->GetBool("HasThemes", true);
+
+		//is this the default
+		info.isDefault = game->GetBool("Default");
+
+		//get the chapter names
+		int i = 1;
+		while (true)
+		{
+			//check for the string
+			const char* chapter = tokens->GetString(CFmtStr("%s_Chapter%d_Title", info.prefix, i++), nullptr);
+			if (!chapter)
+				break;
+
+			info.resourceStrings.AddToTail(_strdup(chapter));
+		}
+
+		//get the chapter image info
+		KeyValues* ChapterImageInfo = game->FindKey("ChapterImageInfo");
+		if (ChapterImageInfo)
+		{
+			FOR_EACH_TRUE_SUBKEY(ChapterImageInfo, _info)
+			{
+				//add the info
+				GameListInfoEditor_t::ChapterImageInfo_t& chapter_info = info.m_ChapterImageInfo[info.m_ChapterImageInfo.AddToTail()];
+
+				//get the name
+				Q_strncpy(chapter_info.name, _info->GetName(), sizeof(chapter_info.name));
+
+				//get the other data
+				chapter_info.min = _info->GetInt("StartChapter");
+				chapter_info.max = _info->GetInt("EndChapter");
+				chapter_info.allowDay = _info->GetBool("AllowShowDay");
+				chapter_info.allowNight = _info->GetBool("AllowShowNight");
+			}
+		}
+	}
+}
+
+//command to optn eht new game editor
+CON_COMMAND(open_new_game_editor_panel, "")
+{
+	if (!s_NewGameEditor)
+		s_NewGameEditor = new CNewGameEditorPanel();
+
+	s_NewGameEditor->Activate();
 }
