@@ -19,7 +19,7 @@ struct MapTimeInfo_t
 		UtlSymId_t value;
 	};
 
-#ifdef FOG_CUBE_TRIGGER_TEST
+#if FOG_CUBE_TRIGGER_TEST
 	//fog cube triggers
 	struct FogCubeTrigger_t
 	{
@@ -58,7 +58,7 @@ struct MapTimeInfo_t
 		bool FogEnabled = false;
 		CUtlVector<FogInfo_t> FogInfo;
 
-#ifdef FOG_CUBE_TRIGGER_TEST
+#if FOG_CUBE_TRIGGER_TEST
 		//fog cube triggers
 		CUtlVector<FogCubeTrigger_t> FogCubeTriggers;
 #endif
@@ -67,15 +67,15 @@ struct MapTimeInfo_t
 
 		//optional filter name + value
 		UtlSymId_t FilterName;
-		UtlSymId_t FilterIntensity;
+		float FilterIntensity;
 
 		//optional clouds color
 		UtlSymId_t CloudsColor;
 
 		//bloom
-		UtlSymId_t BloomEnabled;
-		UtlSymId_t BloomScale;
-		UtlSymId_t BloomScalarFactor;
+		bool BloomEnabled;
+		int BloomScale;
+		float BloomScalarFactor;
 	};
 
 	//day info
@@ -94,7 +94,7 @@ struct MapTimeInfo_t
 		bool FogEnabled = false;
 		CUtlVector<FogInfo_t> FogInfo;
 
-#ifdef FOG_CUBE_TRIGGER_TEST
+#if FOG_CUBE_TRIGGER_TEST
 		//fog cube triggers
 		CUtlVector<FogCubeTrigger_t> FogCubeTriggers;
 #endif
@@ -105,15 +105,15 @@ struct MapTimeInfo_t
 
 		//optional filter name + value
 		UtlSymId_t FilterName;
-		UtlSymId_t FilterIntensity;
+		float FilterIntensity;
 
 		//optional clouds color
 		UtlSymId_t CloudsColor;
 
 		//bloom
-		UtlSymId_t BloomEnabled;
-		UtlSymId_t BloomScale;
-		UtlSymId_t BloomScalarFactor;
+		bool BloomEnabled;
+		int BloomScale;
+		float BloomScalarFactor;
 	};
 
 	char mapname[128];		//mapname (e.g d2_coast_01_d). do NOT keep the / of a map name (like bonus_maps/d1_trainstation_01_snowey).
@@ -152,7 +152,7 @@ void WriteTimeInfoToKeyvalues(MapTimeInfo_t& info, KeyValues* out);
 void WriteAllTimeInfosToFiles(const char* prefix = nullptr);
 
 //copy fuincs
-void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool copynight = true, bool copyday = true);
+void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool fromnight = true, bool tonight = true);
 
 //Returns if the current map is invalid for the day/night sky change
 void InitalizeDayNightInfo(bool reload = false);		//initalizes the day/night info
@@ -161,7 +161,11 @@ void InitalizeDayNightInfo(bool reload = false);		//initalizes the day/night inf
 const char* FindFogInfoFromArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, const char* key, const char* def = "");
 int AddOrUpdateFogInfoInArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, UtlSymId_t key, UtlSymId_t value);
 int AddOrUpdateFogInfoInArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, const char* key, const char* value);
+
+#if FOG_CUBE_TRIGGER_TEST
 int AddOrUpdateFogInfoInArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, UtlSymId_t key, MapTimeInfo_t::FogCubeTrigger_t::Value_t value);
+#endif
+
 void RemoveFogInfoInArray(CUtlVector<MapTimeInfo_t::FogInfo_t>& info, const char* key);
 
 //sun array helpers

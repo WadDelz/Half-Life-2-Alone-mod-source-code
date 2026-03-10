@@ -15,6 +15,7 @@
 #include "tier0/vprof.h"
 #include "checksum_crc.h"
 #include "tier0/icommandline.h"
+#include "AloneMod/AmodCvars.h"
 
 #if defined( TF_CLIENT_DLL ) || defined( TF_DLL )
 #include "tf_shareddefs.h"

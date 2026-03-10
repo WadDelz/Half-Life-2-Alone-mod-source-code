@@ -11,17 +11,17 @@
 #define NIGHT_DEFAULT_FILTER_NAME "scripts/colorcorrection/cc_epic_filter.raw"
 #define NIGHT_DEFAULT_FITLER_INTENSITY "0.7"
 #define NIGHT_DEFAULT_CLOUD_COLOR "255 255 255 255"
-#define NIGHT_DEFAULT_BLOOM_ENABLED "0"
-#define NIGHT_DEFAULT_BLOOM_SCALE "0"
-#define NIGHT_DEFAULT_BLOOM_SCALAR "0"
+#define NIGHT_DEFAULT_BLOOM_ENABLED false
+#define NIGHT_DEFAULT_BLOOM_SCALE 0
+#define NIGHT_DEFAULT_BLOOM_SCALAR 0.0f
 
 #define DAY_DEFAULT_SKY_NAME "sky_day01_01"
 #define DAY_DEFAULT_FILTER_NAME "scripts/colorcorrection/cc_daytime.raw"
 #define DAY_DEFAULT_FILTER_INTENSITY "0.325"
 #define DAY_DEFAULT_CLOUD_COLOR "255 255 255 120"
-#define DAY_DEFAULT_BLOOM_ENABLED "1"
-#define DAY_DEFAULT_BLOOM_SCALE "1"
-#define DAY_DEFAULT_BLOOM_SCALAR "0.4"
+#define DAY_DEFAULT_BLOOM_ENABLED true
+#define DAY_DEFAULT_BLOOM_SCALE 1
+#define DAY_DEFAULT_BLOOM_SCALAR 0.4f
 
 #if FOG_CUBE_TRIGGER_TEST
 #include "AloneMod/map properties editor/MapPropertiesEditorPanel.h"
@@ -184,9 +184,9 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 		info.NightInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString(night->GetString("CloudsColor", NIGHT_DEFAULT_CLOUD_COLOR));
 
 		//get the bloom info
-		info.NightInfo.BloomEnabled = gs_DayNightInfoSymbolsTable.AddString(night->GetString("BloomEnabled", NIGHT_DEFAULT_BLOOM_ENABLED));
-		info.NightInfo.BloomScale = gs_DayNightInfoSymbolsTable.AddString(night->GetString("BloomScale", NIGHT_DEFAULT_BLOOM_SCALE));
-		info.NightInfo.BloomScalarFactor = gs_DayNightInfoSymbolsTable.AddString(night->GetString("BloomScalarFactor", NIGHT_DEFAULT_BLOOM_SCALAR));
+		info.NightInfo.BloomEnabled = night->GetBool("BloomEnabled", NIGHT_DEFAULT_BLOOM_ENABLED);
+		info.NightInfo.BloomScale = night->GetInt("BloomScale", NIGHT_DEFAULT_BLOOM_SCALE);
+		info.NightInfo.BloomScalarFactor = night->GetFloat("BloomScalarFactor", NIGHT_DEFAULT_BLOOM_SCALAR);
 
 		//get the fog info
 		KeyValues* fog = night->FindKey("fog");
@@ -211,9 +211,9 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 		info.NightInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_FILTER_NAME);
 		info.NightInfo.FilterIntensity = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_FITLER_INTENSITY);
 		info.NightInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_CLOUD_COLOR);
-		info.NightInfo.BloomEnabled = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_BLOOM_ENABLED);
-		info.NightInfo.BloomScale = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_BLOOM_SCALE);
-		info.NightInfo.BloomScalarFactor = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_BLOOM_SCALAR);
+		info.NightInfo.BloomEnabled = NIGHT_DEFAULT_BLOOM_ENABLED;
+		info.NightInfo.BloomScale = NIGHT_DEFAULT_BLOOM_SCALE;
+		info.NightInfo.BloomScalarFactor = NIGHT_DEFAULT_BLOOM_SCALAR;
 	}
 
 	//get the day info
@@ -230,9 +230,9 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 		info.DayInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString(day->GetString("CloudsColor", DAY_DEFAULT_CLOUD_COLOR));
 
 		//get the bloom info
-		info.DayInfo.BloomEnabled = gs_DayNightInfoSymbolsTable.AddString(day->GetString("BloomEnabled", DAY_DEFAULT_BLOOM_ENABLED));
-		info.DayInfo.BloomScale = gs_DayNightInfoSymbolsTable.AddString(day->GetString("BloomScale", DAY_DEFAULT_BLOOM_SCALE));
-		info.DayInfo.BloomScalarFactor = gs_DayNightInfoSymbolsTable.AddString(day->GetString("BloomScalarFactor", DAY_DEFAULT_BLOOM_SCALAR));
+		info.DayInfo.BloomEnabled = day->GetBool("BloomEnabled", DAY_DEFAULT_BLOOM_ENABLED);
+		info.DayInfo.BloomScale = day->GetBool("BloomScale", DAY_DEFAULT_BLOOM_SCALE);
+		info.DayInfo.BloomScalarFactor = day->GetFloat("BloomScalarFactor", DAY_DEFAULT_BLOOM_SCALAR);
 
 		//get the sun info
 		KeyValues* sun = day->FindKey("sun");
@@ -276,9 +276,9 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 		info.DayInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_FILTER_NAME);
 		info.DayInfo.FilterIntensity = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_FILTER_INTENSITY);
 		info.DayInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_CLOUD_COLOR);
-		info.DayInfo.BloomEnabled = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_BLOOM_ENABLED);
-		info.DayInfo.BloomScale = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_BLOOM_SCALE);
-		info.DayInfo.BloomScalarFactor = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_BLOOM_SCALAR);
+		info.DayInfo.BloomEnabled = DAY_DEFAULT_BLOOM_ENABLED;
+		info.DayInfo.BloomScale = DAY_DEFAULT_BLOOM_SCALE;
+		info.DayInfo.BloomScalarFactor = DAY_DEFAULT_BLOOM_SCALAR;
 	}
 }
 
@@ -559,14 +559,14 @@ void WriteTimeInfoToKeyvalues(MapTimeInfo_t& info, KeyValues* out)
 		//write bloom settings
 		do
 		{
-			const char* enablebloom[2] = { StringFromMapTimeStringTableIndex(info.DayInfo.BloomEnabled), StringFromMapTimeStringTableIndex(info.NightInfo.BloomEnabled) };
-			const char* bloomscale[2] = { StringFromMapTimeStringTableIndex(info.DayInfo.BloomScale), StringFromMapTimeStringTableIndex(info.NightInfo.BloomScale) };
-			const char* bloomscalar[2] = { StringFromMapTimeStringTableIndex(info.DayInfo.BloomScalarFactor), StringFromMapTimeStringTableIndex(info.NightInfo.BloomScalarFactor) };
+			bool enablebloom[2] = { info.DayInfo.BloomEnabled, info.NightInfo.BloomEnabled };
+			int bloomscale[2] = { info.DayInfo.BloomScale, info.NightInfo.BloomScale };
+			float bloomscalar[2] = { info.DayInfo.BloomScalarFactor, info.NightInfo.BloomScalarFactor };
 
 			//write the filter
-			times[i]->SetString("BloomEnabled", enablebloom[i]);
-			times[i]->SetString("BloomScale", bloomscale[i]);
-			times[i]->SetString("BloomScalarFactor", bloomscalar[i]);
+			times[i]->SetBool("BloomEnabled", enablebloom[i]);
+			times[i]->SetInt("BloomScale", bloomscale[i]);
+			times[i]->SetFloat("BloomScalarFactor", bloomscalar[i]);
 
 		} while (false);
 
@@ -717,17 +717,17 @@ MapTimeInfo_t& GetDefaultMapTimeInfo()
 	def.DayInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_FILTER_NAME);
 	def.DayInfo.FilterIntensity = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_FILTER_INTENSITY);
 	def.DayInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_CLOUD_COLOR);
-	def.DayInfo.BloomEnabled = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_BLOOM_ENABLED);
-	def.DayInfo.BloomScale = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_BLOOM_SCALE);
-	def.DayInfo.BloomScalarFactor = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_BLOOM_SCALAR);
+	def.DayInfo.BloomEnabled = DAY_DEFAULT_BLOOM_ENABLED;
+	def.DayInfo.BloomScale = DAY_DEFAULT_BLOOM_SCALE;
+	def.DayInfo.BloomScalarFactor = DAY_DEFAULT_BLOOM_SCALAR;
 
 	def.NightInfo.DefaultNightSky = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_SKY_NAME);
 	def.NightInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_FILTER_NAME);
 	def.NightInfo.FilterIntensity = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_FITLER_INTENSITY);
 	def.NightInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_CLOUD_COLOR);
-	def.NightInfo.BloomEnabled = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_BLOOM_ENABLED);
-	def.NightInfo.BloomScale = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_BLOOM_SCALE);
-	def.NightInfo.BloomScalarFactor = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_BLOOM_SCALAR);
+	def.NightInfo.BloomEnabled = NIGHT_DEFAULT_BLOOM_ENABLED;
+	def.NightInfo.BloomScale = NIGHT_DEFAULT_BLOOM_SCALE;
+	def.NightInfo.BloomScalarFactor = NIGHT_DEFAULT_BLOOM_SCALAR;
 	return def;
 }
 
@@ -784,113 +784,128 @@ UtlSymId_t StringToMapTimeStringTableIndex(const char* string)
 //--------------------------------------------------------------------------------------------
 // Purpose: Copies time info from 1 instance to another
 //--------------------------------------------------------------------------------------------
-void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool copynight, bool copyday)
+void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool fromnight, bool tonight)
 {
-	//night info
-	if (copynight)
+	//handle to night
+	if (tonight)
 	{
-		//clear current data
+		//bloom
+		to.NightInfo.BloomEnabled = fromnight ? from.NightInfo.BloomEnabled : from.DayInfo.BloomEnabled;
+		to.NightInfo.BloomScale = fromnight ? from.NightInfo.BloomScale : from.DayInfo.BloomScale;
+		to.NightInfo.BloomScalarFactor = fromnight ? from.NightInfo.BloomScalarFactor : from.DayInfo.BloomScalarFactor;
+
+		//skybox
+		to.NightInfo.DefaultNightSky = fromnight ? from.NightInfo.DefaultNightSky : from.DayInfo.DefaultDaySky;
+
+		//filter info
+		to.NightInfo.FilterIntensity = fromnight ? from.NightInfo.FilterIntensity : from.DayInfo.FilterIntensity;
+		to.NightInfo.FilterName = fromnight ? from.NightInfo.FilterName : from.DayInfo.FilterName;
+
+		//clouds
+		to.NightInfo.CloudsColor = fromnight ? from.NightInfo.CloudsColor : from.DayInfo.CloudsColor;
+
+		//fog
+		to.NightInfo.FogEnabled = fromnight ? from.NightInfo.FogEnabled : from.DayInfo.FogEnabled;
 		to.NightInfo.FogInfo.RemoveAll();
-
-		//set new state
-		to.NightInfo.CloudsColor = from.NightInfo.CloudsColor;
-		to.NightInfo.DefaultNightSky = from.NightInfo.DefaultNightSky;
-		to.NightInfo.FilterIntensity = from.NightInfo.FilterIntensity;
-		to.NightInfo.FilterName = from.NightInfo.FilterName;
-		to.NightInfo.FogEnabled = from.NightInfo.FogEnabled;
-		to.NightInfo.BloomEnabled = from.NightInfo.BloomEnabled;
-		to.NightInfo.BloomScale = from.NightInfo.BloomScale;
-		to.NightInfo.BloomScalarFactor = from.NightInfo.BloomScalarFactor;
-
-		//copy the fog states
-		for (int i = 0; i < from.NightInfo.FogInfo.Count(); i++)
+		
+		CUtlVector<MapTimeInfo_t::FogInfo_t>& fromfog = fromnight ? from.NightInfo.FogInfo : from.DayInfo.FogInfo;
+		for (int i = 0; i < fromfog.Count(); i++)
 		{
-			MapTimeInfo_t::FogInfo_t& finfo = to.NightInfo.FogInfo[to.NightInfo.FogInfo.AddToTail()];
-			finfo.convar = from.NightInfo.FogInfo[i].convar;
-			finfo.value = from.NightInfo.FogInfo[i].value;
+			MapTimeInfo_t::FogInfo_t& info = to.NightInfo.FogInfo[to.NightInfo.FogInfo.AddToTail()];
+			info.convar = fromfog[i].convar;
+			info.value = fromfog[i].value;
 		}
 
 #if FOG_CUBE_TRIGGER_TEST
+		//fog cube triggers
 		to.NightInfo.FogCubeTriggers.RemoveAll();
 
-		//copy the fog cubes
-		for (int i = 0; i < from.NightInfo.FogCubeTriggers.Count(); i++)
+		CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& fromtriggers = fromnight ? from.NightInfo.FogCubeTriggers : from.DayInfo.FogCubeTriggers;
+		for (int i = 0; i < fromtriggers.Count(); i++)
 		{
-			MapTimeInfo_t::FogCubeTrigger_t& fromdata = from.NightInfo.FogCubeTriggers[i];
-			MapTimeInfo_t::FogCubeTrigger_t& finfo = to.NightInfo.FogCubeTriggers[to.NightInfo.FogCubeTriggers.AddToTail()];
+			MapTimeInfo_t::FogCubeTrigger_t& info = to.NightInfo.FogCubeTriggers[to.NightInfo.FogCubeTriggers.AddToTail()];
 
-			//set the values
-			Q_strncpy(finfo.name, fromdata.name, sizeof(finfo.name));
-			finfo.mins = fromdata.mins;
-			finfo.maxs = fromdata.maxs;
-			finfo.lerptime = fromdata.lerptime;
+			//copy
+			info.lerptime = fromtriggers[i].lerptime;
+			info.mins = fromtriggers[i].mins;
+			info.maxs = fromtriggers[i].maxs;
+			Q_strncpy(info.name, fromtriggers[i].name, sizeof(info.name));
 
-			//get the vars
-			for (int j = 0; j < fromdata.foginfo.Count(); j++)
+			//copy the vars
+			for (int j = 0; j < fromtriggers[i].foginfo.Count(); j++)
 			{
-				MapTimeInfo_t::FogInfo_t& fogvar = finfo.foginfo[finfo.foginfo.AddToTail()];
-				fogvar.convar = fromdata.foginfo[j].convar;
-				fogvar.value = fromdata.foginfo[j].value;
+				MapTimeInfo_t::FogInfo_t& fogdata = info.foginfo[info.foginfo.AddToTail()];
+				fogdata.convar = fromtriggers[i].foginfo[j].convar;
+				fogdata.value = fromtriggers[i].foginfo[j].value;
 			}
 		}
 #endif
 	}
-
-	//day info
-	if (copyday)
+	else
 	{
-		//clear current data
+		//bloom
+		to.DayInfo.BloomEnabled = fromnight ? from.NightInfo.BloomEnabled : from.DayInfo.BloomEnabled;
+		to.DayInfo.BloomScale = fromnight ? from.NightInfo.BloomScale : from.DayInfo.BloomScale;
+		to.DayInfo.BloomScalarFactor = fromnight ? from.NightInfo.BloomScalarFactor : from.DayInfo.BloomScalarFactor;
+
+		//skybox
+		to.DayInfo.DefaultDaySky = fromnight ? from.NightInfo.DefaultNightSky : from.DayInfo.DefaultDaySky;
+
+		//filter info
+		to.DayInfo.FilterIntensity = fromnight ? from.NightInfo.FilterIntensity : from.DayInfo.FilterIntensity;
+		to.DayInfo.FilterName = fromnight ? from.NightInfo.FilterName : from.DayInfo.FilterName;
+
+		//clouds
+		to.DayInfo.CloudsColor = fromnight ? from.NightInfo.CloudsColor : from.DayInfo.CloudsColor;
+
+		//fog
+		to.DayInfo.FogEnabled = fromnight ? from.NightInfo.FogEnabled : from.DayInfo.FogEnabled;
 		to.DayInfo.FogInfo.RemoveAll();
-		to.DayInfo.SunInfo.RemoveAll();
-
-		//set new state
-		to.DayInfo.CloudsColor = from.DayInfo.CloudsColor;
-		to.DayInfo.DefaultDaySky = from.DayInfo.DefaultDaySky;
-		to.DayInfo.FilterIntensity = from.DayInfo.FilterIntensity;
-		to.DayInfo.FilterName = from.DayInfo.FilterName;
-		to.DayInfo.FogEnabled = from.DayInfo.FogEnabled;
-		to.DayInfo.SunInfoEnabled = from.DayInfo.SunInfoEnabled;
-		to.DayInfo.BloomEnabled = from.DayInfo.BloomEnabled;
-		to.DayInfo.BloomScale = from.DayInfo.BloomScale;
-		to.DayInfo.BloomScalarFactor = from.DayInfo.BloomScalarFactor;
-
-		//copy the fog states
-		for (int i = 0; i < from.DayInfo.FogInfo.Count(); i++)
+		
+		CUtlVector<MapTimeInfo_t::FogInfo_t>& fromfog = fromnight ? from.NightInfo.FogInfo : from.DayInfo.FogInfo;
+		for (int i = 0; i < fromfog.Count(); i++)
 		{
-			MapTimeInfo_t::FogInfo_t& finfo = to.DayInfo.FogInfo[to.DayInfo.FogInfo.AddToTail()];
-			finfo.convar = from.DayInfo.FogInfo[i].convar;
-			finfo.value = from.DayInfo.FogInfo[i].value;
+			MapTimeInfo_t::FogInfo_t& info = to.DayInfo.FogInfo[to.DayInfo.FogInfo.AddToTail()];
+			info.convar = fromfog[i].convar;
+			info.value = fromfog[i].value;
 		}
 
-		//copy the sun states
-		for (int i = 0; i < from.DayInfo.SunInfo.Count(); i++)
+		//sun
+		to.DayInfo.SunInfoEnabled = from.DayInfo.SunInfoEnabled;
+		to.DayInfo.SunInfo.RemoveAll();
+		
+		if (!fromnight)
 		{
-			MapTimeInfo_t::DayInfo_t::SunInfo_t& finfo = to.DayInfo.SunInfo[to.DayInfo.SunInfo.AddToTail()];
-			finfo.key = from.DayInfo.SunInfo[i].key;
-			finfo.value = from.DayInfo.SunInfo[i].value;
+			CUtlVector<MapTimeInfo_t::DayInfo_t::SunInfo_t>& fromfog = from.DayInfo.SunInfo;
+			for (int i = 0; i < fromfog.Count(); i++)
+			{
+				MapTimeInfo_t::DayInfo_t::SunInfo_t& info = to.DayInfo.SunInfo[to.DayInfo.SunInfo.AddToTail()];
+				info.key = fromfog[i].key;
+				info.value = fromfog[i].value;
+			}
 		}
 
 #if FOG_CUBE_TRIGGER_TEST
+		//fog cube triggers
 		to.DayInfo.FogCubeTriggers.RemoveAll();
 
-		//copy the fog cubes
-		for (int i = 0; i < from.DayInfo.FogCubeTriggers.Count(); i++)
+		CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& fromtriggers = fromnight ? from.NightInfo.FogCubeTriggers : from.DayInfo.FogCubeTriggers;
+		for (int i = 0; i < fromtriggers.Count(); i++)
 		{
-			MapTimeInfo_t::FogCubeTrigger_t& fromdata = from.DayInfo.FogCubeTriggers[i];
-			MapTimeInfo_t::FogCubeTrigger_t& finfo = to.DayInfo.FogCubeTriggers[to.DayInfo.FogCubeTriggers.AddToTail()];
+			MapTimeInfo_t::FogCubeTrigger_t& info = to.DayInfo.FogCubeTriggers[to.DayInfo.FogCubeTriggers.AddToTail()];
 
-			//set the values
-			Q_strncpy(finfo.name, fromdata.name, sizeof(finfo.name));
-			finfo.mins = fromdata.mins;
-			finfo.maxs = fromdata.maxs;
-			finfo.lerptime = fromdata.lerptime;
+			//copy
+			info.lerptime = fromtriggers[i].lerptime;
+			info.mins = fromtriggers[i].mins;
+			info.maxs = fromtriggers[i].maxs;
+			Q_strncpy(info.name, fromtriggers[i].name, sizeof(info.name));
 
-			//get the vars
-			for (int j = 0; j < fromdata.foginfo.Count(); j++)
+			//copy the vars
+			for (int j = 0; j < fromtriggers[i].foginfo.Count(); j++)
 			{
-				MapTimeInfo_t::FogInfo_t& fogvar = finfo.foginfo[finfo.foginfo.AddToTail()];
-				fogvar.convar = fromdata.foginfo[j].convar;
-				fogvar.value = fromdata.foginfo[j].value;
+				MapTimeInfo_t::FogInfo_t& fogdata = info.foginfo[info.foginfo.AddToTail()];
+				fogdata.convar = fromtriggers[i].foginfo[j].convar;
+				fogdata.value = fromtriggers[i].foginfo[j].value;
 			}
 		}
 #endif
@@ -1408,12 +1423,12 @@ public:
 } g_TimeInfoInitalizer;
 
 
+#if FOG_CUBE_TRIGGER_TEST
 //------------------------------------------------------------------------------------------------------------------------------------
 // Purpose: For updating the cube triggers for the 
 //------------------------------------------------------------------------------------------------------------------------------------
 void UpdateFogTriggers(CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& CubeTriggers, bool forcend)
 {
-#if FOG_CUBE_TRIGGER_TEST
 	//get the player
 	CBasePlayer* pPlayer = CBasePlayer::GetLocalPlayer();
 	if (!pPlayer)
@@ -1421,6 +1436,7 @@ void UpdateFogTriggers(CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& CubeTriggers
 
 	//update
 	g_TimeInfoInitalizer.UpdateFogTriggers(pPlayer, CubeTriggers, forcend);
-#endif
 }
+#endif //FOG_CUBE_TRIGGER_TEST
+
 #endif

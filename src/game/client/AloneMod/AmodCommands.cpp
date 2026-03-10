@@ -85,33 +85,118 @@ void Amod_WriteConfig()
 	file = nullptr;
 }
 
+//writes to the alone mod config
 CON_COMMAND(amod_writeconfig, "")
 {
 	Amod_WriteConfig();
 }
 
+
+
+//------------------------------------------------------------------------------------------
+// Purpose: Recursivly scans the map directory for maps
+//------------------------------------------------------------------------------------------
+static void ScanMapsRecursive(const char* dir, CUtlVector<char*>& maps)
+{
+	//get the first file
+	FileFindHandle_t handle;
+	const char* file = g_pFullFileSystem->FindFirstEx(CFmtStr("%s/*", dir), "GAME", &handle);
+
+	//go through the files
+	while (file)
+	{
+		//check for . or ..
+		if (!Q_strcmp(file, ".") || !Q_strcmp(file, ".."))
+		{
+			file = g_pFullFileSystem->FindNext(handle);
+			continue;
+		}
+
+		//get the full path
+		char fullpath[512];
+		Q_snprintf(fullpath, sizeof(fullpath), "%s/%s", dir, file);
+
+		//check the file is a directory
+		if (g_pFullFileSystem->FindIsDirectory(handle))
+		{
+			//recurse but check for maps/graphs path first
+			if (Q_strnicmp(fullpath, "maps/graphs", Q_strlen("maps/graphs")))
+				ScanMapsRecursive(fullpath, maps);
+		}
+		else
+		{
+			//check the extention
+			const char* ext = V_GetFileExtension(fullpath);
+			if (ext && !Q_stricmp(ext, "bsp"))
+			{
+				//get the path relative to maps/
+				const char* relative = strstr(fullpath, "maps/");
+				if (!relative) { file = g_pFullFileSystem->FindNext(handle); continue; }
+				relative += Q_strlen("maps/");
+
+				//skip background and credits maps
+				if (Q_strnicmp(relative, "background", Q_strlen("background")) && Q_strnicmp(relative, "credits", Q_strlen("credits")))
+				{
+					//add the path
+					char mapname[512];
+					Q_strcpy(mapname, relative);
+					V_StripExtension(mapname, mapname, sizeof(mapname));
+
+					maps.AddToTail(strdup(mapname));
+				}
+			}
+		}
+
+		file = g_pFullFileSystem->FindNext(handle);
+	}
+
+	g_pFullFileSystem->FindClose(handle);
+}
+
+//chooses a random map out of all the maps in the maps/* directory
 CON_COMMAND_F(map_random, "Goes to a random map", FCVAR_CLIENTCMD_CAN_EXECUTE)
 {
-	int i = random->RandomInt(0, (sizeof(g_szMapNames) / sizeof(g_szMapNames[0]) - 1));
-	engine->ClientCmd_Unrestricted(CFmtStr("map %s", g_szMapNames[i]));
-}
+	//get the relative path
+	char diskpath[MAX_PATH];
+	g_pFullFileSystem->RelativePathToFullPath("gameinfo.txt", "MOD", diskpath, sizeof(diskpath));
+	Q_StripFilename(diskpath);
 
-//is obsolete
-CON_COMMAND(amod_rain_stopsounds, "stops rain sounds")
-{
-	CUtlVector<SndInfo_t> vec;
-	enginesound->GetActiveSounds(vec);
-	for (int i = 0; i < vec.Count(); i++)
+	//scan the maps directory
+	CUtlVector<char*> maps;
+	ScanMapsRecursive(CFmtStr("%s/maps", diskpath), maps);
+
+	//check the maps count (shouldnt be 0 but could be)
+	if (maps.Count() == 0)
 	{
-		SndInfo_t snd = vec[i];
-		char buffer[512];
-		filesystem->String(snd.m_filenameHandle, buffer, sizeof(buffer));
-		if (Q_strstr(buffer, "ambient\\weather\\rain"))
-			enginesound->StopSoundByGuid(snd.m_nGuid);
+		Msg("No maps found.\n");
+		return;
 	}
+
+	//choose a random index
+	int index = random->RandomInt(0, maps.Count() - 1);
+	engine->ClientCmd(CFmtStr("map %s\n", maps[index]));
+
+	//free all the map names
+	for (int i = 0; i < maps.Count(); i++)
+		free(maps[i]);
 }
 
-CON_COMMAND(amod_startcreditssong, "starts the credits song BUT makes it so if you pause the game the music also pauses so the credits and music arnt out of sync")
+////is obsolete
+//CON_COMMAND(amod_rain_stopsounds, "stops rain sounds")
+//{
+//	CUtlVector<SndInfo_t> vec;
+//	enginesound->GetActiveSounds(vec);
+//	for (int i = 0; i < vec.Count(); i++)
+//	{
+//		SndInfo_t snd = vec[i];
+//		char buffer[512];
+//		filesystem->String(snd.m_filenameHandle, buffer, sizeof(buffer));
+//		if (Q_strstr(buffer, "ambient\\weather\\rain"))
+//			enginesound->StopSoundByGuid(snd.m_nGuid);
+//	}
+//}
+
+CON_COMMAND(amod_startcreditssong, "starts the credits song BUT makes it so if you pause the game the music also pauses so the credits and music arnt out of sync. TODO: CHANGEME")
 {
 	enginesound->EmitAmbientSound("music/credits.wav", 7, 100, SND_SHOULDPAUSE);
 }

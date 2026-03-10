@@ -107,6 +107,8 @@ void CPointTeleport::Activate( void )
 	BaseClass::Activate();
 }
 
+extern ConVar __amod_in_prop_editor;
+
 //------------------------------------------------------------------------------
 // Purpose:
 //------------------------------------------------------------------------------
@@ -115,6 +117,10 @@ void CPointTeleport::InputTeleport( inputdata_t &inputdata )
 	// Attempt to find the entity in question
 	CBaseEntity *pTarget = gEntList.FindEntityByName( NULL, m_target, this, inputdata.pActivator, inputdata.pCaller );
 	if ( pTarget == NULL )
+		return;
+
+	//check for __amod_in_prop_editor
+	if (__amod_in_prop_editor.GetBool() && pTarget == UTIL_GetLocalPlayer())
 		return;
 
 	// If teleport object is in a movement hierarchy, remove it first

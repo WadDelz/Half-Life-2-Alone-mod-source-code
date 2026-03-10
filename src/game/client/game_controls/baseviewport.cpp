@@ -18,6 +18,9 @@
 #include <cdll_util.h>
 #include <globalvars_base.h>
 
+//alone mod
+#include "AloneMod/AmodCvars.h"
+
 // VGUI panel includes
 #include <vgui_controls/Panel.h>
 #include <vgui_controls/AnimationController.h>
@@ -722,6 +725,16 @@ int CBaseViewport::GetDeathMessageStartHeight( void )
 	return YRES(2);
 }
 
+//vignette commands
+static ConVar amod_vignette_color_r("amod_new_vignette_color_r", "0");
+static ConVar amod_vignette_color_g("amod_new_vignette_color_g", "0");
+static ConVar amod_vignette_color_b("amod_new_vignette_color_b", "0");
+static ConVar amod_new_vignette_start_alpha("amod_new_vignette_start_alpha", "175");
+static ConVar amod_new_vignette_end_alpha("amod_new_vignette_end_alpha", "0");
+
+static ConVar amod_vignette_width_divisor("amod_new_vignette_width_divisor", "3.75");
+static ConVar amod_vignette_height_divisor("amod_new_vignette_height_divisor", "3.75");
+
 void CBaseViewport::Paint()
 {
 	if ( cl_leveloverviewmarker.GetInt() > 0 )
@@ -731,6 +744,33 @@ void CBaseViewport::Paint()
 		vgui::surface()->DrawSetColor( 255, 0, 0, 255 );
 		vgui::surface()->DrawLine( size, 0, size, size );
 		vgui::surface()->DrawLine( 0, size, size, size );
+	}
+
+	//check for vignette
+	if (amod_vignette.GetBool() && amod_new_vignette.GetBool())
+	{
+		int w, h;
+		vgui::surface()->GetScreenSize(w, h);
+
+		//get size
+		int centerwidth = w / amod_vignette_width_divisor.GetFloat();
+		int centerheight = h / amod_vignette_height_divisor.GetFloat();
+		
+		//set the vignette color
+		Color color(amod_vignette_color_r.GetInt(), amod_vignette_color_g.GetInt(), amod_vignette_color_b.GetInt(), 255);
+		vgui::surface()->DrawSetColor(color);
+
+		// left -> right (edges opaque -> center transparent)
+		vgui::surface()->DrawFilledRectFade(0, 0, centerwidth, h, amod_new_vignette_start_alpha.GetInt(), amod_new_vignette_end_alpha.GetInt(), true);
+
+		// top -> bottom
+		vgui::surface()->DrawFilledRectFade(0, 0, w, centerheight, amod_new_vignette_start_alpha.GetInt(), amod_new_vignette_end_alpha.GetInt(), false);
+
+		// right -> left (edges opaque -> center transparent)
+		vgui::surface()->DrawFilledRectFade(w - centerwidth, 0, w, h, amod_new_vignette_end_alpha.GetInt(), amod_new_vignette_start_alpha.GetInt(), true);
+
+		// bottom -> top
+		vgui::surface()->DrawFilledRectFade(0, h - centerheight, w, h, amod_new_vignette_end_alpha.GetInt(), amod_new_vignette_start_alpha.GetInt(), false);
 	}
 }
 

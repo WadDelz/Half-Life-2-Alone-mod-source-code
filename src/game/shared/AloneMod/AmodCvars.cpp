@@ -76,6 +76,8 @@ ConVar amod_camera_cinematic_fix("amod_camera_cinematic_fix", "0", FCVAR_CLIENTD
 //fog
 ConVar amod_fog_disabled("amod_fog_disabled", "0", FCVAR_CLIENTDLL);
 
+//vignette
 ConVar amod_vignette("amod_vignette", "0", FCVAR_CLIENTDLL);
+ConVar amod_new_vignette("amod_new_vignette", "1", FCVAR_CLIENTDLL);
 
 #endif

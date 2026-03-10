@@ -35,18 +35,18 @@ enum class OverlayDrawType_e
 //overlay draw type string's for combo box
 static const char* g_OverlayDrawStrings[] =
 {
-	"Always Draw",
-	"When flashlight on",
-	"When flashlight off",
-	"When walking",
-	"When sprinting",
-	"When crouching",
-	"When on ground",
-	"When in air",
-	"When under water",
-	"When health low",
-	"When holding object",
-	"When using suit zoom"
+	"#Amod_EffectsPanel_OverlayPage_ActiveType_Always",
+	"#Amod_EffectsPanel_OverlayPage_ActiveType_WhenFlashlightOn",
+	"#Amod_EffectsPanel_OverlayPage_ActiveType_WhenFlashlightOff",
+	"#Amod_EffectsPanel_OverlayPage_ActiveType_WhenWalking",
+	"#Amod_EffectsPanel_OverlayPage_ActiveType_WhenSprinting",
+	"#Amod_EffectsPanel_OverlayPage_ActiveType_WhenCrouching",
+	"#Amod_EffectsPanel_OverlayPage_ActiveType_WhenOnGround",
+	"#Amod_EffectsPanel_OverlayPage_ActiveType_WhenInAir",
+	"#Amod_EffectsPanel_OverlayPage_ActiveType_WhenUnderWater",
+	"#Amod_EffectsPanel_OverlayPage_ActiveType_WhenHealthLow",
+	"#Amod_EffectsPanel_OverlayPage_ActiveType_WhenHoldingObject",
+	"#Amod_EffectsPanel_OverlayPage_ActiveType_WhenUsingSuitZoom"
 };
 
 //overlay button data

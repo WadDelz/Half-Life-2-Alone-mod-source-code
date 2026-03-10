@@ -23,9 +23,9 @@ enum class LightingMode_t
 };
 
 static const char* gsz_LightingModeStrings[] = {
-	"Dynamic Light",
-	"Dynamic Environmental Light",
-	"Projected Flashlight (can be buggy)",
+	"#Amod_EffectsPanel_LightingPage_LightType_Dynamic",
+	"#Amod_EffectsPanel_LightingPage_LightType_DynamicELight",
+	"#Amod_EffectsPanel_LightingPage_LightType_DynamicFlashLight",
 };
 
 //all the lighting movement modes
@@ -43,15 +43,15 @@ enum class LightingMovementMode_t
 };
 
 static const char* gsz_LightingMovementModeStrings[] = {
-	"Static",
-	"Follow Players Eyes",
-	"Parent to player's weapon muzzle (if possible)",
-	"Parent to entity with classname",
-	"Parent to entity with targetname",
-	"Parent to entity with model name",
-	"Parent to all entities with classname",
-	"Parent to all entities with targetname",
-	"Parent to all entities with model name",
+	"#Amod_EffectsPanel_LightingPage_MovementMode_Static",
+	"#Amod_EffectsPanel_LightingPage_MovementMode_FollowEyes",
+	"#Amod_EffectsPanel_LightingPage_MovementMode_ParentToMuzzle",
+	"#Amod_EffectsPanel_LightingPage_MovementMode_ParentToEntCName",
+	"#Amod_EffectsPanel_LightingPage_MovementMode_ParentToEntName",
+	"#Amod_EffectsPanel_LightingPage_MovementMode_ParentToEntMName",
+	"#Amod_EffectsPanel_LightingPage_MovementMode_ParentToAllEntCName",
+	"#Amod_EffectsPanel_LightingPage_MovementMode_ParentToAllEntName",
+	"#Amod_EffectsPanel_LightingPage_MovementMode_ParentToAllEntMName",
 };
 
 
@@ -75,18 +75,18 @@ enum class LightingType_e
 //lighting active type string's for combo box
 static const char* g_LightingActiveType[] =
 {
-	"Always Active",
-	"When flashlight on",
-	"When flashlight off",
-	"When walking",
-	"When sprinting",
-	"When crouching",
-	"When on ground",
-	"When in air",
-	"When under water",
-	"When health low",
-	"When holding object",
-	"When using suit zoom"
+	"#Amod_EffectsPanel_LightingPage_ActiveType_Always",
+	"#Amod_EffectsPanel_LightingPage_ActiveType_WhenFlashlightOn",
+	"#Amod_EffectsPanel_LightingPage_ActiveType_WhenFlashlightOff",
+	"#Amod_EffectsPanel_LightingPage_ActiveType_WhenWalking",
+	"#Amod_EffectsPanel_LightingPage_ActiveType_WhenSprinting",
+	"#Amod_EffectsPanel_LightingPage_ActiveType_WhenCrouching",
+	"#Amod_EffectsPanel_LightingPage_ActiveType_WhenOnGround",
+	"#Amod_EffectsPanel_LightingPage_ActiveType_WhenInAir",
+	"#Amod_EffectsPanel_LightingPage_ActiveType_WhenUnderWater",
+	"#Amod_EffectsPanel_LightingPage_ActiveType_WhenHealthLow",
+	"#Amod_EffectsPanel_LightingPage_ActiveType_WhenHoldingObject",
+	"#Amod_EffectsPanel_LightingPage_ActiveType_WhenUsingSuitZoom"
 };
 
 //text entry

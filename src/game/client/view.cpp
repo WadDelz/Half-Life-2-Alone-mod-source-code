@@ -1050,9 +1050,10 @@ void CViewRender::WriteSaveGameScreenshot( const char *pFilename )
 	WriteSaveGameScreenshotOfSize( pFilename, SAVEGAME_SCREENSHOT_WIDTH, SAVEGAME_SCREENSHOT_HEIGHT );
 }
 
+static ConVar amod_write_game_screenshot_current_config_fov("amod_write_game_screenshot_current_config_fov", "75");
+
 CON_COMMAND(amod_write_game_screenshot, "")
 {
-
 	//get the mod folder name
 	const char* modfolder = args.Arg(1);
 	if (!*modfolder)
@@ -1100,8 +1101,8 @@ CON_COMMAND(amod_write_game_screenshot, "")
 	//disable color correction if day is 0. this shit doesnt work :(
 	colorcorrection->EnableColorCorrection(daytime);
 
-	//set our fov hack to 75
-	g_CustomFovHack = 75;
+	//set our fov hack to amod_write_game_screenshot_current_config_fov
+	g_CustomFovHack = amod_write_game_screenshot_current_config_fov.GetFloat();
 
 	char filenamebase[512];
 	Q_strncpy(filenamebase, CFmtStr("%s/chapter%d%s", dir, chapter, daytime ? "_day" : ""), sizeof(filenamebase));
@@ -1131,7 +1132,7 @@ CON_COMMAND(amod_write_game_screenshot, "")
 //----------------------------------------------------------------------------------------------------
 // Purpose: finds the cfg folder containing a chapter*.cfg that references the current map
 //----------------------------------------------------------------------------------------------------
-static int FindChapterCfgForMap(char* outFolder, int outLen)
+int FindChapterCfgForMap(char* outFolder, int outLen)
 {
 	FileFindHandle_t hCfgRoot;
 	const char* pszFolder = filesystem->FindFirstEx("cfg/*", "MOD", &hCfgRoot);
@@ -1170,11 +1171,11 @@ static int FindChapterCfgForMap(char* outFolder, int outLen)
 				while (filesystem->ReadLine(buffer, sizeof(buffer), fh))
 				{
 					//check for 'map' first
-					char* p = Q_strstr(buffer, "map");
+					char* p = Q_strstr(buffer, "map ");
 					if (!p)
 						continue;
 
-					p = p + Q_strlen("map");
+					p = p + Q_strlen("map ");
 
 					//eat white spaces
 					while (*p && isspace((unsigned char)*p))

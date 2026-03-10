@@ -6,6 +6,7 @@
 #include "vgui_controls/PropertyDialog.h"
 #include "vgui_controls/Tooltip.h"
 #include "vgui_controls/MenuItem.h"
+#include "vgui/ILocalize.h"
 #include "c_soundscape.h"
 #include "filesystem.h"
 #include "fmtstr.h"
@@ -547,7 +548,7 @@ CEffectsPanelOverlayPage::CEffectsPanelOverlayPage(vgui::Panel* parent, const ch
 	SetKeyBoardInputEnabled(true);
 
 	//make the overlay list
-	m_OverlayList = new COverlayPageList(this, "OverlayList", "Overlays:");
+	m_OverlayList = new COverlayPageList(this, "OverlayList", "#Amod_EffectsPanel_OverlayPage_OverlayList");
 
 	//make overlay text entry
 	m_OverlayTextEntry = new vgui::ComboBox(this, "OverlayTextEntry", 20, true);
@@ -570,14 +571,14 @@ CEffectsPanelOverlayPage::CEffectsPanelOverlayPage(vgui::Panel* parent, const ch
 	}
 
 	//active the items
-	m_TypeComboBox->SetText("Active Types:");
+	m_TypeComboBox->SetText("#Amod_EffectsPanel_OverlayPage_TypeComboBox");
 
 	//make texts and sliders
-	m_RedText = new vgui::Label(this, "RedTextLabel", "Red Color = -1");
-	m_GreenText = new vgui::Label(this, "GreenTextLabel", "Green Color = -1");
-	m_BlueText = new vgui::Label(this, "BlueTextLabel", "Blue Color = -1");
-	m_AlphaText = new vgui::Label(this, "AlphaTextLabel", "Alpha = -1");
-	
+	m_RedText = new vgui::Label(this, "RedTextLabel", "");
+	m_GreenText = new vgui::Label(this, "GreenTextLabel", "");
+	m_BlueText = new vgui::Label(this, "BlueTextLabel", "");
+	m_AlphaText = new vgui::Label(this, "AlphaTextLabel", "");
+
 	m_RedSlider = new OverlaySlider(this, "RedSlider");
 	m_GreenSlider = new OverlaySlider(this, "GreenSlider");
 	m_BlueSlider = new OverlaySlider(this, "BlueSlider");
@@ -589,21 +590,21 @@ CEffectsPanelOverlayPage::CEffectsPanelOverlayPage(vgui::Panel* parent, const ch
 	m_AlphaSlider->SetRange(0, 255);
 
 	//make buttons
-	m_AddButton = new vgui::Button(this, "AddButton", "Add Overlay", this, ADD_OVERLAY_BUTTON_COMMAWND);
-	m_ChangeOverlay = new vgui::Button(this, "ChangeButton", "Update Selected Overlay", this, CHANGE_OVERLAY_BUTTON_COMMAWND);
-	m_RemoveOverlay = new vgui::Button(this, "RemoveOverlay", "Remove Selected Overlay", this, REMOVE_OVERLAY_BUTTON_COMMAWND);
+	m_AddButton = new vgui::Button(this, "AddButton", "#Amod_EffectsPanel_OverlayPage_AddButton", this, ADD_OVERLAY_BUTTON_COMMAWND);
+	m_ChangeOverlay = new vgui::Button(this, "ChangeButton", "#Amod_EffectsPanel_OverlayPage_ChangeButton", this, CHANGE_OVERLAY_BUTTON_COMMAWND);
+	m_RemoveOverlay = new vgui::Button(this, "RemoveOverlay", "#Amod_EffectsPanel_OverlayPage_RemoveButton", this, REMOVE_OVERLAY_BUTTON_COMMAWND);
 
 	//add the tool tips
-	ADD_TOOLTIP(m_OverlayList, 100, "This contains all of the overlays that will show. Hold shift and press the up/down arrow keys when an overlay is selected to change the render order of the overlays!", true);
-	ADD_TOOLTIP(m_OverlayTextEntry, 100, "Select an overlay from the combo box or input your own material path that will get added when you press the 'add' button.\nNote that some overlays can be buggy/visually glitchy.", true);
-	ADD_TOOLTIP(m_TypeComboBox, 100, "The conditions that must be met for the overlay to draw. Note that only 1 condition needs to be met for the overlay to draw", true);
-	ADD_TOOLTIP(m_RedSlider, 100, "The red amount of the overlay. Note that with some overlays it might not work!", true);
-	ADD_TOOLTIP(m_GreenSlider, 100, "The green amount of the overlay. Note that with some overlays it might not work!", true);
-	ADD_TOOLTIP(m_BlueSlider, 100, "The blue amount of the overlay. Note that with some overlays it might not work!", true);
-	ADD_TOOLTIP(m_AlphaSlider, 100, "The transparency amount of the overlay. Note that with some overlays it might not work!", true);
-	ADD_TOOLTIP(m_AddButton, 100, "Press this to add the overlay (with the rgba and draw type data) to the overlay list.", true);
-	ADD_TOOLTIP(m_ChangeOverlay, 100, "Press this to change the selected overlay from the overlay list to the new overlay data in the sliders and combo boxs.", true);
-	ADD_TOOLTIP(m_RemoveOverlay, 100, "Press this to remove the selected overlay from the overlay list.", true);
+	ADD_TOOLTIP(m_OverlayList, 100, "#Amod_EffectsPanel_OverlayPage_Tooltip_OverlayList", true);
+	ADD_TOOLTIP(m_OverlayTextEntry, 100, "#Amod_EffectsPanel_OverlayPage_Tooltip_OverlayTextEntry", true);
+	ADD_TOOLTIP(m_TypeComboBox, 100, "#Amod_EffectsPanel_OverlayPage_Tooltip_TypeComboBox", true);
+	ADD_TOOLTIP(m_RedSlider, 100, "#Amod_EffectsPanel_OverlayPage_Tooltip_RedSlider", true);
+	ADD_TOOLTIP(m_GreenSlider, 100, "#Amod_EffectsPanel_OverlayPage_Tooltip_GreenSlider", true);
+	ADD_TOOLTIP(m_BlueSlider, 100, "#Amod_EffectsPanel_OverlayPage_Tooltip_BlueSlider", true);
+	ADD_TOOLTIP(m_AlphaSlider, 100, "#Amod_EffectsPanel_OverlayPage_Tooltip_AlphaSlider", true);
+	ADD_TOOLTIP(m_AddButton, 100, "#Amod_EffectsPanel_OverlayPage_Tooltip_AddButton", true);
+	ADD_TOOLTIP(m_ChangeOverlay, 100, "#Amod_EffectsPanel_OverlayPage_Tooltip_ChangeButton", true);
+	ADD_TOOLTIP(m_RemoveOverlay, 100, "#Amod_EffectsPanel_OverlayPage_Tooltip_RemoveButton", true);
 
 	//reset the things to the defaults
 	ResetEffects();
@@ -696,7 +697,7 @@ void CEffectsPanelOverlayPage::ResetEffects()
 	m_OverlayList->ClearOverlays();
 
 	//reset draw mode
-	m_TypeComboBox->SetText("Active Types:");
+	m_TypeComboBox->SetText("#Amod_EffectsPanel_OverlayPage_ActiveTypes");
 
 	//only select menu item 1 (Always active)
 	for (int i = 0; i < m_TypeComboBox->GetItemCount(); i++)
@@ -911,10 +912,27 @@ void CEffectsPanelOverlayPage::OnCommand(const char* pszCommand)
 //---------------------------------------------------------------------------------
 void CEffectsPanelOverlayPage::OnTick()
 {
-	m_RedText->SetText(CFmtStr("Red Color = %d", m_RedSlider->GetValue()));
-	m_GreenText->SetText(CFmtStr("Green Color = %d", m_GreenSlider->GetValue()));
-	m_BlueText->SetText(CFmtStr("Blue Color = %d", m_BlueSlider->GetValue()));
-	m_AlphaText->SetText(CFmtStr("Alpha = %d", m_AlphaSlider->GetValue()));
+	//get the texts
+	wchar_t* redTextLoc = g_pVGuiLocalize->Find("#Amod_EffectsPanel_OverlayPage_RedText");
+	wchar_t* greenTextLoc = g_pVGuiLocalize->Find("#Amod_EffectsPanel_OverlayPage_GreenText");
+	wchar_t* blueTextLoc = g_pVGuiLocalize->Find("#Amod_EffectsPanel_OverlayPage_BlueText");
+	wchar_t* alphaTextLoc = g_pVGuiLocalize->Find("#Amod_EffectsPanel_OverlayPage_AlphaText");
+
+	//set the text's for the sliders
+	wchar_t redBuf[128];
+	wchar_t greenBuf[128];
+	wchar_t blueBuf[128];
+	wchar_t alphaBuf[128];
+
+	swprintf(redBuf, sizeof(redBuf) / sizeof(wchar_t), L"%ws = %d", redTextLoc, m_RedSlider->GetValue());
+	swprintf(greenBuf, sizeof(greenBuf) / sizeof(wchar_t), L"%ws = %d", greenTextLoc, m_GreenSlider->GetValue());
+	swprintf(blueBuf, sizeof(blueBuf) / sizeof(wchar_t), L"%ws = %d", blueTextLoc, m_BlueSlider->GetValue());
+	swprintf(alphaBuf, sizeof(alphaBuf) / sizeof(wchar_t), L"%ws = %d", alphaTextLoc, m_AlphaSlider->GetValue());
+
+	m_RedText->SetText(redBuf);
+	m_GreenText->SetText(greenBuf);
+	m_BlueText->SetText(blueBuf);
+	m_AlphaText->SetText(alphaBuf);
 }
 
 //---------------------------------------------------------------------------------

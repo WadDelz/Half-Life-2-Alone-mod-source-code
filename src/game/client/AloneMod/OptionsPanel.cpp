@@ -25,6 +25,7 @@
 #include "AloneMod/Amod_SharedDefs.h"
 #include "AloneMod/geo guesser/GG_MiniMap.h"
 #include "AloneMod/ColorPicker.h"
+#include "map properties editor/MapPropertiesEditorMenuPanel.h"
 
 using namespace vgui;
 
@@ -575,8 +576,6 @@ CAModWeatherPanel::~CAModWeatherPanel()
 	weatherpanel->ClearPanel();
 }
 
-
-
 //skybox panel
 #define SKYBOX_COMMAND_SET_BUTTON "SetSkybox"
 
@@ -602,9 +601,9 @@ private:
 	CUtlVector<const char*> m_Skyboxes;
 
 	//panel items
-	ComboBox* m_skyComboBox;
-	ComboBox* m_filterComboBox;
-	ComboBox* m_intensitiesComboBox;
+	CMapPropertiesEditorComboBox* m_skyComboBox;
+	CMapPropertiesEditorComboBox* m_filterComboBox;
+	CMapPropertiesEditorComboBox* m_intensitiesComboBox;
 	CStretchingImage* m_skyImage;
 	CheckButton* m_FogDisable;
 	CheckButton* m_SunDisableButton;
@@ -684,8 +683,9 @@ CAModSkyboxPanel::CAModSkyboxPanel(Panel* parent) : vgui::Frame(parent, "AloneMo
 		int index = 0, current = 1;
 
 		//before anything make the skybox's combo box so i can add the skybox names to it
-		m_skyComboBox = new ComboBox(this, "m_skyComboBox", 14, false);
+		m_skyComboBox = new CMapPropertiesEditorComboBox(this, "m_skyComboBox", 14, false);
 		m_skyComboBox->SetBounds(10, 282, 230, 20);
+		ADD_TOOLTIP(m_skyComboBox, 100, "#Amod_SkyboxPanel_Skyboxs_Tooltip", true)
 
 		//always add "" as the starting item
 		m_skyComboBox->AddItem("#Amod_SkyboxPanel_UseDefaultSkybox", nullptr);
@@ -728,12 +728,13 @@ CAModSkyboxPanel::CAModSkyboxPanel(Panel* parent) : vgui::Frame(parent, "AloneMo
 		FilterText->SetCenterWrap(true);
 
 		//make the custom filter combo box
-		m_filterComboBox = new ComboBox(this, "m_filterComboBox", 14, false);
+		m_filterComboBox = new CMapPropertiesEditorComboBox(this, "m_filterComboBox", 14, false);
 		m_filterComboBox->SetBounds(10, 361, 230, 20);
+		ADD_TOOLTIP(m_filterComboBox, 100, "#Amod_SkyboxPanel_Filter_Tooltip", true)
 
 		//always 
 		m_filterComboBox->AddItem("#Amod_SkyboxPanel_UseDefaultFilter", new KeyValues(""));
-
+		
 		//get the stuff
 		int index = 0, current = 1;
 
@@ -780,8 +781,9 @@ CAModSkyboxPanel::CAModSkyboxPanel(Panel* parent) : vgui::Frame(parent, "AloneMo
 
 	{
 		//make the filter intensities combo box
-		m_intensitiesComboBox = new ComboBox(this, "m_intensitiesComboBox", 14, false);
+		m_intensitiesComboBox = new CMapPropertiesEditorComboBox(this, "m_intensitiesComboBox", 14, false);
 		m_intensitiesComboBox->SetBounds(10, 383, 230, 20);
+		ADD_TOOLTIP(m_intensitiesComboBox, 100, "#Amod_SkyboxPanel_FilterIntensity_Tooltip", true)
 
 		//always 
 		m_intensitiesComboBox->AddItem("#Amod_SkyboxPanel_UseDefaultFilterIntensity", new KeyValues(""));
@@ -1473,6 +1475,7 @@ void COptionsPanel::Init()
 	m_FilterOnBrightnessSlider->SetBounds(FilterOnBrightnessSliderKv->GetInt("XPos"), FilterOnBrightnessSliderKv->GetInt("YPos"), FilterOnBrightnessSliderKv->GetInt("Wide"), FilterOnBrightnessSliderKv->GetInt("Tall"));
 	m_FilterOnBrightnessSlider->SetRange(0, 12);
 	m_FilterOnBrightnessSlider->SetValue(m_FilterOnValue);
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_FilterOnBrightnessSlider, FilterOnBrightnessSliderKv);
 
 	//make 'filter on exponent' label
 	Label* FilterOnExponentLabel = new Label(this, "FilterOnExponentLabel", FilterOnExponentLabelKv->GetString("text"));
@@ -1483,6 +1486,7 @@ void COptionsPanel::Init()
 	m_FilterOnExponentSlider->SetBounds(FilterOnExponentSliderKv->GetInt("XPos"), FilterOnExponentSliderKv->GetInt("YPos"), FilterOnExponentSliderKv->GetInt("Wide"), FilterOnExponentSliderKv->GetInt("Tall"));
 	m_FilterOnExponentSlider->SetRange(0, 12);
 	m_FilterOnExponentSlider->SetValue(m_FilterOnExponent);
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_FilterOnExponentSlider, FilterOnExponentSliderKv);
 
 	//make 'Filter off brightness' label
 	Label* FilterOffBrightnessLabel = new Label(this, "FilterOffBLabel", FilterOffBrightnessLabelKv->GetString("text"));
@@ -1493,12 +1497,14 @@ void COptionsPanel::Init()
 	m_FilterOffBrightnessSlider->SetBounds(FilterOffBrightnessSliderKv->GetInt("XPos"), FilterOffBrightnessSliderKv->GetInt("YPos"), FilterOffBrightnessSliderKv->GetInt("Wide"), FilterOffBrightnessSliderKv->GetInt("Tall"));
 	m_FilterOffBrightnessSlider->SetRange(0, 10);
 	m_FilterOffBrightnessSlider->SetValue(m_FilterOffValue);
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_FilterOffBrightnessSlider, FilterOffBrightnessSliderKv);
 
 	//epic filter (post processing type color-correction) check button
 	ConVarRef amod_epic_filter("amod_epic_filter");
 	m_EpicFilterCheckButton = new CheckButton(this, "EpicFilterCB", EpicFilterCheckButtonKV->GetString("Text", ""));
 	m_EpicFilterCheckButton->SetBounds(EpicFilterCheckButtonKV->GetInt("XPos"), EpicFilterCheckButtonKV->GetInt("YPos"), EpicFilterCheckButtonKV->GetInt("Wide"), EpicFilterCheckButtonKV->GetInt("Tall"));
 	m_EpicFilterCheckButton->SetSelected(amod_epic_filter.GetInt());
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_EpicFilterCheckButton, EpicFilterCheckButtonKV);
 
 	//Effects button
 	vgui::Button* EffectsButton = new Button(this, "EffectsButton", EffectsButtonKv->GetString("Text", "Button"));
@@ -1565,11 +1571,13 @@ void COptionsPanel::Init()
 	m_FlashlightLagCheckButton = new CheckButton(this, "FlashlightLagComboBox", FlashlightLagCheckButtonKv->GetString("Text"));
 	m_FlashlightLagCheckButton->SetBounds(FlashlightLagCheckButtonKv->GetInt("XPos"), FlashlightLagCheckButtonKv->GetInt("YPos"), FlashlightLagCheckButtonKv->GetInt("Wide"), FlashlightLagCheckButtonKv->GetInt("Tall"));
 	m_FlashlightLagCheckButton->SetSelected(amod_flashlightlag.GetBool());
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_FlashlightLagCheckButton, FlashlightLagCheckButtonKv);
 
 	//flashlight flicker combo box
 	m_FlashlightFlickerCheckButton = new CheckButton(this, "FlashlightFlickerComboBox", FlashlightFlickerCheckButtonKv->GetString("Text"));
 	m_FlashlightFlickerCheckButton->SetBounds(FlashlightFlickerCheckButtonKv->GetInt("XPos"), FlashlightFlickerCheckButtonKv->GetInt("YPos"), FlashlightFlickerCheckButtonKv->GetInt("Wide"), FlashlightFlickerCheckButtonKv->GetInt("Tall"));
 	m_FlashlightFlickerCheckButton->SetSelected(amod_flashlightflicker.GetBool());
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_FlashlightFlickerCheckButton, FlashlightFlickerCheckButtonKv);
 
 	//-------------------------------------- OTHER SETTINGS --------------------------------------//
 	

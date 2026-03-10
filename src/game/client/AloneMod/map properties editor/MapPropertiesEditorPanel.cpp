@@ -294,11 +294,6 @@ end:
 //----------------------------------------------------------------------------------------------------
 void CMapPropertiesPanel::OnClose()
 {
-	//when we close our panel, it doesnt cause our pages Update() function to stop for abit after we close. This can be an issue
-	//because sometimes the Update() functions reset the vars we set inside the _amod_day_do call below. So dont do anything for the OnThink function
-	//if this panel is currently closed
-	m_bClosed = true;
-
 	//check our s_NeedSave
 	if (s_NeedSave)
 	{
@@ -311,6 +306,11 @@ void CMapPropertiesPanel::OnClose()
 		modal->SetCancelCommand(new KeyValues("Command", "command", "DoModal"));
 		return;
 	}
+
+	//when we close our panel, it doesnt cause our pages Update() function to stop for abit after we close. This can be an issue
+	//because sometimes the Update() functions reset the vars we set inside the _amod_day_do call below. So dont do anything for the OnThink function
+	//if this panel is currently closed
+	m_bClosed = true;
 
 	//call base func
 	engine->ClientCmd("_amod_day_do");

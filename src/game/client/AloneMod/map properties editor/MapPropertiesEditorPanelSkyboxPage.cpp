@@ -395,6 +395,24 @@ void CMapPropertiesPanelSkyboxFiltersPage::InitSkyboxAndFilter(MapTimeInfo_t& in
 			m_PrevSkyboxNamesValue = index == -1 ? 0 : index;
 
 		} while (false);
+
+
+		//make SURE the current skybox is added
+		bool added = false;
+		for (int i = 0; i < m_SkyboxNames->GetItemCount(); i++)
+		{
+			if (!Q_stricmp(skybox, m_SkyboxNames->GetItemUserData(i)->GetName()))
+			{
+				added = true;
+				break;
+			}
+		}
+
+		if (!added)
+		{
+			m_SkyboxNames->AddItem(skybox, new KeyValues(skybox));
+			m_SkyboxNames->ActivateItem(m_SkyboxNames->GetItemCount() - 1);
+		}
 	}
 
 	//post processing
@@ -458,9 +476,9 @@ void CMapPropertiesPanelSkyboxFiltersPage::InitSkyboxAndFilter(MapTimeInfo_t& in
 
 	//bloom
 	{
-		m_EnableBloomCheckButton->SetSelected(atoi(StringFromMapTimeStringTableIndex(IsNightPage ? info.NightInfo.BloomEnabled : info.DayInfo.BloomEnabled)));
-		m_BloomScaleSlider->SetValue(atoi(StringFromMapTimeStringTableIndex(IsNightPage ? info.NightInfo.BloomScale : info.DayInfo.BloomScale)));
-		m_BloomScalarSlider->SetValue(atof(StringFromMapTimeStringTableIndex(IsNightPage ? info.NightInfo.BloomScalarFactor : info.DayInfo.BloomScalarFactor)) * BLOOM_SCALAR_DIVISOR);
+		m_EnableBloomCheckButton->SetSelected(IsNightPage ? info.NightInfo.BloomEnabled : info.DayInfo.BloomEnabled);
+		m_BloomScaleSlider->SetValue(IsNightPage ? info.NightInfo.BloomScale : info.DayInfo.BloomScale);
+		m_BloomScalarSlider->SetValue((IsNightPage ? info.NightInfo.BloomScalarFactor : info.DayInfo.BloomScalarFactor) * BLOOM_SCALAR_DIVISOR);
 	}
 }
 
@@ -519,15 +537,15 @@ void CMapPropertiesPanelSkyboxFiltersPage::GetSkyboxFilterInfo(MapTimeInfo_t& in
 		//set the value
 		if (m_bNightTimeMode)
 		{
-			info.NightInfo.BloomEnabled = StringToMapTimeStringTableIndex(CFmtStr("%d", m_EnableBloomCheckButton->IsSelected()));
-			info.NightInfo.BloomScale = StringToMapTimeStringTableIndex(CFmtStr("%d", m_BloomScaleSlider->GetValue()));
-			info.NightInfo.BloomScalarFactor = StringToMapTimeStringTableIndex(CFmtStr("%.3f", (float)m_BloomScalarSlider->GetValue() / BLOOM_SCALAR_DIVISOR));
+			info.NightInfo.BloomEnabled = m_EnableBloomCheckButton->IsSelected();
+			info.NightInfo.BloomScale = m_BloomScaleSlider->GetValue();
+			info.NightInfo.BloomScalarFactor = (float)m_BloomScalarSlider->GetValue() / BLOOM_SCALAR_DIVISOR;
 		}
 		else
 		{
-			info.DayInfo.BloomEnabled = StringToMapTimeStringTableIndex(CFmtStr("%d", m_EnableBloomCheckButton->IsSelected()));
-			info.DayInfo.BloomScale = StringToMapTimeStringTableIndex(CFmtStr("%d", m_BloomScaleSlider->GetValue()));
-			info.DayInfo.BloomScalarFactor = StringToMapTimeStringTableIndex(CFmtStr("%.3f", (float)m_BloomScalarSlider->GetValue() / BLOOM_SCALAR_DIVISOR));
+			info.DayInfo.BloomEnabled = m_EnableBloomCheckButton->IsSelected();
+			info.DayInfo.BloomScale = m_BloomScaleSlider->GetValue();
+			info.DayInfo.BloomScalarFactor = (float)m_BloomScalarSlider->GetValue() / BLOOM_SCALAR_DIVISOR;
 		}
 
 	} while (false);

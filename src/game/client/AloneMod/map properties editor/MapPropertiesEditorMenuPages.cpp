@@ -46,7 +46,10 @@ CMapPropertiesEditorPageBase::CMapPropertiesEditorPageBase(Panel* parent, const 
 	m_bIsNightPage = IsNightPage;
 	if (!gs_HasCopiedState[IsNightPage])
 	{
-		memset(&gs_CopiedState, 0, sizeof(MapTimeInfo_t));		//sizeof(MapTimeInfo_t) looks cooler in editor then sizeof(gs_CopiedState)
+		if (IsNightPage)
+			memset(&gs_CopiedState.NightInfo, 0, sizeof(MapTimeInfo_t::NightInfo_t));		//sizeof(MapTimeInfo_t::NightInfo_t) looks cooler in editor then sizeof(gs_CopiedState.NightInfo)
+		else
+			memset(&gs_CopiedState.DayInfo, 0, sizeof(MapTimeInfo_t::DayInfo_t));
 	}
 
 	//create our top combo box
@@ -294,18 +297,21 @@ void CMapPropertiesEditorPageBase::Populate(CUtlVector<MapTimeInfo_t>& base)
 		enabledCheckButton->SetCommand(CFmtStr(ENABLE_MAP_PREFIX "%d", i));
 		enabledCheckButton->AddActionSignalTarget(this);
 		enabledCheckButton->SetSelected(enabled);
-		
+		ADD_TOOLTIP(enabledCheckButton, 100, "#MapProperties_CheckButton_AllowTime_Tooltip", true)
+
 		//create the copy map settings button
 		Button* copyButton = new Button(divider, "copyButton", "#MapProperties_Button_CopyState");
 		copyButton->SetBounds(4, MAP_CONTAINER_HEIGHT - 61, 105, 24);
 		copyButton->SetCommand(CFmtStr(COPY_MAP_STATE_PREFIX "%d", i));
 		copyButton->AddActionSignalTarget(this);
+		ADD_TOOLTIP(copyButton, 100, "#MapProperties_Button_CopyState_ToolTip", true)
 
 		//create the paste map settings button
 		Button* pasteButton = new Button(divider, "pasteButton", "#MapProperties_Button_PasteState");
 		pasteButton->SetBounds(114, MAP_CONTAINER_HEIGHT - 61, 105, 24);
 		pasteButton->SetCommand(CFmtStr(PASTE_MAP_STATE_PREFIX"%d", i));
 		pasteButton->AddActionSignalTarget(this);
+		ADD_TOOLTIP(pasteButton, 100, "#MapProperties_Button_PasteState_ToolTip", true)
 
 		//create the modify map settings button
 		Button* modifyButton = new Button(divider, "ModifyMapSettings", "#MapProperties_Button_ModifyMapState");
@@ -367,6 +373,9 @@ void CMapPropertiesEditorPageBase::ApplySchemeSettings(IScheme* settings)
 void CMapPropertiesEditorPageBase::OnCommand(KeyValues* data)
 {
 	const char* cmd = data->GetString("command");
+
+	//is the ctrl key down?
+	bool ctrl = vgui::input()->IsKeyDown(vgui::KeyCode::KEY_LCONTROL) || vgui::input()->IsKeyDown(vgui::KeyCode::KEY_RCONTROL);
 
 	//check for MODIFY_MAP_PREFIX
 	if (Q_strstr(cmd, MODIFY_MAP_PREFIX))
@@ -443,17 +452,17 @@ void CMapPropertiesEditorPageBase::OnCommand(KeyValues* data)
 		gs_HasCopiedState[m_bIsNightPage] = true;
 
 		//copy state
-		CopyTimeInfoData(info, gs_CopiedState, m_bIsNightPage, !m_bIsNightPage);
+		CopyTimeInfoData(info, gs_CopiedState, m_bIsNightPage, m_bIsNightPage);
 	}
 
 	//check for paste state
 	else if (Q_strstr(cmd, PASTE_MAP_STATE_PREFIX))
 	{
 		//we must have a copied state
-		if (!gs_HasCopiedState[m_bIsNightPage])
+		if (!gs_HasCopiedState[ctrl ? !m_bIsNightPage : m_bIsNightPage])
 		{
 			//show error
-			QueryBox* modal = new QueryBox("No Copied State", "There is currently no state coppied!", this);
+			QueryBox* modal = new QueryBox("#MapProperties_Query_NoCopiedStates_Title", "#MapProperties_Query_NoCopiedStates_Desc", this);
 			modal->MoveToCenterOfScreen();
 			modal->Activate();
 			modal->DoModal();
@@ -471,7 +480,7 @@ void CMapPropertiesEditorPageBase::OnCommand(KeyValues* data)
 		MapTimeInfo_t& info = baseinfo[m_FileList->GetActiveItem()].base[index];
 
 		//copy state
-		CopyTimeInfoData(gs_CopiedState, info, m_bIsNightPage, !m_bIsNightPage);
+		CopyTimeInfoData(gs_CopiedState, info, ctrl ? !m_bIsNightPage : m_bIsNightPage, m_bIsNightPage);
 
 		//clear then repopulate the list to show the changes
 		Clear();

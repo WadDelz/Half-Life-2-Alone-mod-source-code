@@ -105,10 +105,10 @@ CEffectsPanel::CEffectsPanel(vgui::VPANEL parent) : BaseClass(nullptr, "EffectsP
 	SetVisible(false);
 
 	//add all the pages needed
-	m_EffectsPages.AddToTail(new CEffectsPanelViewEffects(this, "View Effects"));
-	m_EffectsPages.AddToTail(new CEffectsPanelConvarPage(this, "Console Variables"));	//if you change this then change CONVAR_PAGE_INDEX
-	m_EffectsPages.AddToTail(new CEffectsPanelOverlayPage(this, "Screen Overlays"));
-	m_EffectsPages.AddToTail(new CEffectsPanelLightingPage(this, "Lighting"));			//if you change this then change LIGHTING_PAGE_INDEX
+	m_EffectsPages.AddToTail(new CEffectsPanelViewEffects(this, "#Amod_EffectsPanel_PageTitle_ViewEffects"));
+	m_EffectsPages.AddToTail(new CEffectsPanelConvarPage(this, "#Amod_EffectsPanel_PageTitle_Convars"));			//if you change this then change CONVAR_PAGE_INDEX
+	m_EffectsPages.AddToTail(new CEffectsPanelOverlayPage(this, "#Amod_EffectsPanel_PageTitle_Overlays"));
+	m_EffectsPages.AddToTail(new CEffectsPanelLightingPage(this, "#Amod_EffectsPanel_PageTitle_Lighting"));			//if you change this then change LIGHTING_PAGE_INDEX
 
 	//add each page
 	for (int i = 0; i < m_EffectsPages.Count(); i++)
@@ -116,7 +116,7 @@ CEffectsPanel::CEffectsPanel(vgui::VPANEL parent) : BaseClass(nullptr, "EffectsP
 
 	//add the settings page
 	m_SettingsPage = new CEffectsPanelSettingsPage(this, "SettingsPage");
-	AddPage(m_SettingsPage, "Autoload Files");
+	AddPage(m_SettingsPage, "#Amod_EffectsPanel_PageTitle_Autoload");
 
 	//load the settings
 	KeyValues* settings = new KeyValues("Settings");
@@ -127,46 +127,46 @@ CEffectsPanel::CEffectsPanel(vgui::VPANEL parent) : BaseClass(nullptr, "EffectsP
 	settings->deleteThis();
 
 	//bounds and title
-	SetTitle("Effects Panel", false);
+	SetTitle("#Amod_EffectsPanel_Title", false);
 	SetSize(EFFECTS_PANEL_WIDTH, EFFECTS_PANEL_HEIGHT);
 	MoveToCenterOfScreen();
 
 	//bottom buttons
 	SetOKButtonVisible(true);
-	SetOKButtonText("Reset");
+	SetOKButtonText("#Amod_EffectsPanel_Buttons_Reset");
 	_okButton->SetEnabled(true);
 	_okButton->SetCommand(COMMAND_RESET_EFFECTS);
 	_okButton->SetReleasedSound("ui/buttonclickrelease.wav");
 
 	SetCancelButtonVisible(true);
-	SetCancelButtonText("Save");
+	SetCancelButtonText("#Amod_EffectsPanel_Buttons_Save");
 	_cancelButton->SetEnabled(true);
 	_cancelButton->SetCommand(COMMAND_SAVE_EFFECTS);
 	_cancelButton->SetReleasedSound("ui/buttonclickrelease.wav");
 
 	SetApplyButtonVisible(true);
-	SetApplyButtonText("Load");
+	SetApplyButtonText("#Amod_EffectsPanel_Buttons_Load");
 	_applyButton->SetEnabled(true);
 	_applyButton->SetCommand(COMMAND_LOAD_EFFECTS);
 	_applyButton->SetReleasedSound("ui/buttonclickrelease.wav");
 
 	//create the lighting debug button
-	m_LightingDebugCheckButton = new vgui::CheckButton(this, "LightingDebug", "Lighting Debug");
+	m_LightingDebugCheckButton = new vgui::CheckButton(this, "LightingDebug", "#Amod_EffectsPanel_Buttons_LightingDebug");
 	m_LightingDebugCheckButton->SetBounds(10, EFFECTS_PANEL_HEIGHT - 32, 150, 22);
 	m_LightingDebugCheckButton->AddActionSignalTarget(this);
 	m_LightingDebugCheckButton->SetSelected(false);
 	m_LightingDebugCheckButton->SetCommand(COMMAND_LIGHTING_DEBUG);
 	
 	//create the autoload check buttong
-	m_AutoloadCheckButton = new vgui::CheckButton(this, "AutoloadButton", "Should Autoload Files?");
+	m_AutoloadCheckButton = new vgui::CheckButton(this, "AutoloadButton", "#Amod_EffectsPanel_Buttons_ShouldAutoload");
 	m_AutoloadCheckButton->SetBounds(10, EFFECTS_PANEL_HEIGHT - 32, 165, 22);
 	m_AutoloadCheckButton->AddActionSignalTarget(this);
 	m_AutoloadCheckButton->SetSelected(amod_effects_panel_autoload_files.GetBool());
 	m_AutoloadCheckButton->SetCommand(COMMAND_AUTOLOAD);
 
 	//add tooltips
-	ADD_TOOLTIP(m_LightingDebugCheckButton, 100, "If selected then it will show debug lines/boxes/texts for all of the active (newly added) lights in the scene/map.", true)
-	ADD_TOOLTIP(m_AutoloadCheckButton, 100, "If selected then when a map loads it will go through each folder/file added to the 'Autoload List' and add those effect save files into each page of the effect panel.", true)
+	ADD_TOOLTIP(m_LightingDebugCheckButton, 100, "#Amod_EffectsPanel_Buttons_LightingDebug_Tooltip", true)
+	ADD_TOOLTIP(m_AutoloadCheckButton, 100, "#Amod_EffectsPanel_Buttons_ShouldAutoload_Tooltip", true)
 
 	vgui::ivgui()->AddTickSignal(GetVPanel(), 30);
 }
@@ -284,7 +284,7 @@ void CEffectsPanel::OnCommand(const char* pszCommand)
 	if (!Q_strcmp(pszCommand, COMMAND_RESET_EFFECTS))
 	{
 		//prompt the user
-		vgui::QueryBox* prompt = new vgui::QueryBox("Save?", "Are you sure you want to reset without saving?");
+		vgui::QueryBox* prompt = new vgui::QueryBox("#Amod_EffectsPanel_ResetPrompt_Title", "#Amod_EffectsPanel_ResetPrompt_Desc");
 		prompt->SetOKButtonText("Ok");
 		prompt->SetOKCommand(new KeyValues("Command", "command", COMMAND_CONFIRM_RESET));
 		prompt->SetCancelButtonVisible(false);
@@ -313,7 +313,7 @@ void CEffectsPanel::OnCommand(const char* pszCommand)
 		}
 
 		//create the dialog
-		m_FileDialog = new vgui::FileOpenDialog(this, "Save Preset", false);
+		m_FileDialog = new vgui::FileOpenDialog(this, "#Amod_EffectsPanel_SavePreset_Title", false);
 		m_FileDialog->AddFilter("*.amf", "Amod Filter Files (*.amf)", true);
 		m_FileDialog->AddFilter("*.*", "All Files (*.*)", false);
 		m_FileDialog->AddActionSignalTarget(this);
@@ -342,7 +342,7 @@ void CEffectsPanel::OnCommand(const char* pszCommand)
 		}
 
 		//create the dialog
-		m_FileDialog = new vgui::FileOpenDialog(this, "Save Preset", true);
+		m_FileDialog = new vgui::FileOpenDialog(this, "#Amod_EffectsPanel_LoadPreset_Title", true);
 		m_FileDialog->AddFilter("*.amf", "Amod Filter Files (*.amf)", true);
 		m_FileDialog->AddFilter("*.*", "All Files (*.*)", false);
 		m_FileDialog->AddActionSignalTarget(this);
@@ -435,8 +435,19 @@ void CEffectsPanel::OnFileSelected(const char* pszFileName)
 			//play an error sound
 			vgui::surface()->PlaySound("resource/warning.wav");
 
+			//get the text
+			wchar_t* format = g_pVGuiLocalize->Find("#Amod_EffectsPanel_FailedToLoadPreset_Desc");
+
+			//get the filename
+			wchar_t name[256];
+			g_pVGuiLocalize->ConvertANSIToUnicode(filename, name, sizeof(name));
+
+			//get the output text
+			wchar_t text[1024];
+			swprintf(text, SIZE_OF_ARRAY(text), format, name);
+
 			//show error message
-			vgui::QueryBox* error = new vgui::QueryBox("Error", CFmtStr1024("Failed to load preset file:\n%s", filename));
+			vgui::QueryBox* error = new vgui::QueryBox(L"#Amod_Panel_Error", text);
 			error->SetOKButtonText("Ok");
 			error->SetCancelButtonVisible(false);
 			error->AddActionSignalTarget(this);
@@ -463,8 +474,19 @@ void CEffectsPanel::OnFileSelected(const char* pszFileName)
 			//play an error sound
 			vgui::surface()->PlaySound("resource/warning.wav");
 
+			//get the text
+			wchar_t* format = g_pVGuiLocalize->Find("#Amod_EffectsPanel_FailedToSavePreset_Desc");
+
+			//get the filename
+			wchar_t name[256];
+			g_pVGuiLocalize->ConvertANSIToUnicode(filename, name, sizeof(name));
+
+			//get the output text
+			wchar_t text[1024];
+			swprintf(text, SIZE_OF_ARRAY(text), format, name);
+
 			//show error message
-			vgui::QueryBox* error = new vgui::QueryBox("Error", CFmtStr1024("Failed to save preset to file:\n%s", filename));
+			vgui::QueryBox* error = new vgui::QueryBox(L"#Amod_Panel_Error", text);
 			error->SetOKButtonText("Ok");
 			error->SetCancelButtonVisible(false);
 			error->AddActionSignalTarget(this);

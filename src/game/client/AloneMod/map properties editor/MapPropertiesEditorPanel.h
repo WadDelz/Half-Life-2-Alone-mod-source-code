@@ -43,7 +43,11 @@ public:
 private:
 	//pages
 	CMapPropertiesPanelFogPage* m_FogPage;
+
+#if FOG_CUBE_TRIGGER_TEST
 	CMapPropertiesPanelFogTriggersPage* m_FogTriggersPage;
+#endif //FOG_CUBE_TRIGGER_TEST
+
 	CMapPropertiesPanelSkyboxFiltersPage* m_SkyboxFilterPage;
 	CMapPropertiesPanelSunPage* m_SunPage;
 

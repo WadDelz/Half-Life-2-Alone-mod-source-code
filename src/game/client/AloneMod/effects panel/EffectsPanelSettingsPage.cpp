@@ -247,26 +247,26 @@ CEffectsPanelSettingsPage::CEffectsPanelSettingsPage(vgui::Panel* parent, const 
 	SetKeyBoardInputEnabled(true);
 
 	//make file list
-	m_FileList = new CAutoLoadPageList(this, "FileList", "Autoload List:");
+	m_FileList = new CAutoLoadPageList(this, "FileList", "#Amod_EffectsPanel_SettingsPage_FileList");
 
 	//create the file text entry
 	m_FileTextEntry = new vgui::TextEntry(this, "FileTextEntry");
 	m_FileTextEntry->SetMaximumCharCount(FILENAME_MAX);
-	
+
 	//create the file label
-	m_FileLabel = new vgui::Label(this, "FileLabel", "Autoload File Name:");
+	m_FileLabel = new vgui::Label(this, "FileLabel", "#Amod_EffectsPanel_SettingsPage_FileLabel");
 	m_FileLabel->SetContentAlignment(vgui::Label::Alignment::a_center);
 
 	//create select buttons
-	m_SelectFileButton = new vgui::Button(this, "SelectFileButton", "Choose File", this, COMMAND_SELECT_FILE);
-	m_SelectFolderButton = new vgui::Button(this, "SelectFolderButton", "Choose Folder", this, COMMAND_SELECT_FOLDER);
-	
+	m_SelectFileButton = new vgui::Button(this, "SelectFileButton", "#Amod_EffectsPanel_SettingsPage_SelectFileButton", this, COMMAND_SELECT_FILE);
+	m_SelectFolderButton = new vgui::Button(this, "SelectFolderButton", "#Amod_EffectsPanel_SettingsPage_SelectFolderButton", this, COMMAND_SELECT_FOLDER);
+
 	//create add/remove buttons
-	m_AddToListButton = new vgui::Button(this, "AddButton", "Add to list", this, COMMAND_ADD);
-	m_RemoveButton = new vgui::Button(this, "RemoveButton", "Remove selected from list", this, COMMAND_REMOVE);
+	m_AddToListButton = new vgui::Button(this, "AddButton", "#Amod_EffectsPanel_SettingsPage_AddToListButton", this, COMMAND_ADD);
+	m_RemoveButton = new vgui::Button(this, "RemoveButton", "#Amod_EffectsPanel_SettingsPage_RemoveButton", this, COMMAND_REMOVE);
 
 	//add tooltips
-	ADD_TOOLTIP(m_FileList, 100, "This contains a list of every single file and folder that will get loaded into the effects panel when a new map starts. To add a file/folder use the 'select file' or 'select folder' button to get the file/folder(s) name then add the folder with the add button.\n\nIf you make a file or have a folder with the name of a map in the maps directory then it will only load that folder/file if the current map name is the name of the folder/file.\n\nThe file and files in the folder and folders sub folders must be of the .amf extention (or else it wont load),\n\nAll the effects in the effects panel will get cleared when a level is shutdown unless the 'Should Autoload Files?' button isnt checked.", true);
+	ADD_TOOLTIP(m_FileList, 100, "#Amod_EffectsPanel_SettingsPage_Tooltip_FileList", true);
 
 	//set the bounds for each item
 	PerformLayout();
@@ -588,7 +588,7 @@ void CEffectsPanelSettingsPage::OnCommand(const char* pszCommand)
 			vgui::surface()->PlaySound("resource/warning.wav");
 
 			//show error message
-			vgui::QueryBox* error = new vgui::QueryBox("Error", "Error: Cant have empty file!");
+			vgui::QueryBox* error = new vgui::QueryBox("#Amod_Panel_Error", "#Amod_EffectsPanel_SettingsPage_Query_EmptyFile");
 			error->SetOKButtonText("Ok");
 			error->SetCancelButtonVisible(false);
 			error->AddActionSignalTarget(this);
@@ -609,7 +609,7 @@ void CEffectsPanelSettingsPage::OnCommand(const char* pszCommand)
 			vgui::surface()->PlaySound("resource/warning.wav");
 
 			//show error message
-			vgui::QueryBox* error = new vgui::QueryBox("Error", "Error: No file selected!");
+			vgui::QueryBox* error = new vgui::QueryBox("#Amod_Panel_Error", "#Amod_EffectsPanel_SettingsPage_Query_NoSelectedFile");
 			error->SetOKButtonText("Ok");
 			error->SetCancelButtonVisible(false);
 			error->AddActionSignalTarget(this);
@@ -629,7 +629,7 @@ void CEffectsPanelSettingsPage::OnCommand(const char* pszCommand)
 		}
 
 		//create the dialog
-		m_FileDialog = new vgui::FileOpenDialog(this, "Save Preset", true);
+		m_FileDialog = new vgui::FileOpenDialog(this, "#Amod_EffectsPanel_SettingsPage_FileDialog_SelectFile", true);
 		m_FileDialog->AddFilter("*.amf", "Amod Filter Files (*.amf)", true);
 		m_FileDialog->AddFilter("*.*", "All Files (*.*)", false);
 		m_FileDialog->AddActionSignalTarget(this);
@@ -655,7 +655,7 @@ void CEffectsPanelSettingsPage::OnCommand(const char* pszCommand)
 		}
 
 		//create the dialog
-		m_FileDialog = new vgui::FileOpenDialog(this, "Save Preset", vgui::FileOpenDialogType_t::FOD_SELECT_DIRECTORY);
+		m_FileDialog = new vgui::FileOpenDialog(this, "#Amod_EffectsPanel_SettingsPage_FileDialog_SelectFolder", vgui::FileOpenDialogType_t::FOD_SELECT_DIRECTORY);
 		m_FileDialog->AddFilter("*.amf", "Amod Filter Files (*.amf)", true);
 		m_FileDialog->AddFilter("*.*", "All Files (*.*)", false);
 		m_FileDialog->AddActionSignalTarget(this);

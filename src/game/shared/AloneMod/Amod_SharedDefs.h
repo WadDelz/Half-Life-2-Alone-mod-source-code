@@ -3,8 +3,6 @@
 
 #include "AloneModTimeInfo.h"
 
-extern const char* g_szMapNames[98];
-
 #ifdef CLIENT_DLL
 extern const char* szMapName;
 #endif

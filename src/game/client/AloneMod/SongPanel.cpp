@@ -1795,12 +1795,15 @@ void CSongPanel::Init()
 	m_DurationText = new Label(this, "DurationText", "Duration: 0:00");
 	m_DurationText->SetBounds(DurationTextKv->GetInt("XPos"), DurationTextKv->GetInt("YPos"), DurationTextKv->GetInt("Wide"), DurationTextKv->GetInt("Tall"));
 
-	//add the elapsed text
-	m_ElapsedText = new Label(this, "ElapsedText", "Elapsed: 0:00 (Speed 1.0x)");
+	//make the text
+	wchar_t text[256];
+	swprintf(text, SIZE_OF_ARRAY(text), g_pVGuiLocalize->Find("#Amod_SongPanel_ElapsedPlayingText"), 0, 0, 1.0f);
+
+	m_ElapsedText = new Label(this, "ElapsedText", text);
 	m_ElapsedText->SetBounds(ElapsedTextKv->GetInt("XPos"), ElapsedTextKv->GetInt("YPos"), ElapsedTextKv->GetInt("Wide"), ElapsedTextKv->GetInt("Tall"));
 
 	//add the elapsed text
-	m_CurrentlyPlayingText = new Label(this, "CurrentlyPlayingText", "Currently Playing:");
+	m_CurrentlyPlayingText = new Label(this, "CurrentlyPlayingText", "#Amod_SongPanel_CurrentlyPlayingText");
 	m_CurrentlyPlayingText->SetBounds(CurrentlyPlayingTextKv->GetInt("XPos"), CurrentlyPlayingTextKv->GetInt("YPos"), CurrentlyPlayingTextKv->GetInt("Wide"), CurrentlyPlayingTextKv->GetInt("Tall"));
 	m_CurrentlyPlayingText->SetContentAlignment(vgui::Label::a_center);
 
@@ -2116,34 +2119,70 @@ void CSongPanel::OnTick()
 	static int PreviousPitch = 100;
 	int Pitch = m_PitchSlider->GetValue();
 
-	m_PitchLabel->SetText(CFmtStr("Song Pitch/Speed: %d", Pitch));
-	m_VolumeLabel->SetText(CFmtStr("Song Volume: %.2f", (float)m_VolumeSlider->GetValue() / 100));
+	//set pitch + volume text
+	{
+		//make the speed text
+		wchar_t speedText[256];
+		swprintf(speedText, SIZE_OF_ARRAY(speedText), L"%ls %d", g_pVGuiLocalize->Find("#Amod_SongPanel_SpeedText"), Pitch);
+		m_PitchLabel->SetText(speedText);
+
+		//make the volume text
+		wchar_t volumeText[256];
+		swprintf(volumeText, SIZE_OF_ARRAY(volumeText), L"%ls %.2f", g_pVGuiLocalize->Find("#Amod_SongPanel_VolumeText"), (float)m_VolumeSlider->GetValue() / 100);
+		m_VolumeLabel->SetText(volumeText);
+	}
 
 	//update m_CurrentlyPlayingText
 	if (!m_CurrPlaying)
 	{
-		m_CurrentlyPlayingText->SetText("Currently Playing:");
+		m_CurrentlyPlayingText->SetText("#Amod_SongPanel_CurrentlyPlayingText");
 	}
 	else
 	{
-		m_CurrentlyPlayingText->SetText(CFmtStr("Currently Playing: %s", m_CurrPlaying));
+		//get the format text
+		wchar_t* format = g_pVGuiLocalize->Find("#Amod_SongPanel_CurrentlyPlayingText");
+
+		//song to display (default = internal name)
+		const char* song = m_CurrPlaying;
 
 		//look for song with same name
 		for (int i = 0; i < m_Songs.Count(); i++)
 		{
 			if (!Q_strcmp(m_Songs[i].SongName, m_CurrPlaying))
 			{
-				m_CurrentlyPlayingText->SetText(CFmtStr("Currently Playing: %s", m_Songs[i].Name));
+				song = m_Songs[i].Name;
 				break;
 			}
 		}
+
+		//convert to unicode
+		wchar_t name[256];
+		g_pVGuiLocalize->ConvertANSIToUnicode(song, name, sizeof(name));
+
+		//makie the final text
+		wchar_t text[512];
+		swprintf(text, SIZE_OF_ARRAY(text), L"%ws %ws", format, name);
+
+		//set text
+		m_CurrentlyPlayingText->SetText(text);
 	}
 
 	//if the song isnt active then return
 	if (m_SongGuid == INVALID_SONG_GUID || !m_CurrPlaying)
 	{
-		m_DurationText->SetText("Duration: 0:00");
-		m_ElapsedText->SetText("Elapsed: 0:00 (Speed 1.0x)");
+		//make the duration text
+		wchar_t dtext[256];
+		swprintf(dtext, SIZE_OF_ARRAY(dtext), L"%ws 0:00", g_pVGuiLocalize->Find("#Amod_SongPanel_DurationText"));
+
+		m_DurationText->SetText(dtext);
+
+
+		//make the elapsed text
+		wchar_t text[256];
+		swprintf(text, SIZE_OF_ARRAY(text), g_pVGuiLocalize->Find("#Amod_SongPanel_ElapsedPlayingText"), 0, 0, 1.0f);
+
+		//set text
+		m_ElapsedText->SetText(text);
 		return;
 	}
 	else
@@ -2152,8 +2191,9 @@ void CSongPanel::OnTick()
 		int minutes = (int)((m_SongDuration) / 60.0f);
 		int seconds = (int)((m_SongDuration) - (60 * minutes));
 
-		char Durationstr[256];
-		Q_snprintf(Durationstr, sizeof(Durationstr), "Duration: %i:%02i", minutes, seconds);
+		//make the duration text
+		wchar_t Durationstr[256];
+		swprintf(Durationstr, SIZE_OF_ARRAY(Durationstr), L"%ws %i:%02i", g_pVGuiLocalize->Find("#Amod_SongPanel_DurationText"), minutes, seconds);
 
 		m_DurationText->SetText(Durationstr);
 	}
@@ -2238,8 +2278,9 @@ void CSongPanel::OnTick()
 		int minutes = (int)(playingtime / 60.0f);
 		int seconds = (int)(playingtime - (60 * minutes));
 
-		char Durationstr[256];
-		Q_snprintf(Durationstr, sizeof(Durationstr), "Elapsed: %i:%02i (Speed %.2fx)", minutes, seconds, (float)Pitch / 100);
+		//build the text
+		wchar_t Durationstr[256];
+		swprintf(Durationstr, SIZE_OF_ARRAY(Durationstr), g_pVGuiLocalize->Find("#Amod_SongPanel_ElapsedPlayingText"), minutes, seconds, (float)Pitch / 100);
 
 		m_ElapsedText->SetText(Durationstr);
 	}

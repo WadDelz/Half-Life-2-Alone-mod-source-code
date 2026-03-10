@@ -73,5 +73,6 @@ extern ConVar amod_flashlightflicker_time_interval_max;
 extern ConVar amod_fog_disabled;
 
 extern ConVar amod_vignette;
+extern ConVar amod_new_vignette;
 
 #endif

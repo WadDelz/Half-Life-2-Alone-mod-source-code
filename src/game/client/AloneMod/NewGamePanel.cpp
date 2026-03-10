@@ -23,10 +23,10 @@ struct GameListInfo_t
 	int CurrentChapterIndex = 0;
 	CUtlVector<const char*> ChapterNames;
 
-	//has themes?
+	//has themes? ALSO OBSOLETE
 	bool UsesThemes = true;
 
-	//chapter image info
+	//chapter image info.		OBSOLETE
 	struct ChapterImageInfo_t
 	{
 		bool allowDay;		//show day
@@ -96,6 +96,139 @@ private:
 	//m_bShouldShowChangeModal
 	bool m_bShouldShowChangeModal = true;
 };
+
+//-----------------------------------------------------------------------
+// Purpose: Returns the map name from the config file
+//-----------------------------------------------------------------------
+bool GetMapFromConfig(const char* input, char* output, int outlen)
+{
+	//open file
+	FileHandle_t fh = filesystem->Open(input, "r", "MOD");
+	if (fh)
+	{
+		char buffer[1024];
+		while (filesystem->ReadLine(buffer, sizeof(buffer), fh))
+		{
+			//check for 'map' first
+			char* p = Q_strstr(buffer, "map ");
+			if (!p)
+				continue;
+
+			p = p + Q_strlen("map ");
+
+			//eat white spaces
+			while (*p && isspace((unsigned char)*p))
+				p++;
+
+			//check p
+			if (!*p)
+				continue;
+
+			//remove \r\n or just \n
+			char* tmp = p;
+			while (*p)
+			{
+				if (*p == '\r' || *p == '\n')
+				{
+					*p = '\0';
+					break;
+				}
+
+				p++;
+			}
+
+
+			//copy the map name
+			Q_strncpy(output, tmp, outlen);
+			return true;
+		}
+
+		filesystem->Close(fh);
+	}
+
+	return false;
+}
+
+//previous file
+static KeyValues* previousfile = nullptr;
+
+//-----------------------------------------------------------------------
+// Purpose: This function returns the day/night 'allowed' states for the map selector panel.
+//-----------------------------------------------------------------------
+bool GetMapDayEnabledStateFromTimeinfoFromFile(const char* mapname, bool& allowDaytime, bool& allowNighttime, const char* modname)
+{
+	//check the current mod is amod_timeinfo_load_mod.
+	extern ConVar amod_timeinfo_load_mod;
+	if (!Q_stricmp(modname, amod_timeinfo_load_mod.GetString()))
+	{
+		MapTimeInfo_t& info = GetMapTimeInfo(mapname);
+		allowDaytime = info.AllowDaytime;
+		allowNighttime = info.AllowNightTime;
+		return true;
+	}
+
+	//check inside previousfile
+	if (previousfile)
+	{
+		KeyValues* find = previousfile->FindKey(mapname);
+		if (find)
+		{
+			allowDaytime = find->GetBool("AllowDayTime");
+			allowNighttime = find->GetBool("AllowNightTime");
+			return true;
+		}
+	}
+
+	//delete previousfile
+	previousfile->deleteThis();
+	previousfile = nullptr;
+
+	//get the mod folder
+	char modfolder[512];
+	Q_strncpy(modfolder, CFmtStr("resource/time_info%s%s", modname[0] ? "/" : "", modname), sizeof(modfolder));
+
+	//go through all files in the amod_timeinfo_load_directory.GetString()/* directory
+	FileFindHandle_t handle;
+	const char* firstfile = filesystem->FindFirst(CFmtStr("%s/*.txt", modfolder), &handle);
+	while (firstfile)
+	{
+		//dont read the . filenames
+		if (!Q_stricmp(firstfile, ".") || !Q_stricmp(firstfile, ".."))
+		{
+			firstfile = filesystem->FindNext(handle);
+			continue;
+		}
+
+		//load the file
+		if (filesystem->FindIsDirectory(handle) || !strchr(firstfile, '.'))
+		{
+			firstfile = filesystem->FindNext(handle);
+			continue;
+		}
+
+		//load the file
+		previousfile = new KeyValues("TimeInfo");
+		if (previousfile->LoadFromFile(filesystem, CFmtStr("%s/%s", modfolder, firstfile)))
+		{
+			KeyValues* find = previousfile->FindKey(mapname);
+			if (find)
+			{
+				allowDaytime = find->GetBool("AllowDayTime");
+				allowNighttime = find->GetBool("AllowNightTime");
+				break;
+			}
+		}
+
+		//delete previousfile
+		previousfile->deleteThis();
+		previousfile = nullptr;
+
+		firstfile = filesystem->FindNext(handle);
+	}
+
+	filesystem->FindClose(handle);
+	return true;
+}
 
 //-----------------------------------------------------------------------
 // Purpose: Constructor for the new game panel
@@ -245,7 +378,10 @@ void CNewGamePanel::InitThemesComboBox()
 	m_ThemesComboBox->RemoveAll();
 
 	//ALWAYS load the default theme
-	m_ThemesComboBox->AddItem("THEME: Default", new KeyValues(""));
+	wchar_t* themetext = g_pVGuiLocalize->Find("Amod_NewGamePanel_ThemeText");
+	if (!themetext) themetext = L"THEME";
+
+	m_ThemesComboBox->AddItem("#Amod_NewGamePanel_DefaultThemeText", new KeyValues(""));
 
 	//theme convar
 	extern ConVar amod_timeinfo_load_mod;
@@ -280,12 +416,18 @@ void CNewGamePanel::InitThemesComboBox()
 		}
 
 		//check the amod_time_properties_load_mod with the previous text
-		const char* text = CFmtStr("THEME: %s", firstfile);
 		if (!Q_stricmp(amod_timeinfo_load_mod.GetString(), firstfile))
 			index = curr;
 
+		//get the theme text
+		wchar_t wchar_file[128];
+		g_pVGuiLocalize->ConvertANSIToUnicode(firstfile, wchar_file, sizeof(wchar_file));
+
+		wchar_t theme[512];
+		swprintf(theme, SIZE_OF_ARRAY(theme), L"%ws %ws", themetext, wchar_file);
+
 		//add the item
-		m_ThemesComboBox->AddItem(text, new KeyValues(firstfile));
+		m_ThemesComboBox->AddItem(theme, new KeyValues(firstfile));
 		firstfile = filesystem->FindNext(handle);
 		curr++;
 	}
@@ -353,23 +495,23 @@ void CNewGamePanel::LoadNewGameInfo(const char* filename)
 			info.ChapterNames.AddToTail(_strdup(chapter));
 		}
 
-		//get the chapter image info
-		KeyValues* ChapterImageInfo = game->FindKey("ChapterImageInfo");
-		if (!ChapterImageInfo)
-		{
-			AloneModEnglish->deleteThis();
-			continue;
-		}
-
-		FOR_EACH_TRUE_SUBKEY(ChapterImageInfo, _info)
-		{
-			//add the info
-			GameListInfo_t::ChapterImageInfo_t& chapter_info = info.m_ChapterImageInfo[info.m_ChapterImageInfo.AddToTail()];
-			chapter_info.min = _info->GetInt("StartChapter");
-			chapter_info.max = _info->GetInt("EndChapter");
-			chapter_info.allowDay = _info->GetBool("AllowShowDay");
-			chapter_info.allowNight = _info->GetBool("AllowShowNight");
-		}
+		//get the chapter image info. OBSOLETE
+		//KeyValues* ChapterImageInfo = game->FindKey("ChapterImageInfo");
+		//if (!ChapterImageInfo)
+		//{
+		//	AloneModEnglish->deleteThis();
+		//	continue;
+		//}
+		//
+		//FOR_EACH_TRUE_SUBKEY(ChapterImageInfo, _info)
+		//{
+		//	//add the info
+		//	GameListInfo_t::ChapterImageInfo_t& chapter_info = info.m_ChapterImageInfo[info.m_ChapterImageInfo.AddToTail()];
+		//	chapter_info.min = _info->GetInt("StartChapter");
+		//	chapter_info.max = _info->GetInt("EndChapter");
+		//	chapter_info.allowDay = _info->GetBool("AllowShowDay");
+		//	chapter_info.allowNight = _info->GetBool("AllowShowNight");
+		//}
 
 		//delete the alone mod resource config
 		AloneModEnglish->deleteThis();
@@ -460,26 +602,41 @@ void CNewGamePanel::SelectPage(int page)
 		bool daytime = amod_day.GetBool();
 		const char* sDayTime = daytime ? "_day" : "";
 
-		//check the chapter image info
-		for (int j = 0; j < m_CurrentSelectedGameInfo->m_ChapterImageInfo.Count(); j++)
+		//check we allow for daytime modes
+		char output[64];
+		if (GetMapFromConfig(CFmtStr("cfg/%s/chapter%d.cfg", m_CurrentSelectedGameInfo->prefix, realindex), output, sizeof(output)))
 		{
-			//check the info
-			GameListInfo_t::ChapterImageInfo_t& info = m_CurrentSelectedGameInfo->m_ChapterImageInfo[j];
-			
-			if ((realindex >= info.min && realindex <= info.max))
+			//get the time enabled state from the file
+			bool allowDaytime = true;
+			bool allowNighttime = true;
+			if (GetMapDayEnabledStateFromTimeinfoFromFile(output, allowDaytime, allowNighttime, m_ThemesComboBox->GetActiveItemUserData()->GetName()))
 			{
-				//check to see if both day and night are disabled. If so then just do what it would do if both were enabled
-				if (!info.allowDay && !info.allowNight)
-					continue;
-
-				if (!info.allowDay)
-					sDayTime = "";
-				else
-					sDayTime = "_day";
-
-				break;
+				//check info
+				if (!allowDaytime || !allowNighttime && !(allowDaytime && allowNighttime))
+					sDayTime = allowDaytime ? "_day" : "";
 			}
 		}
+
+		//check the chapter image info
+		//for (int j = 0; j < m_CurrentSelectedGameInfo->m_ChapterImageInfo.Count(); j++)
+		//{
+		//	//check the info
+		//	GameListInfo_t::ChapterImageInfo_t& info = m_CurrentSelectedGameInfo->m_ChapterImageInfo[j];
+		//
+		//	if ((realindex >= info.min && realindex <= info.max))
+		//	{
+		//		//check to see if both day and night are disabled. If so then just do what it would do if both were enabled
+		//		if (!info.allowDay && !info.allowNight)
+		//			continue;
+		//	
+		//		if (!info.allowDay)
+		//			sDayTime = "";
+		//		else
+		//			sDayTime = "_day";
+		//	
+		//		break;
+		//	}
+		//}
 
 		//see if an image exists with the chapters/(FE)/%s/chapters%d%s name where (FE) is just V_GetFileName(m_ThemesComboBox->GetActiveItemUserData()->GetName()).
 		char buf[512] = { 0 };
@@ -571,7 +728,7 @@ void CNewGamePanel::OnCommand(const char* pszCommand)
 		extern ConVar amod_timeinfo_load_mod;
 
 		//ask if the user wants to reload the theme now
-		if (!engine->IsLevelMainMenuBackground() && Q_stricmp(amod_timeinfo_load_mod.GetString(), m_ThemesComboBox->GetActiveItemUserData()->GetName()))
+		if (Q_stricmp(amod_timeinfo_load_mod.GetString(), m_ThemesComboBox->GetActiveItemUserData()->GetName()))
 		{
 			//show the modal
 			QueryBox* modal = new QueryBox("#Amod_NewGamePanel_ReloadThemeNow_Title", "#Amod_NewGamePanel_ReloadThemeNow_Desc", this);
@@ -654,8 +811,8 @@ void CNewGamePanel::OnTextChanged(KeyValues* kv)
 			modal->MoveToCenterOfScreen();
 			modal->Activate();
 			modal->DoModal();
-			modal->SetCancelCommand(new KeyValues("OnCommand", "Command", COMMAND_CHANGE_THEME));
-			modal->SetOKCommand(new KeyValues("OnCommand", "Command", COMMAND_CHANGE_THEME));
+			modal->SetCancelCommand(new KeyValues("Command", "Command", COMMAND_CHANGE_THEME));
+			modal->SetOKCommand(new KeyValues("Command", "Command", COMMAND_CHANGE_THEME));
 			return;
 		}
 
@@ -806,7 +963,9 @@ void AmodDayChangeCallback(IConVar* var, const char* olds, float oldf)
 
 
 //new game editor panel. This code below is VERY rushed so its pretty garbage but it works and i need to release the next update very soon.
-
+// 
+// 
+//EDIT: THIS IS NOW AN OBSOLETE PANEL. USED TO BE USED TO MODIFY THE CHAPTER TIME INFO DATA
 
 
 
@@ -1648,10 +1807,10 @@ void CNewGameEditorPanel::LoadNewGameInfo(const char* filename)
 }
 
 //command to optn eht new game editor
-CON_COMMAND(open_new_game_editor_panel, "")
-{
-	if (!s_NewGameEditor)
-		s_NewGameEditor = new CNewGameEditorPanel();
-
-	s_NewGameEditor->Activate();
-}
+//CON_COMMAND(open_new_game_editor_panel, "")
+//{
+//	if (!s_NewGameEditor)
+//		s_NewGameEditor = new CNewGameEditorPanel();
+//
+//	s_NewGameEditor->Activate();
+//}

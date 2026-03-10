@@ -615,7 +615,7 @@ CConvarListPanel::CConvarListPanel(vgui::VPANEL parent, const char* name, CEffec
 	SetVisible(false);
 
 	//set the size, pos and title
-	SetTitle("Convar List", true);
+	SetTitle("#Amod_EffectsPanel_ConvarPage_FindConvar_Title", true);
 	SetSize(CONVAR_LIST_PANEL_WIDTH, CONVAR_LIST_PANEL_HEIGHT);
 	MoveToCenterOfScreen();
 
@@ -629,7 +629,7 @@ CConvarListPanel::CConvarListPanel(vgui::VPANEL parent, const char* name, CEffec
 	divider1->SetBounds(-5, 48, CONVAR_LIST_PANEL_WIDTH + 10, 2);
 
 	//create text
-	vgui::Label* label1 = new vgui::Label(this, "FindConvar", "Find Convar");
+	vgui::Label* label1 = new vgui::Label(this, "FindConvar", "#Amod_EffectsPanel_ConvarPage_FindConvar_FindButton");
 	label1->SetBounds(145, 51, 120, 20);
 
 	//create text entry
@@ -639,7 +639,7 @@ CConvarListPanel::CConvarListPanel(vgui::VPANEL parent, const char* name, CEffec
 	m_SearchText->SetText("");
 
 	//create search for button
-	m_SearchButton = new vgui::Button(this, "SearchButton", "Search For");
+	m_SearchButton = new vgui::Button(this, "SearchButton", "#Amod_EffectsPanel_ConvarPage_FindConvar_SearchForLabel");
 	m_SearchButton->SetBounds(5, 100, CONVAR_LIST_PANEL_WIDTH - 10, 20);;
 	m_SearchButton->SetEnabled(true);
 	m_SearchButton->SetCommand(CONVAR_LIST_SEARCH_COMMAND);
@@ -649,11 +649,11 @@ CConvarListPanel::CConvarListPanel(vgui::VPANEL parent, const char* name, CEffec
 	divider2->SetBounds(-5, 124, CONVAR_LIST_PANEL_WIDTH + 10, 2);
 
 	//create text
-	vgui::Label* label2 = new vgui::Label(this, "ConvarButtons", "Other Buttons");
+	vgui::Label* label2 = new vgui::Label(this, "ConvarButtons", "#Amod_EffectsPanel_ConvarPage_FindConvar_InsertLabel");
 	label2->SetBounds(140, 127, 120, 20);
 
 	//create convar insert button
-	m_InsertButton = new vgui::Button(this, "InsertConvar", "Insert Convar", this);
+	m_InsertButton = new vgui::Button(this, "InsertConvar", "#Amod_EffectsPanel_ConvarPage_FindConvar_InsertButton", this);
 	m_InsertButton->SetBounds(5, 150, CONVAR_LIST_PANEL_WIDTH - 10, 20);
 	m_InsertButton->SetCommand(CONVAR_LIST_INSERT_COMMAND);
 
@@ -883,7 +883,7 @@ CEffectsPanelConvarPage::CEffectsPanelConvarPage(vgui::Panel* parent, const char
 	SetKeyBoardInputEnabled(true);
 
 	//create the convar list panel
-	m_ConvarListPanel = new CConvarPageConvarList(this, "ConvarList", "Convar List:");
+	m_ConvarListPanel = new CConvarPageConvarList(this, "ConvarList", "#Amod_EffectsPanel_ConvarPage_ConvarListText");
 
 	//make types combo box
 	m_TypeComboBox = new vgui::ComboBox(this, "TypesComboBox", 14, false);
@@ -898,35 +898,35 @@ CEffectsPanelConvarPage::CEffectsPanelConvarPage(vgui::Panel* parent, const char
 	}
 
 	//set the text
-	m_TypeComboBox->SetText("Active Types:");
+	m_TypeComboBox->SetText("#Amod_EffectsPanel_ConvarPage_ActiveTypes");
 
 	//create the name stuff
-	m_ConvarNameText = new vgui::Label(this, "ConvarNameText", "Convar Name");
+	m_ConvarNameText = new vgui::Label(this, "ConvarNameText", "#Amod_EffectsPanel_ConvarPage_ConvarName");
 	m_ConvarNameTextEntry = new CFilteredTextEntry(this, "ConvarNameTextEntry", CONVAR_PAGE_NAME_FILTER);
 	m_ConvarNameTextEntry->SetMaximumCharCount(55);
 		
 	//find convar button
-	m_FindConvarButton = new vgui::Button(this, "FindConvar", "Find Convar", this, CONVAR_PAGE_FIND_COMMAND);
+	m_FindConvarButton = new vgui::Button(this, "FindConvar", "#Amod_EffectsPanel_ConvarPage_FindConvar", this, CONVAR_PAGE_FIND_COMMAND);
 
 	//create the value stuff
-	m_ConvarValueText = new vgui::Label(this, "ConvarValueText", "Convar Value");
+	m_ConvarValueText = new vgui::Label(this, "ConvarValueText", "#Amod_EffectsPanel_ConvarPage_ConvarValue");
 	m_ConvarValueTextEntry = new CFilteredTextEntry(this, "ConvarValueTextEntry", "");
 	m_ConvarValueTextEntry->SetMaximumCharCount(200);
 
 	//bottom buttons
-	m_AddButton = new vgui::Button(this, "AddConvarButton", "Add Convar", this, CONVAR_PAGE_ADD_COMMAND);
-	m_ChangeButton = new vgui::Button(this, "ChangeConvarButton", "Update Selected Vars Value", this, CONVAR_PAGE_CHANGE_COMMAND);
-	m_RemoveButton = new vgui::Button(this, "RemoveConvarButton", "Remove Selected Convar", this, CONVAR_PAGE_REMOVE_COMMAND);
+	m_AddButton = new vgui::Button(this, "AddConvarButton", "#Amod_EffectsPanel_ConvarPage_AddConvar", this, CONVAR_PAGE_ADD_COMMAND);
+	m_ChangeButton = new vgui::Button(this, "ChangeConvarButton", "#Amod_EffectsPanel_ConvarPage_UpdateConvar", this, CONVAR_PAGE_CHANGE_COMMAND);
+	m_RemoveButton = new vgui::Button(this, "RemoveConvarButton", "#Amod_EffectsPanel_ConvarPage_RemoveConvar", this, CONVAR_PAGE_REMOVE_COMMAND);
 
 	//add the tool tips
-	ADD_TOOLTIP(m_ConvarListPanel, 100, "This list shows all of the convars that are currently being modified. Select the convar to change its value/active type or remove it using the buttons below.", true);
-	ADD_TOOLTIP(m_TypeComboBox, 100, "When you add a convar to the list panel/change it, These are the conditions that must be met for the convar to show. Note that only 1 condition needs to be met for the convars value to be set", true);
-	ADD_TOOLTIP(m_ConvarNameTextEntry, 100, "The name of the convar that's value you want to change.", true);
-	ADD_TOOLTIP(m_FindConvarButton, 100, "Press this to find a list of convar's that you can insert into the name text entry", true);
-	ADD_TOOLTIP(m_ConvarNameTextEntry, 100, "The value that will get set for the convar.", true);
-	ADD_TOOLTIP(m_AddButton, 100, "Press this button to add the convar (and its data) into the list of convars.", true);
-	ADD_TOOLTIP(m_ChangeButton, 100, "Press this button to update the button that is currently selected in the convar list", true);
-	ADD_TOOLTIP(m_RemoveButton, 100, "Press this button to remove the button that is currently selected in the convar list", true);
+	ADD_TOOLTIP(m_ConvarListPanel, 100, "#Amod_EffectsPanel_ConvarPage_Tooltip_ConvarList", true);
+	ADD_TOOLTIP(m_TypeComboBox, 100, "#Amod_EffectsPanel_ConvarPage_Tooltip_ActiveTypes", true);
+	ADD_TOOLTIP(m_ConvarNameTextEntry, 100, "#Amod_EffectsPanel_ConvarPage_Tooltip_ConvarNameTextEntry", true);
+	ADD_TOOLTIP(m_FindConvarButton, 100, "#Amod_EffectsPanel_ConvarPage_Tooltip_FindConvarButton", true);
+	ADD_TOOLTIP(m_ConvarValueTextEntry, 100, "#Amod_EffectsPanel_ConvarPage_Tooltip_ConvarValueTextEntry", true);
+	ADD_TOOLTIP(m_AddButton, 100, "#Amod_EffectsPanel_ConvarPage_Tooltip_AddButton", true);
+	ADD_TOOLTIP(m_ChangeButton, 100, "#Amod_EffectsPanel_ConvarPage_Tooltip_UpdateButton", true);
+	ADD_TOOLTIP(m_RemoveButton, 100, "#Amod_EffectsPanel_ConvarPage_Tooltip_RemoveButton", true);
 
 	//reset the things to the defaults
 	ResetEffects();
@@ -944,7 +944,7 @@ void CEffectsPanelConvarPage::ResetEffects()
 	m_ConvarListPanel->ClearConvars();
 
 	//reset mode
-	m_TypeComboBox->SetText("Active Types:");
+	m_TypeComboBox->SetText("#Amod_EffectsPanel_ConvarPage_ActiveTypes");
 
 	//only select menu item 1 (Always active)
 	for (int i = 0; i < m_TypeComboBox->GetItemCount(); i++)

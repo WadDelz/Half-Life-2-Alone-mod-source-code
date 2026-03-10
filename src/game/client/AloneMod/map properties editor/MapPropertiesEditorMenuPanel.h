@@ -38,6 +38,8 @@ public:
 
 	//called when a key is pressed
 	void OnKeyCodeTyped(KeyCode code);
+	void OnKeyCodePressed(KeyCode code) {}
+	void OnKeyTyped(wchar_t code) {}
 };
 
 

@@ -93,6 +93,26 @@ $Project
 				$File "$SRCDIR\game\server\AloneMod\AutoFuckYouCitadel03System.cpp"
 				$File "$SRCDIR\game\server\AloneMod\GlobalAmodSystems.cpp"
 			}
+			$Folder "Nav Mesh"
+			{
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_area.cpp"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_area.h"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_colors.cpp"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_colors.h"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_edit.cpp"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_entities.cpp"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_entities.h"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_file.cpp"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_generate.cpp"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_ladder.cpp"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_merge.cpp"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_mesh.cpp"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_mesh.h"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_node.cpp"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_node.h"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_path.h"
+				$File "$SRCDIR\game\server\AloneMod\Nav mesh\nav_pathfind.h"
+			}
 			$Folder "Shared Definitions"
 			{
 				$File "$SRCDIR\game\shared\AloneMod\Amod_SharedDefs.cpp"

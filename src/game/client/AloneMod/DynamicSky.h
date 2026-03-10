@@ -12,7 +12,7 @@
 #pragma once
 #endif
 
-#ifdef LINUX
+#ifndef _WINDOWS
 #define USES_DYNAMIC_SKY_NEWFUNC 0
 #else
 #define USES_DYNAMIC_SKY_NEWFUNC 1							//im going to try out the new system i created that actually calls engine code instead of engine code coppied to the client. If it goes to shit then i will set this to 0.

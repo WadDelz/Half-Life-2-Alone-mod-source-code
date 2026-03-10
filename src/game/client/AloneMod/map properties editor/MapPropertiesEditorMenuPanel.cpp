@@ -254,11 +254,11 @@ CLoadFromFolderPanel::CLoadFromFolderPanel(Panel* parent, const char* name) : Ba
 	}
 
 	//create the Load and Cancel button
-	Button* m_LoadButton = new Button(this, "LoadButton", "Load");
+	Button* m_LoadButton = new Button(this, "LoadButton", "#MapProperties_Button_Load");
 	m_LoadButton->SetBounds(5, 55, 142, 25);
 	m_LoadButton->SetCommand("Load");
 
-	Button* m_CancelButton = new Button(this, "CancelButton", "Cancel");
+	Button* m_CancelButton = new Button(this, "CancelButton", "#MapProperties_Button_Cancel");
 	m_CancelButton->SetBounds(152, 55, 142, 25);
 	m_CancelButton->SetCommand("Close");
 }
@@ -311,21 +311,35 @@ void CMapPropertiesEditorComboBox::OnKeyCodeTyped(KeyCode code)
 	if (code == KeyCode::KEY_UP)
 	{
 		//get the item
-		int item = clamp(GetActiveItem() - 1, 0, GetItemCount());
+		int item = GetActiveItem() - 1;
+
+		if (item < 0)
+			item = GetItemCount() - 1;
+
+		//select the item
+		ActivateItem(item);
 		SelectMenuItem(item);
 		RequestFocus();
-		return;
 	}
 	else if (code == KeyCode::KEY_DOWN)
 	{
 		//get the item
-		int item = clamp(GetActiveItem() + 1, 0, GetItemCount());
+		int item = GetActiveItem() + 1;
+
+		if (item >= GetItemCount())
+			item = 0;
+
+		//select the item
+		ActivateItem(item);
 		SelectMenuItem(item);
 		RequestFocus();
-		return;
 	}
 
-	BaseClass::OnKeyCodeTyped(code);
+	//check for R
+	else if (code == KeyCode::KEY_R)
+	{
+		GetParent()->OnKeyCodePressed(KeyCode::KEY_R);
+	}
 }
 
 
@@ -461,17 +475,40 @@ void CMapPropertiesEditorPanel::OnFileSaved(KeyValues* data)
 	if (!filename || !*filename)
 	{
 		surface()->PlaySound("resource/warning.wav");
-		QueryBox* modal = new QueryBox("#Amod_Panel_Error", "The text entry was empty for the save dialog!", this);
+		QueryBox* modal = new QueryBox("#Amod_Panel_Error", "#MapProperties_Query_EmptySaveTextEntry", this);
 		modal->MoveToCenterOfScreen();
 		modal->DoModal(this);
 		modal->Activate();
 		return;
 	}
 	
+	//check for _ignore or default
+	if (!Q_stricmp(filename, "_ignore") || !Q_stricmp(filename, "default"))
+	{
+		surface()->PlaySound("resource/warning.wav");
+		QueryBox* modal = new QueryBox("#Amod_Panel_Error", "#MapProperties_Query_PreservedSaveName", this);
+		modal->MoveToCenterOfScreen();
+		modal->DoModal(this);
+		modal->Activate();
+		return;
+	}
+
 	//check if the folder exists AND it isnt map_properties_editor_load_mod
 	if (filesystem->IsDirectory(CFmtStr("resource/time_info/%s", filename), "MOD") && Q_stricmp(filename, map_properties_editor_load_mod.GetString()))
 	{
-		QueryBox* modal = new QueryBox("Folder Already Exists?", CFmtStr("The folder %s already exists. Would you like to override the contents inside?", filename), this);
+		//get the text
+		wchar_t* format = g_pVGuiLocalize->Find("#MapProperties_Query_FolderExists_Desc");
+
+		//get the filename
+		wchar_t name[256];
+		g_pVGuiLocalize->ConvertANSIToUnicode(filename, name, sizeof(name));
+
+		//get the output text
+		wchar_t text[512];
+		swprintf(text, SIZE_OF_ARRAY(text), format, name);
+
+		//show the text
+		QueryBox* modal = new QueryBox(L"#MapProperties_Query_FolderExists_Title", text, this);
 		modal->MoveToCenterOfScreen();
 		modal->DoModal(this);
 		modal->Activate();
@@ -597,7 +634,19 @@ void CMapPropertiesEditorPanel::OnCommand(const char* pszCommand)
 	//check for COMMAND_RELOAD_SCRIPTS
 	else if (!Q_stricmp(pszCommand, COMMAND_RELOAD_SCRIPTS))
 	{
-		QueryBox* modal = new QueryBox("#Amod_Panel_AreYouSure", CFmtStr("Are you sure you want to reload the \"resource/time_info/%s\" script files?\nAny unsaved data will be lost!", map_properties_editor_load_mod.GetString()), this);
+		//get the text
+		wchar_t* format = g_pVGuiLocalize->Find("#MapProperties_Query_Reload_Desc");
+
+		//get the map name
+		wchar_t map[256];
+		g_pVGuiLocalize->ConvertANSIToUnicode(map_properties_editor_load_mod.GetString(), map, sizeof(map));
+
+		//get the output text
+		wchar_t text[512];
+		swprintf(text, SIZE_OF_ARRAY(text), format, map);
+
+		//show the text
+		QueryBox* modal = new QueryBox(L"#Amod_Panel_AreYouSure", text, this);
 		modal->MoveToCenterOfScreen();
 		modal->DoModal(this);
 		modal->Activate();

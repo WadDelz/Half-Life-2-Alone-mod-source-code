@@ -95,7 +95,7 @@ public:
 		return *this;
 	}
 
-private:
+public:
 	unsigned char _color[4];
 };
 

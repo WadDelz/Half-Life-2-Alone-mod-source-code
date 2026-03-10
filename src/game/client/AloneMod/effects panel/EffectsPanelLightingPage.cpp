@@ -2,6 +2,7 @@
 #include "EffectsPanelLightingPage.h"
 #include "vgui_controls/PropertyDialog.h"
 #include "vgui_controls/QueryBox.h"
+#include "vgui/ILocalize.h"
 #include "vgui/ISurface.h"
 #include "fmtstr.h"
 #include "iefx.h"
@@ -1064,8 +1065,8 @@ CEffectsPanelLightingPage::CEffectsPanelLightingPage(vgui::Panel* parent, const 
 	SetKeyBoardInputEnabled(true);
 
 	//make the name/type stuff
-	m_LightNameLabel = new vgui::Label(this, "LightNameLabel", "Name:");
-	m_TypeLabel = new vgui::Label(this, "LightTypeLabel", "Light Type:");
+	m_LightNameLabel = new vgui::Label(this, "LightNameLabel", "#Amod_EffectsPanel_LightingPage_LightNameLabel");
+	m_TypeLabel = new vgui::Label(this, "LightTypeLabel", "#Amod_EffectsPanel_LightingPage_LightTypeLabel");
 
 	m_LightNameTextEntry = new CLightingPageTextEntry(this, "NameTextEntry");
 	m_LightNameTextEntry->SetText("Light 1");
@@ -1073,51 +1074,47 @@ CEffectsPanelLightingPage::CEffectsPanelLightingPage(vgui::Panel* parent, const 
 
 	//type combo box
 	m_TypeComboBox = new vgui::ComboBox(this, "LightTypeComboBox", 3, false);
-	
 	for (int i = 0; i < SIZE_OF_ARRAY(gsz_LightingModeStrings); i++)
 		m_TypeComboBox->AddItem(gsz_LightingModeStrings[i], nullptr);
-
 	m_TypeComboBox->ActivateItem(0);
 
 	//make the mode/lighting offset/attach to entity name/attach to entity attachment text's
-	m_LightingMovementModeLabel = new vgui::Label(this, "LightingMovementModeLabel", "Lighting Movement Mode:");
-	m_LightingOffsetLabel = new vgui::Label(this, "LightingOffsetLabel", "Origin Offset (x y z):");
-	m_LightingAngleOffsetLabel = new vgui::Label(this, "LightingAngleOffsetLabel", "Angle Offset (x y z):");
-	m_LightingEntityLabel = new vgui::Label(this, "AttachToEntityLabel", "Entity 'name':");
-	m_LightingEntityAttachmentLabel = new vgui::Label(this, "AttachToEntityAttachmentLabel", "Opt Entity 'attachment':");
+	m_LightingMovementModeLabel = new vgui::Label(this, "LightingMovementModeLabel", "#Amod_EffectsPanel_LightingPage_LightingMovementModeLabel");
+	m_LightingOffsetLabel = new vgui::Label(this, "LightingOffsetLabel", "#Amod_EffectsPanel_LightingPage_LightingOffsetLabel");
+	m_LightingAngleOffsetLabel = new vgui::Label(this, "LightingAngleOffsetLabel", "#Amod_EffectsPanel_LightingPage_LightingAngleOffsetLabel");
+	m_LightingEntityLabel = new vgui::Label(this, "AttachToEntityLabel", "#Amod_EffectsPanel_LightingPage_LightingEntityLabel");
+	m_LightingEntityAttachmentLabel = new vgui::Label(this, "AttachToEntityAttachmentLabel", "#Amod_EffectsPanel_LightingPage_LightingEntityAttachmentLabel");
 
 	//movement combo box
-	m_LightMovementComboBox = new vgui::ComboBox(this, "LightTypeComboBox", 10, false);
-
+	m_LightMovementComboBox = new vgui::ComboBox(this, "LightMovementComboBox", 10, false);
 	for (int i = 0; i < SIZE_OF_ARRAY(gsz_LightingMovementModeStrings); i++)
 		m_LightMovementComboBox->AddItem(gsz_LightingMovementModeStrings[i], nullptr);
-
 	m_LightMovementComboBox->ActivateItem(0);
-	
+
 	//text entries
 	m_LightOffsetTextEntry = new CLightingPageTextEntry(this, "LightOffsetTextEntry");
 	m_LightOffsetTextEntry->SetText("0 0 0");
 	m_LightOffsetTextEntry->SetMaximumCharCount(32);
-	
+
 	m_LightAngleOffsetTextEntry = new CLightingPageTextEntry(this, "LightAngleOffsetTextEntry");
 	m_LightAngleOffsetTextEntry->SetText("0 0 0");
 	m_LightAngleOffsetTextEntry->SetMaximumCharCount(32);
-	
+
 	m_LightingEntityTextEntry = new CLightingPageTextEntry(this, "LightingEntityTextEntry");
 	m_LightingEntityTextEntry->SetText("");
 	m_LightingEntityTextEntry->SetMaximumCharCount(127);
 	m_LightingEntityTextEntry->SetEnabled(false);
-	
+
 	m_LightingEntityAttachmentTextEntry = new CLightingPageTextEntry(this, "LightingEntityAttachmentTextEntry");
 	m_LightingEntityAttachmentTextEntry->SetText("");
-	m_LightingEntityAttachmentTextEntry->SetEnabled(false);
 	m_LightingEntityAttachmentTextEntry->SetMaximumCharCount(63);
+	m_LightingEntityAttachmentTextEntry->SetEnabled(false);
 
 	//make the color/fov/far stuff
-	m_ColorLabel = new vgui::Label(this, "ColorLabel", "Color (r g b a)");
-	m_FarLabel = new vgui::Label(this, "FarLabel", "Distance = 750");
-	m_FovLabel = new vgui::Label(this, "FovLabel", "Flashlight Fov = 45");
-	
+	m_ColorLabel = new vgui::Label(this, "ColorLabel", "#Amod_EffectsPanel_LightingPage_ColorLabel");
+	m_FarLabel = new vgui::Label(this, "FarLabel", "");
+	m_FovLabel = new vgui::Label(this, "FovLabel", "");
+
 	m_ColorTextEntry = new CLightingPageTextEntry(this, "ColorTextEntry");
 	m_ColorTextEntry->SetText("255 255 255 255");
 	m_ColorTextEntry->SetMaximumCharCount(32);
@@ -1125,16 +1122,16 @@ CEffectsPanelLightingPage::CEffectsPanelLightingPage(vgui::Panel* parent, const 
 	m_FarSlider = new WheelSlider(this, "FarSlider");
 	m_FarSlider->SetRange(0, 3000);
 	m_FarSlider->SetValue(750);
-	
+
 	m_FovSlider = new WheelSlider(this, "FovSlider");
 	m_FovSlider->SetRange(0, 179);
 	m_FovSlider->SetValue(45);
 
 	//make buttons
-	m_AddButton = new vgui::Button(this, "AddButton", "Add Light", this, ADD_LIGHT_BUTTON_COMMAND);
-	m_ChangeLight = new vgui::Button(this, "ChangeButton", "Update Selected Light", this, CHANGE_LIGHT_BUTTON_COMMAND);
-	m_RemoveLight = new vgui::Button(this, "RemoveOverlay", "Remove Selected Light", this, REMOVE_LIGHT_BUTTON_COMMAND);
-	m_SetSelectedToPlayer = new vgui::Button(this, "SetSelectedToPlayerButton", "Set selected lights position and angle to players current position and angle + offset", this, LIGHT_SET_TO_PLAYERS_POS_BUTTON);
+	m_AddButton = new vgui::Button(this, "AddButton", "#Amod_EffectsPanel_LightingPage_AddButton", this, ADD_LIGHT_BUTTON_COMMAND);
+	m_ChangeLight = new vgui::Button(this, "ChangeButton", "#Amod_EffectsPanel_LightingPage_ChangeButton", this, CHANGE_LIGHT_BUTTON_COMMAND);
+	m_RemoveLight = new vgui::Button(this, "RemoveLightButton", "#Amod_EffectsPanel_LightingPage_RemoveButton", this, REMOVE_LIGHT_BUTTON_COMMAND);
+	m_SetSelectedToPlayer = new vgui::Button(this, "SetSelectedToPlayerButton", "#Amod_EffectsPanel_LightingPage_SetSelectedToPlayerButton", this, LIGHT_SET_TO_PLAYERS_POS_BUTTON);
 
 	//active type combo box
 	m_ActiveModeComboBox = new vgui::ComboBox(this, "ActiveTypeComboBox", 14, false);
@@ -1147,12 +1144,10 @@ CEffectsPanelLightingPage::CEffectsPanelLightingPage(vgui::Panel* parent, const 
 		m_ActiveModeComboBox->GetMenu()->GetMenuItem(i)->SetCommand(CFmtStr(LIGHTING_PAGE_ACTIVE_TYPE_PREFIX "%d", i));
 		m_ActiveModeComboBox->GetMenu()->GetMenuItem(i)->AddActionSignalTarget(this);
 	}
-
-	//set the text
-	m_ActiveModeComboBox->SetText("Active Types:");
+	m_ActiveModeComboBox->SetText("#Amod_EffectsPanel_LightingPage_ActiveModeComboBox");
 
 	//finally make the light list
-	m_LightList = new CLightingPageList(this, "LightingList", "Lights:");
+	m_LightList = new CLightingPageList(this, "LightingList", "#Amod_EffectsPanel_LightingPage_LightList");
 
 	//reset the things to the defaults
 	ResetEffects();
@@ -1179,7 +1174,7 @@ CEffectsPanelLightingPage::~CEffectsPanelLightingPage()
 void CEffectsPanelLightingPage::ResetEffects()
 {
 	//reset mode
-	m_ActiveModeComboBox->SetText("Active Types:");
+	m_ActiveModeComboBox->SetText("#Amod_EffectsPanel_LightingPage_ActiveTypes");
 
 	//only select menu item 1 (Always active)
 	for (int i = 0; i < m_ActiveModeComboBox->GetItemCount(); i++)
@@ -1535,9 +1530,18 @@ void CEffectsPanelLightingPage::OnTick()
 	m_LightingEntityTextEntry->SetEnabled((LightingMovementMode_t)m_LightMovementComboBox->GetActiveItem() >= LightingMovementMode_t::Mode_ParentToClassnameEntity);
 	m_LightingEntityAttachmentTextEntry->SetEnabled((LightingMovementMode_t)m_LightMovementComboBox->GetActiveItem() >= LightingMovementMode_t::Mode_ParentToClassnameEntity);
 
+	//get the texts
+	wchar_t* fovtext = g_pVGuiLocalize->Find("#Amod_EffectsPanel_LightingPage_FovLabel");
+	wchar_t* fartext = g_pVGuiLocalize->Find("#Amod_EffectsPanel_LightingPage_FarLabel");
+
 	//set the text's for the sliders
-	m_FarLabel->SetText(CFmtStr("Distance = %d", m_FarSlider->GetValue()));
-	m_FovLabel->SetText(CFmtStr("Flashlight Fov = %d", m_FovSlider->GetValue()));
+	wchar_t fovbuf[128];
+	wchar_t farbuf[128];
+	swprintf(fovbuf, sizeof(fovbuf) / sizeof(wchar_t), L"%ws = %d", fovtext, m_FovSlider->GetValue());
+	swprintf(farbuf, sizeof(farbuf) / sizeof(wchar_t), L"%ws = %d", fartext, m_FarSlider->GetValue());
+
+	m_FovLabel->SetText(fovbuf);
+	m_FarLabel->SetText(farbuf);
 
 	//draw debug overlays for the selected light(s)
 	if (amod_lighting_debug.GetBool())

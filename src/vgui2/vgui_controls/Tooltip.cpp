@@ -28,7 +28,7 @@ using namespace vgui;
 
 //------------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------------
-static vgui::DHANDLE< TextEntry > s_TooltipWindow;
+vgui::DHANDLE< TextEntry > s_TooltipWindow;
 static int s_iTooltipWindowCount = 0;
 
 
@@ -295,8 +295,22 @@ void TextTooltip::ApplySchemeSettings(IScheme *pScheme)
 //-----------------------------------------------------------------------------
 void TextTooltip::ShowTooltip(Panel *currentPanel)
 {
+	if (!s_TooltipWindow.Get())
+	{
+		s_TooltipWindow = new TextEntry(NULL, "tooltip");
+		s_TooltipWindow->InvalidateLayout(false, true);
+
+		// this bit of hackery is necessary because tooltips don't get ApplySchemeSettings called from their parents
+		IScheme* pScheme = scheme()->GetIScheme(s_TooltipWindow->GetScheme());
+		s_TooltipWindow->SetBgColor(s_TooltipWindow->GetSchemeColor("Tooltip.BgColor", s_TooltipWindow->GetBgColor(), pScheme));
+		s_TooltipWindow->SetFgColor(s_TooltipWindow->GetSchemeColor("Tooltip.TextColor", s_TooltipWindow->GetFgColor(), pScheme));
+		s_TooltipWindow->SetBorder(pScheme->GetBorder("ToolTipBorder"));
+		s_TooltipWindow->SetFont(pScheme->GetFont("DefaultSmall", s_TooltipWindow->IsProportional()));
+	}
+
 	if ( s_TooltipWindow.Get() )
 	{
+		s_TooltipWindow->SetText(GetText());
 		int nLen = s_TooltipWindow->GetTextLength();
 
 		if ( nLen <= 0 )

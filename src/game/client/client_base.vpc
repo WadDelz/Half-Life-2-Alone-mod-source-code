@@ -259,6 +259,8 @@ $Project
 					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelBasePage.h"
 					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelFogPage.cpp"
 					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelFogPage.h"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelFogTriggersPage.cpp"
+					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelFogTriggersPage.h"
 					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelSkyboxPage.cpp"
 					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelSkyboxPage.h"
 					$File	"AloneMod\map properties editor\MapPropertiesEditorPanelSunPage.cpp"

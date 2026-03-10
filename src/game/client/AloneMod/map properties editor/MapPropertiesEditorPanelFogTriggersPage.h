@@ -4,6 +4,7 @@
 #include "MapPropertiesEditorPanelBasePage.h"
 #include "vgui_controls/ListPanel.h"
 
+#if FOG_CUBE_TRIGGER_TEST
 
 //add trigger dialog
 class CAddTriggerDialogPanel : public Frame
@@ -129,6 +130,6 @@ private:
 	CColorPicker* m_ColorPicker;
 };
 
-
+#endif //FOG_CUBE_TRIGGER_TEST
 
 #endif //__MAPPROPERTIESEDITORPANELFOGTRIGGERSPAGE_H

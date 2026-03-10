@@ -3,14 +3,15 @@
 #include "fmtstr.h"
 #include <vgui/ISurface.h>
 #include "vgui/IInput.h"
+#include "vgui_controls/QueryBox.h"
 
 using namespace vgui;
 
 //common colors
 static const char* s_CommonColorNames[10] =
 {
-	"Random Color", "Red", "Green", "Blue", "Yellow", "Cyan",
-	"Magenta", "White/Default", "Black/Transparent", "Orange"
+	"#ColorPicker_RandomColor", "#ColorPicker_RedColor", "#ColorPicker_GreenColor", "#ColorPicker_BlueColor", "#ColorPicker_YellowColor", "#ColorPicker_CyanColor",
+	"#ColorPicker_MagentaColor", "#ColorPicker_WhiteColor", "#ColorPicker_BlackColor", "#ColorPicker_OrangeColor"
 };
 
 //common color presets
@@ -81,6 +82,14 @@ CColorPicker::CColorPicker(vgui::VPANEL parent) : BaseClass(nullptr, "CColorPick
 
 	//update the text entries
 	UpdateTextEntries();
+
+	//show the intro modal
+	static bool s_ShowedIntroModal = false;
+	if (!s_ShowedIntroModal)
+	{
+		PostMessage(this, new KeyValues("Command", "command", "ShowIntroModal"), 0.0f);
+		s_ShowedIntroModal = true;
+	}
 }
 
 //-----------------------------------------------------------------------
@@ -249,6 +258,30 @@ void CColorPicker::OnCommand(const char* command)
 		SetColor(color);
 	}
 
+	//show the intro modal
+	else if (!Q_stricmp(command, "ShowIntroModal"))
+	{
+		//show first time dialog
+		QueryBox* modal = new QueryBox("#ColorPicker_IntroModal_Title", "#ColorPicker_IntroModal_Desc", this);
+		modal->MoveToCenterOfScreen();
+		modal->Activate();
+		modal->DoModal(this);
+		modal->SetOKCommand(new KeyValues("Command", "command", "DoModal"));
+		modal->SetCancelCommand(new KeyValues("Command", "command", "DoModal"));
+	}
+
+	//resets this panels modal state
+	else if (!Q_stricmp(command, "DoModal"))
+	{
+		//if this is the current app surfaces then return.
+		if (vgui::input()->GetAppModalSurface() == GetVPanel())
+			return;
+
+		m_hPreviousModal = vgui::input()->GetAppModalSurface();
+		vgui::input()->SetAppModalSurface(GetVPanel());
+		return;
+	}
+
 	else
 	{
 		BaseClass::OnCommand(command);
@@ -292,6 +325,10 @@ void CColorPicker::SetColor(Color color)
 {
 	//set then update
 	m_CurrentColor = color;
+
+	//set a
+	if (!m_bUseAlpha)
+		m_CurrentColor._color[3] = 255;
 
 	UpdateTextEntries();
 	Repaint();

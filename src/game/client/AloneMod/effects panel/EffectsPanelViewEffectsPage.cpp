@@ -69,90 +69,90 @@ CEffectsPanelViewEffects::CEffectsPanelViewEffects(vgui::Panel* parent, const ch
 	SetKeyBoardInputEnabled(true);
 
 	//create the left hand side check buttons
-	m_DontDrawViewmodel = new vgui::CheckButton(this, "DontDrawViewmodel",					"Dont Draw Weapon Viewmodel");
-	m_EnableBlackAndWhiteView = new vgui::CheckButton(this, "EnableBlackAndWhiteView",		"Enable black and white view");
-	m_EnableLenseDirtOnScreen = new vgui::CheckButton(this, "EnableLenseDirtOnScreen",		"Enable lense dirt on screen");
-	m_EnableTvStyledView = new vgui::CheckButton(this, "EnableTvStyledView",				"Enable tv styled view");
-	m_EnableColoredTvStyledView = new vgui::CheckButton(this, "EnableColoredTvStyledView",	"Enable colored tv styled view");
-	m_EnableBlurredView = new vgui::CheckButton(this, "EnableBlurredView",					"Enable blurred view");
-	m_EnableBlackBoxes = new vgui::CheckButton(this, "EnableBlackBoxes",					"Enable cinematic black boxes");
-	m_OverrideViewmodelFov = new vgui::CheckButton(this, "OverrideViewmodelFov",			"Override Viewmodel Fov");
-	m_EnableClaustraphobia = new vgui::CheckButton(this, "EnableClaustraphobia",			"Enable claustraphobic view");
+	m_DontDrawViewmodel = new vgui::CheckButton(this, "DontDrawViewmodel", "#Amod_EffectsPanel_ViewPage_DontDrawViewmodel");
+	m_EnableBlackAndWhiteView = new vgui::CheckButton(this, "EnableBlackAndWhiteView", "#Amod_EffectsPanel_ViewPage_EnableBlackAndWhiteView");
+	m_EnableLenseDirtOnScreen = new vgui::CheckButton(this, "EnableLenseDirtOnScreen", "#Amod_EffectsPanel_ViewPage_EnableLenseDirtOnScreen");
+	m_EnableTvStyledView = new vgui::CheckButton(this, "EnableTvStyledView", "#Amod_EffectsPanel_ViewPage_EnableTvStyledView");
+	m_EnableColoredTvStyledView = new vgui::CheckButton(this, "EnableColoredTvStyledView", "#Amod_EffectsPanel_ViewPage_EnableColoredTvStyledView");
+	m_EnableBlurredView = new vgui::CheckButton(this, "EnableBlurredView", "#Amod_EffectsPanel_ViewPage_EnableBlurredView");
+	m_EnableBlackBoxes = new vgui::CheckButton(this, "EnableBlackBoxes", "#Amod_EffectsPanel_ViewPage_EnableBlackBoxes");
+	m_OverrideViewmodelFov = new vgui::CheckButton(this, "OverrideViewmodelFov", "#Amod_EffectsPanel_ViewPage_OverrideViewmodelFov");
+	m_EnableClaustraphobia = new vgui::CheckButton(this, "EnableClaustraphobia", "#Amod_EffectsPanel_ViewPage_EnableClaustraphobia");
 	m_EnableClaustraphobia->SetCommand(CLAUSTRAPHOBIA_BUTTON_COMMAND);
 
 	//horizontal divider
 	m_HorizontalDivider = new vgui::Divider(this, "HorizontalDivider");
 
 	//create the bottom stuff
-	m_BlackBoxWidthText = new vgui::Label(this, "BlackBoxWidthText", "Black Boxes Width");
+	m_BlackBoxWidthText = new vgui::Label(this, "BlackBoxWidthText", "#Amod_EffectsPanel_ViewPage_BlackBoxWidthText");
 	m_BlackBoxWidthSlider = new WheelSlider(this, "BlackBoxWidthSlider");
 	m_BlackBoxWidthSlider->AddActionSignalTarget(this);
 	m_BlackBoxWidthSlider->SetRange(BLACK_BOX_WIDTH_SLIDER_MIN, BLACK_BOX_WIDTH_SLIDER_MAX);
 	m_BlackBoxWidthSlider->SetValue(BLACK_BOX_WIDTH_SLIDER_DEFAULT);
 
-	m_BlackBoxHeightText = new vgui::Label(this, "BlackBoxHeightText", "Black Boxes Height");
+	m_BlackBoxHeightText = new vgui::Label(this, "BlackBoxHeightText", "#Amod_EffectsPanel_ViewPage_BlackBoxHeightText");
 	m_BlackBoxHeightSlider = new WheelSlider(this, "BlackBoxHeightSlider");
 	m_BlackBoxHeightSlider->AddActionSignalTarget(this);
 	m_BlackBoxHeightSlider->SetRange(BLACK_BOX_HEIGHT_SLIDER_MIN, BLACK_BOX_HEIGHT_SLIDER_MAX);
 	m_BlackBoxHeightSlider->SetValue(BLACK_BOX_HEIGHT_SLIDER_DEFAULT);
 
-	m_ClaustrapphobiaAmountText = new vgui::Label(this, "ClaustraphobiaAmountText", "Claustraphobia Amount");
+	m_ClaustrapphobiaAmountText = new vgui::Label(this, "ClaustraphobiaAmountText", "#Amod_EffectsPanel_ViewPage_ClaustraphobiaAmountText");
 	m_ClaustrapphobiaAmountSlider = new WheelSlider(this, "ClaustraphobiaAmountSlider");
 	m_ClaustrapphobiaAmountSlider->AddActionSignalTarget(this);
 	m_ClaustrapphobiaAmountSlider->SetRange(CLAUSTRAPHOBIA_SLIDER_MIN, CLAUSTRAPHOBIA_SLIDER_MAX);
 	m_ClaustrapphobiaAmountSlider->SetValue(CLAUSTRAPHOBIA_SLIDER_DEFAULT);
 
-	m_ClaustrapphobiaFovText = new vgui::Label(this, "ClaustraphobiaFovText", "Claustraphobia Fov Amount");
+	m_ClaustrapphobiaFovText = new vgui::Label(this, "ClaustraphobiaFovText", "#Amod_EffectsPanel_ViewPage_ClaustraphobiaFovText");
 	m_ClaustrapphobiaFovSlider = new WheelSlider(this, "ClaustraphobiaFovSlider");
 	m_ClaustrapphobiaFovSlider->AddActionSignalTarget(this);
 	m_ClaustrapphobiaFovSlider->SetRange(CLAUSTRAPHOBIA_FOV_SLIDER_MIN, CLAUSTRAPHOBIA_FOV_SLIDER_MAX);
 	m_ClaustrapphobiaFovSlider->SetValue(fov_desired.GetInt());
 	m_ClaustrapphobiaFovSlider->SetEnabled(false);
 
-	m_ViewmodelFovOverrideText = new vgui::Label(this, "ViewmodelFovOverrideText", "Viewmodel Fov Amount");
+	m_ViewmodelFovOverrideText = new vgui::Label(this, "ViewmodelFovOverrideText", "#Amod_EffectsPanel_ViewPage_ViewmodelFovOverrideText");
 	m_ViewmodelFovOverrideSlider = new WheelSlider(this, "ViewmodelFovOverrideSlider");
 	m_ViewmodelFovOverrideSlider->AddActionSignalTarget(this);
 	m_ViewmodelFovOverrideSlider->SetRange(VIEWMODEL_FOV_SLIDER_MIN, VIEWMODEL_FOV_SLIDER_MAX);
 	m_ViewmodelFovOverrideSlider->SetValue(v_viewmodel_fov.GetInt());
-	
+
 	//verticle divider
 	m_VerticalDivider = new vgui::Divider(this, "VerticleDivider");
 
 	//finally create the right hand side stuff
-	m_EnableCameraEditor = new vgui::CheckButton(this, "EnableCameraEditor",							"Enable Camera Editor");
-	m_EnableCameraEditorViewmodelFix = new vgui::CheckButton(this, "EnableSmoothCameraViewmodelFix",	"Enable Smooth Camera Viewmodel Fix");
-	
-	m_SmoothAngleAmountText = new vgui::Label(this, "SmoothAngleAmountText", "Angles Smooth Amount");
+	m_EnableCameraEditor = new vgui::CheckButton(this, "EnableCameraEditor", "#Amod_EffectsPanel_ViewPage_EnableCameraEditor");
+	m_EnableCameraEditorViewmodelFix = new vgui::CheckButton(this, "EnableSmoothCameraViewmodelFix", "#Amod_EffectsPanel_ViewPage_EnableCameraEditorViewmodelFix");
+
+	m_SmoothAngleAmountText = new vgui::Label(this, "SmoothAngleAmountText", "#Amod_EffectsPanel_ViewPage_SmoothAngleAmountText");
 	m_SmoothAngleAmountSlider = new WheelSlider(this, "SmoothAngleAmountSlider");
 	m_SmoothAngleAmountSlider->AddActionSignalTarget(this);
 	m_SmoothAngleAmountSlider->SetRange(SMOOTH_ANGLES_SLIDER_MIN, SMOOTH_ANGLES_SLIDER_MAX);
 	m_SmoothAngleAmountSlider->SetValue(SMOOTH_ANGLES_SLIDER_DEFAULT);
-	
-	m_SmoothOriginAmountText = new vgui::Label(this, "SmoothOriginAmountText", "Origin Smooth Amount");
+
+	m_SmoothOriginAmountText = new vgui::Label(this, "SmoothOriginAmountText", "#Amod_EffectsPanel_ViewPage_SmoothOriginAmountText");
 	m_SmoothOriginAmountSlider = new WheelSlider(this, "SmoothOriginAmountSlider");
 	m_SmoothOriginAmountSlider->AddActionSignalTarget(this);
 	m_SmoothOriginAmountSlider->SetRange(SMOOTH_ORIGIN_SLIDER_MIN, SMOOTH_ORIGIN_SLIDER_MAX);
 	m_SmoothOriginAmountSlider->SetValue(SMOOTH_ORIGIN_SLIDER_DEFAULT);
 
-	m_OriginOverrideText = new vgui::Label(this, "OriginOffsetText", "Origin Offset");
+	m_OriginOverrideText = new vgui::Label(this, "OriginOffsetText", "#Amod_EffectsPanel_ViewPage_OriginOverrideText");
 	m_OriginOverrideTextEntry = new vgui::TextEntry(this, "OriginOffsetTextEntry");
 	m_OriginOverrideTextEntry->SetText(ORIGIN_OFFSET_DEFAULT);
 	m_OriginOverrideTextEntry->SetMaximumCharCount(30);
 	m_OriginOverrideTextEntry->AddActionSignalTarget(this);
-	
-	m_AngleOverrideText = new vgui::Label(this, "AngleOffsetText", "Angle Offset");
+
+	m_AngleOverrideText = new vgui::Label(this, "AngleOffsetText", "#Amod_EffectsPanel_ViewPage_AngleOverrideText");
 	m_AngleOverrideTextEntry = new vgui::TextEntry(this, "AngleOffsetTextEntry");
 	m_AngleOverrideTextEntry->SetText(ANGLE_OFFSET_DEFAULT);
 	m_AngleOverrideTextEntry->SetMaximumCharCount(30);
 	m_AngleOverrideTextEntry->AddActionSignalTarget(this);
 
-	m_MinimumPitchText = new vgui::Label(this, "MinimumPitchText", "Minimum View Pitch");
+	m_MinimumPitchText = new vgui::Label(this, "MinimumPitchText", "#Amod_EffectsPanel_ViewPage_MinimumPitchText");
 	m_MinimumPitchSlider = new WheelSlider(this, "SmoothAngleAmountSlider");
 	m_MinimumPitchSlider->AddActionSignalTarget(this);
 	m_MinimumPitchSlider->SetRange(MINIMUM_PITCH_SLIDER_MIN, MINIMUM_PITCH_SLIDER_MAX);
 	m_MinimumPitchSlider->SetValue(MINIMUM_PITCH_SLIDER_DEFAULT);
 
-	m_MaximumPitchText = new vgui::Label(this, "MaximumPitchText", "Maximum View Pitch");
+	m_MaximumPitchText = new vgui::Label(this, "MaximumPitchText", "#Amod_EffectsPanel_ViewPage_MaximumPitchText");
 	m_MaximumPitchSlider = new WheelSlider(this, "MaximumPitchSlider");
 	m_MaximumPitchSlider->AddActionSignalTarget(this);
 	m_MaximumPitchSlider->SetRange(MAXIMUM_PITCH_SLIDER_MIN, MAXIMUM_PITCH_SLIDER_MAX);
@@ -160,35 +160,35 @@ CEffectsPanelViewEffects::CEffectsPanelViewEffects(vgui::Panel* parent, const ch
 
 	m_iPrevFovValue = fov_desired.GetInt();
 
-	//add all the tooltips
-	ADD_TOOLTIP(m_DontDrawViewmodel, 100, "If selected then the player's weapon model wont show, Else it will.", true);
-	ADD_TOOLTIP(m_EnableBlackAndWhiteView, 100, "Enables a noir black and white filter.", false);
-	ADD_TOOLTIP(m_EnableLenseDirtOnScreen, 100, "Adds lense dirt onto the players screen.", false);
-	ADD_TOOLTIP(m_EnableTvStyledView, 100, "Adds a bodycan styled old tv overlay onto the screen.", true);
-	ADD_TOOLTIP(m_EnableColoredTvStyledView, 100, "Adds a blue colored bodycan styled old tv overlay onto the screen.", true);
-	ADD_TOOLTIP(m_EnableBlurredView, 100, "Adds a blur effect onto the screen", false);
-	ADD_TOOLTIP(m_EnableBlackBoxes, 100, "Adds cinematic black edge boxes onto the screen.\nChange the size with the black box sliders below", true);
-	ADD_TOOLTIP(m_EnableClaustraphobia, 100, "Enables a claustraphobic styled view effect that can be modified with the claustraphobia sliders below.", true);
-	ADD_TOOLTIP(m_OverrideViewmodelFov, 100, "Overrides the players viewmodel fov using the sliders value below.", true);
+	//tooltips
+	ADD_TOOLTIP(m_DontDrawViewmodel, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_DontDrawViewmodel", true);
+	ADD_TOOLTIP(m_EnableBlackAndWhiteView, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_EnableBlackAndWhiteView", false);
+	ADD_TOOLTIP(m_EnableLenseDirtOnScreen, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_EnableLenseDirtOnScreen", false);
+	ADD_TOOLTIP(m_EnableTvStyledView, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_EnableTvStyledView", true);
+	ADD_TOOLTIP(m_EnableColoredTvStyledView, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_EnableColoredTvStyledView", true);
+	ADD_TOOLTIP(m_EnableBlurredView, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_EnableBlurredView", false);
+	ADD_TOOLTIP(m_EnableBlackBoxes, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_EnableBlackBoxes", true);
+	ADD_TOOLTIP(m_EnableClaustraphobia, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_EnableClaustraphobia", true);
+	ADD_TOOLTIP(m_OverrideViewmodelFov, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_OverrideViewmodelFov", true);
 
-	ADD_TOOLTIP(m_EnableCameraEditor, 100, "Enables all the camera features below", false);
-	ADD_TOOLTIP(m_EnableCameraEditorViewmodelFix, 100, "When the angle smooth amount or origin smooth amount slider is set to something other then 0, and the player moves/looks around, The viewmodel can move faster then the camera. Select this to fix this", true);
-	ADD_TOOLTIP(m_SmoothAngleAmountSlider, 100, "Changes how smooth the players view moves when looking around", true);
-	ADD_TOOLTIP(m_SmoothOriginAmountSlider, 100, "Changes how smooth the players view moves moving around", true);
-	ADD_TOOLTIP(m_OriginOverrideTextEntry, 100, "Determines the players position offset using the (forward/back left/right up/down) format", true);
-	ADD_TOOLTIP(m_AngleOverrideTextEntry, 100, "Determines the players angle offset using the (pitch yaw roll) format", true);
-	ADD_TOOLTIP(m_MinimumPitchSlider, 100, "Changes how far the player can look down", false);
-	ADD_TOOLTIP(m_MaximumPitchSlider, 100, "Changes how far the player can look up", false);
+	ADD_TOOLTIP(m_EnableCameraEditor, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_EnableCameraEditor", false);
+	ADD_TOOLTIP(m_EnableCameraEditorViewmodelFix, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_EnableCameraEditorViewmodelFix", true);
+	ADD_TOOLTIP(m_SmoothAngleAmountSlider, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_SmoothAngleAmountSlider", true);
+	ADD_TOOLTIP(m_SmoothOriginAmountSlider, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_SmoothOriginAmountSlider", true);
+	ADD_TOOLTIP(m_OriginOverrideTextEntry, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_OriginOverrideTextEntry", true);
+	ADD_TOOLTIP(m_AngleOverrideTextEntry, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_AngleOverrideTextEntry", true);
+	ADD_TOOLTIP(m_MinimumPitchSlider, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_MinimumPitchSlider", false);
+	ADD_TOOLTIP(m_MaximumPitchSlider, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_MaximumPitchSlider", false);
 
-	ADD_TOOLTIP(m_BlackBoxWidthSlider, 100, "Sets how much room (width) the black boxes should take up on either side of the screen if the 'Enable cinematic black boxes' check button is selected", true);
-	ADD_TOOLTIP(m_BlackBoxHeightSlider, 100, "Sets how much room (height) the black boxes should take up on either side of the screen if the 'Enable cinematic black boxes' check button is selected", true);
-	ADD_TOOLTIP(m_ClaustrapphobiaAmountSlider, 100, "Sets how claustraphobic the players view should be if the 'Enable claustraphobia' check button is selected", true);
-	ADD_TOOLTIP(m_ClaustrapphobiaFovSlider, 100, "Overrides the players fov tho this amount if the 'Enable claustraphobia' check button is selected", true);
-	ADD_TOOLTIP(m_ViewmodelFovOverrideSlider, 100, "Overrides the players viewmodel fov to this amount if the 'Override viewmodel fov' check button is selected", true);
+	ADD_TOOLTIP(m_BlackBoxWidthSlider, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_BlackBoxWidthSlider", true);
+	ADD_TOOLTIP(m_BlackBoxHeightSlider, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_BlackBoxHeightSlider", true);
+	ADD_TOOLTIP(m_ClaustrapphobiaAmountSlider, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_ClaustraphobiaAmountSlider", true);
+	ADD_TOOLTIP(m_ClaustrapphobiaFovSlider, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_ClaustraphobiaFovSlider", true);
+	ADD_TOOLTIP(m_ViewmodelFovOverrideSlider, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_ViewmodelFovOverrideSlider", true);
 
 	//reset these to the defaults
 	ResetEffects();
-	
+
 	//set the bounds for each item
 	PerformLayout();
 }

@@ -18,7 +18,7 @@ void AmodCloudsChangeCallback(IConVar* var, const char*, float);
 void AmodSunChangeCallback(IConVar* var, const char*, float);
 
 //sky
-ConVar amod_sky_override("amod_sky_override", "1");
+//ConVar amod_sky_override("amod_sky_override", "1");
 ConVar amod_night_sky("amod_night_sky", "", 0, "", AmodSkyCallback);
 ConVar amod_day_sky("amod_day_sky", "", 0, "", AmodSkyCallback);
 
@@ -120,8 +120,8 @@ CBaseEntity* CreateEpicFilter()
 void AmodSkyCallback(IConVar* var, const char* oldstring, float)
 {
 	//see if we should override the sky or not
-	if (!amod_sky_override.GetBool())
-		return;
+	//if (!amod_sky_override.GetBool())
+	//	return;
 
 	//get the convar type
 	bool CalledFromDayConvar = cvar->FindVar(var->GetName()) == &amod_day_sky;
@@ -271,8 +271,8 @@ void AmodSunChangeCallback(IConVar* var, const char*, float)
 	}
 }
 
-static ConVar amod_ep2_bg_brush_color_day("amod_ep2_bg_brush_color_day", "255 255 255", 0, "The color the _bg_brush (skybox trees) will be for the episodes if amod_day is enabled.");
-static ConVar amod_ep2_bg_brush_color_night("amod_ep2_bg_brush_color_night", "41 41 41", 0, "The color the _bg_brush (skybox trees) will be for the episodes if amod_day is not enabled.");
+//static ConVar amod_ep2_bg_brush_color_day("amod_ep2_bg_brush_color_day", "255 255 255", 0, "The color the _bg_brush (skybox trees) will be for the episodes if amod_day is enabled.");
+//static ConVar amod_ep2_bg_brush_color_night("amod_ep2_bg_brush_color_night", "41 41 41", 0, "The color the _bg_brush (skybox trees) will be for the episodes if amod_day is not enabled.");
 
 //alone mod auto game system for epic filter and day/night system
 class CAmodAutoGameSystem : public CAutoGameSystem
@@ -322,15 +322,15 @@ public:
 		//enable bloom
 		if (daytime)
 		{
-			clientengine->ClientCmd(CFmtStr("mat_force_bloom %s", StringFromMapTimeStringTableIndex(info.DayInfo.BloomEnabled)));
-			clientengine->ClientCmd(CFmtStr("mat_bloomscale %s", StringFromMapTimeStringTableIndex(info.DayInfo.BloomScale)));
-			clientengine->ClientCmd(CFmtStr("mat_bloom_scalefactor_scalar %s", StringFromMapTimeStringTableIndex(info.DayInfo.BloomScalarFactor)));
+			clientengine->ClientCmd(CFmtStr("mat_force_bloom %d", info.DayInfo.BloomEnabled));
+			clientengine->ClientCmd(CFmtStr("mat_bloomscale %d", info.DayInfo.BloomScale));
+			clientengine->ClientCmd(CFmtStr("mat_bloom_scalefactor_scalar %f", info.DayInfo.BloomScalarFactor));
 		}
 		else
 		{
-			clientengine->ClientCmd(CFmtStr("mat_force_bloom %s", StringFromMapTimeStringTableIndex(info.NightInfo.BloomEnabled)));
-			clientengine->ClientCmd(CFmtStr("mat_bloomscale %s", StringFromMapTimeStringTableIndex(info.NightInfo.BloomScale)));
-			clientengine->ClientCmd(CFmtStr("mat_bloom_scalefactor_scalar %s", StringFromMapTimeStringTableIndex(info.NightInfo.BloomScalarFactor)));
+			clientengine->ClientCmd(CFmtStr("mat_force_bloom %d", info.NightInfo.BloomEnabled));
+			clientengine->ClientCmd(CFmtStr("mat_bloomscale %d", info.NightInfo.BloomScale));
+			clientengine->ClientCmd(CFmtStr("mat_bloom_scalefactor_scalar %f", info.NightInfo.BloomScalarFactor));
 		}
 
 		//get the current sky name
@@ -464,37 +464,39 @@ public:
 			pEntity->SetRenderColor(icolor[0], icolor[1], icolor[2]);
 		} while (false);
 
-		//enable/disable the _brush_night for the bottom of the episodes skybox
+		//enable the _brush_night for the bottom of the episode 2s skybox
 		CBaseEntity* pEntity = gEntList.FindEntityByName(nullptr, "_brush_night");
 		while (pEntity)
 		{
 			//enable or disable
-			if (IsDaytimeEnabled())
-				pEntity->AcceptInput("disable", nullptr, nullptr, variant_t{}, 0);
-			else
+			//if (IsDaytimeEnabled())
+			//	pEntity->AcceptInput("disable", nullptr, nullptr, variant_t{}, 0);
+			//else
 				pEntity->AcceptInput("enable", nullptr, nullptr, variant_t{}, 0);
 
 			pEntity = gEntList.FindEntityByName(pEntity, "_brush_night");
 		}
 
-		//sets the _brush_bg for episode 2
+		//sets the _brush_bg for episode 2. Now obsolete (kind of)
+		
 		pEntity = gEntList.FindEntityByName(nullptr, "_brush_bg");
 		while (pEntity)
 		{
-			//enable or disable
-			if (IsDaytimeEnabled())
-			{
-				int array[3];
-				UTIL_StringToIntArray(array, 3, amod_ep2_bg_brush_color_day.GetString());
-				pEntity->SetRenderColor(array[0], array[1], array[2]);
-			}
-			else
-			{
-				int array[3];
-				UTIL_StringToIntArray(array, 3, amod_ep2_bg_brush_color_night.GetString());
-				pEntity->SetRenderColor(array[0], array[1], array[2]);
-			}
-
+		//	//enable or disable
+		//	if (IsDaytimeEnabled())
+		//	{
+		//		int array[3];
+		//		UTIL_StringToIntArray(array, 3, amod_ep2_bg_brush_color_day.GetString());
+		//		pEntity->SetRenderColor(array[0], array[1], array[2]);
+		//	}
+		//	else
+		//	{
+		//		int array[3];
+		//		UTIL_StringToIntArray(array, 3, amod_ep2_bg_brush_color_night.GetString());
+		//		pEntity->SetRenderColor(array[0], array[1], array[2]);
+		//	}
+		//
+			pEntity->SetRenderColor(255, 255, 255);
 			pEntity = gEntList.FindEntityByName(pEntity, "_brush_bg");
 		}
 	}

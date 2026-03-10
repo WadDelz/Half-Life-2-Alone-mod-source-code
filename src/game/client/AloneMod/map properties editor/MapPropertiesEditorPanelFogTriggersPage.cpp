@@ -2,6 +2,8 @@
 #include "MapPropertiesEditorPanelFogTriggersPage.h"
 #include "debugoverlay_shared.h"
 
+#if FOG_CUBE_TRIGGER_TEST
+
 //-------------------------------------------------------------------------------------------------------
 // Purpose: Draws a debug box
 //-------------------------------------------------------------------------------------------------------
@@ -995,3 +997,5 @@ void CMapPropertiesPanelFogTriggersPage::OnColorSelected(KeyValues* data)
 void CMapPropertiesPanelFogTriggersPage::OnCheckButtonChecked(KeyValues* subkey)
 {
 }
+
+#endif //FOG_CUBE_TRIGGER_TEST

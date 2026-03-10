@@ -39,18 +39,18 @@ enum class ConvarActiveType_e
 //convar active type string's for combo box
 static const char* g_ConvarActiveType[] =
 {
-	"Always Active",
-	"When flashlight on",
-	"When flashlight off",
-	"When walking",
-	"When sprinting",
-	"When crouching",
-	"When on ground",
-	"When in air",
-	"When under water",
-	"When health low",
-	"When holding object",
-	"When using suit zoom"
+	"#Amod_EffectsPanel_ConvarPage_ActiveType_Always",
+	"#Amod_EffectsPanel_ConvarPage_ActiveType_WhenFlashlightOn",
+	"#Amod_EffectsPanel_ConvarPage_ActiveType_WhenFlashlightOff",
+	"#Amod_EffectsPanel_ConvarPage_ActiveType_WhenWalking",
+	"#Amod_EffectsPanel_ConvarPage_ActiveType_WhenSprinting",
+	"#Amod_EffectsPanel_ConvarPage_ActiveType_WhenCrouching",
+	"#Amod_EffectsPanel_ConvarPage_ActiveType_WhenOnGround",
+	"#Amod_EffectsPanel_ConvarPage_ActiveType_WhenInAir",
+	"#Amod_EffectsPanel_ConvarPage_ActiveType_WhenUnderWater",
+	"#Amod_EffectsPanel_ConvarPage_ActiveType_WhenHealthLow",
+	"#Amod_EffectsPanel_ConvarPage_ActiveType_WhenHoldingObject",
+	"#Amod_EffectsPanel_ConvarPage_ActiveType_WhenUsingSuitZoom"
 };
 
 

@@ -2549,7 +2549,7 @@ void CViewRender::RenderView(const CViewSetup& viewtmp, int nClearFlags, int wha
 		Amod_VideoFilter(7);
 		Amod_VideoFilter(8);
 
-		if (amod_vignette.GetBool())
+		if (amod_vignette.GetBool() && !amod_new_vignette.GetBool())
 		{
 			Amod_PerformScreenOverlay(m_filterVignette, view.x, view.y, view.width, view.height);
 		}

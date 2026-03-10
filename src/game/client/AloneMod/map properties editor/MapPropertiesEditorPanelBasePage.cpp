@@ -374,11 +374,11 @@ CSetSliderValuePanel::CSetSliderValuePanel(Panel* parent, const char* name, cons
 	m_TextEntry->SetText(text);
 
 	//create the Save and Cancel button
-	Button* m_SaveButton = new Button(this, "SetButton", "Set Value");
+	Button* m_SaveButton = new Button(this, "SetButton", "#MapProperties_Slider_SetValuePanel_SetButton");
 	m_SaveButton->SetBounds(5, 55, 142, 25);
 	m_SaveButton->SetCommand("Set");
 
-	Button* m_CancelButton = new Button(this, "CancelButton", "Cancel");
+	Button* m_CancelButton = new Button(this, "CancelButton", "#MapProperties_Slider_SetValuePanel_CancelButton");
 	m_CancelButton->SetBounds(152, 55, 142, 25);
 	m_CancelButton->SetCommand("Close");
 }
@@ -490,13 +490,13 @@ void CMapPropertiesPanelSlider::OnMouseReleased(MouseCode code)
 
 		//make a popup prompting the user to copy or paste OR set the exact value
 		Menu* menu = new Menu(this, "CopyMenu");
-		menu->AddMenuItem("Set", "Set exact value", "SetExactValue", this);
+		menu->AddMenuItem("Set", "#MapProperties_Slider_SetValue", "SetExactValue", this);
 		menu->AddSeparator();
-		menu->AddMenuItem("CopyToClipboard", "Copy", "Copy", this);
+		menu->AddMenuItem("CopyToClipboard", "#MapProperties_Copy", "Copy", this);
 
 		//check if we have a value coppied
 		if (g_bHasValueCoppied != INT_MAX)
-			menu->AddMenuItem("PasteFromClipboard", "Paste", "Paste", this);
+			menu->AddMenuItem("PasteFromClipboard", "#MapProperties_Paste", "Paste", this);
 
 		menu->SetBounds(x, y, 200, 50);
 		menu->SetVisible(true);
@@ -616,11 +616,11 @@ void CMapPropertiesPanelButton::OnMouseReleased(MouseCode code)
 
 		//make a popup prompting the user to copy or paste
 		Menu* menu = new Menu(this, "CopyMenu");
-		menu->AddMenuItem("CopyToClipboard", "Copy", "Copy", this);
+		menu->AddMenuItem("CopyToClipboard", "#MapProperties_Copy", "Copy", this);
 
 		//check if we have a value coppied
 		if (s_bHasCoppiedColor)
-			menu->AddMenuItem("PasteFromClipboard", "Paste", "Paste", this);
+			menu->AddMenuItem("PasteFromClipboard", "#MapProperties_Paste", "Paste", this);
 
 		menu->SetBounds(x, y, 200, 50);
 		menu->SetVisible(true);
