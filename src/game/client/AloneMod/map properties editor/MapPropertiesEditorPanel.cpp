@@ -280,6 +280,7 @@ void CMapPropertiesPanel::OnThink()
 #endif
 
 	m_SkyboxFilterPage->Update();
+	m_HorizonPage->Update();
 
 	//only update the sun page if not using the daytime panel
 	if (!m_bNightTimeMode)
@@ -405,9 +406,13 @@ void CMapPropertiesPanel::Init(MapTimeInfo_t& info, bool IsNightPage)
 	//only add the sun page if it isnt the daytime panel
 	if (!IsNightPage)
 	{
-		AddPage(m_SunPage = new CMapPropertiesPanelSunPage(this, "SunPage"), "Sun Settings");
+		AddPage(m_SunPage = new CMapPropertiesPanelSunPage(this, "SunPage"), "#MapProperties_SunPage_Title");
 		m_SunPage->InitSunInfo(info, IsNightPage);
 	}
+
+	//horizon page
+	AddPage(m_HorizonPage = new CMapPropertiesPanelHorizonFogPage(this, "HorizonPage"), "#MapProperties_HorizonPage_Title");
+	m_HorizonPage->InitHorizonInfo(info, IsNightPage);
 
 	//HACK: reset the undo steps because setting the values (with like SetSelected or SetActiveItem can
 	//		add an undo step)
@@ -430,6 +435,7 @@ void CMapPropertiesPanel::GetData(MapTimeInfo_t& info)
 #endif
 
 	m_SkyboxFilterPage->GetSkyboxFilterInfo(info);
+	m_HorizonPage->GetHorizonInfo(info);
 
 	//dont get the sun data if this is the night page
 	if (!m_bNightTimeMode)

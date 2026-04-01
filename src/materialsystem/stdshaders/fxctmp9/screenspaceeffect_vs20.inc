@@ -1,51 +1,51 @@
 #include "shaderlib/cshader.h"
-class sdk_bloom_ps20b_Static_Index
+class screenspaceeffect_vs20_Static_Index
 {
 private:
-	int m_nCONVERT_TO_SRGB;
+	int m_nX360APPCHOOSER;
 #ifdef _DEBUG
-	bool m_bCONVERT_TO_SRGB;
+	bool m_bX360APPCHOOSER;
 #endif
 public:
-	void SetCONVERT_TO_SRGB( int i )
+	void SetX360APPCHOOSER( int i )
 	{
 		Assert( i >= 0 && i <= 1 );
-		m_nCONVERT_TO_SRGB = i;
+		m_nX360APPCHOOSER = i;
 #ifdef _DEBUG
-		m_bCONVERT_TO_SRGB = true;
+		m_bX360APPCHOOSER = true;
 #endif
 	}
-	void SetCONVERT_TO_SRGB( bool i )
+	void SetX360APPCHOOSER( bool i )
 	{
-		m_nCONVERT_TO_SRGB = i ? 1 : 0;
+		m_nX360APPCHOOSER = i ? 1 : 0;
 #ifdef _DEBUG
-		m_bCONVERT_TO_SRGB = true;
+		m_bX360APPCHOOSER = true;
 #endif
 	}
 public:
-	sdk_bloom_ps20b_Static_Index( )
+	screenspaceeffect_vs20_Static_Index( )
 	{
 #ifdef _DEBUG
-		m_bCONVERT_TO_SRGB = true;
+		m_bX360APPCHOOSER = true;
 #endif // _DEBUG
-		m_nCONVERT_TO_SRGB =  g_pHardwareConfig->NeedsShaderSRGBConversion();
+		m_nX360APPCHOOSER =  0;
 	}
 	int GetIndex()
 	{
 		// Asserts to make sure that we aren't using any skipped combinations.
 		// Asserts to make sure that we are setting all of the combination vars.
 #ifdef _DEBUG
-		bool bAllStaticVarsDefined = m_bCONVERT_TO_SRGB;
+		bool bAllStaticVarsDefined = m_bX360APPCHOOSER;
 		Assert( bAllStaticVarsDefined );
 #endif // _DEBUG
-		return ( 1 * m_nCONVERT_TO_SRGB ) + 0;
+		return ( 1 * m_nX360APPCHOOSER ) + 0;
 	}
 };
-#define shaderStaticTest_sdk_bloom_ps20b 0
-class sdk_bloom_ps20b_Dynamic_Index
+#define shaderStaticTest_screenspaceeffect_vs20 0
+class screenspaceeffect_vs20_Dynamic_Index
 {
 public:
-	sdk_bloom_ps20b_Dynamic_Index()
+	screenspaceeffect_vs20_Dynamic_Index()
 	{
 	}
 	int GetIndex()
@@ -57,4 +57,4 @@ public:
 		return 0;
 	}
 };
-#define shaderDynamicTest_sdk_bloom_ps20b 0
+#define shaderDynamicTest_screenspaceeffect_vs20 0

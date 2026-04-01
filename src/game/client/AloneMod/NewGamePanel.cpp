@@ -151,6 +151,7 @@ bool GetMapFromConfig(const char* input, char* output, int outlen)
 
 //previous file
 static KeyValues* previousfile = nullptr;
+static char previousefilemod[512];
 
 //-----------------------------------------------------------------------
 // Purpose: This function returns the day/night 'allowed' states for the map selector panel.
@@ -168,7 +169,7 @@ bool GetMapDayEnabledStateFromTimeinfoFromFile(const char* mapname, bool& allowD
 	}
 
 	//check inside previousfile
-	if (previousfile)
+	if (previousfile && !Q_stricmp(previousefilemod, modname))
 	{
 		KeyValues* find = previousfile->FindKey(mapname);
 		if (find)
@@ -182,6 +183,7 @@ bool GetMapDayEnabledStateFromTimeinfoFromFile(const char* mapname, bool& allowD
 	//delete previousfile
 	previousfile->deleteThis();
 	previousfile = nullptr;
+	previousefilemod[0] = '\0';
 
 	//get the mod folder
 	char modfolder[512];
@@ -215,6 +217,7 @@ bool GetMapDayEnabledStateFromTimeinfoFromFile(const char* mapname, bool& allowD
 			{
 				allowDaytime = find->GetBool("AllowDayTime");
 				allowNighttime = find->GetBool("AllowNightTime");
+				Q_strncpy(previousefilemod, modname, sizeof(previousefilemod));
 				break;
 			}
 		}
@@ -603,8 +606,20 @@ void CNewGamePanel::SelectPage(int page)
 		const char* sDayTime = daytime ? "_day" : "";
 
 		//check we allow for daytime modes
-		char output[64];
-		if (GetMapFromConfig(CFmtStr("cfg/%s/chapter%d.cfg", m_CurrentSelectedGameInfo->prefix, realindex), output, sizeof(output)))
+		char output[64] = { '\0' };
+
+
+
+		//check if m_ThemesComboBox->GetActiveItemUserData()->GetName() is not amod_timeinfo_load_mod.GetString()
+		bool succeed = true;
+		extern ConVar amod_timeinfo_load_mod;
+
+		if (Q_stricmp(m_ThemesComboBox->GetActiveItemUserData()->GetName(), amod_timeinfo_load_mod.GetString()))
+		{
+			succeed = GetMapFromConfig(CFmtStr("cfg/%s/chapter%d.cfg", m_CurrentSelectedGameInfo->prefix, realindex), output, sizeof(output));
+		}
+
+		if (succeed)
 		{
 			//get the time enabled state from the file
 			bool allowDaytime = true;
@@ -637,6 +652,9 @@ void CNewGamePanel::SelectPage(int page)
 		//		break;
 		//	}
 		//}
+
+
+
 
 		//see if an image exists with the chapters/(FE)/%s/chapters%d%s name where (FE) is just V_GetFileName(m_ThemesComboBox->GetActiveItemUserData()->GetName()).
 		char buf[512] = { 0 };

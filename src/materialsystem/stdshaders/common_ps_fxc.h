@@ -237,23 +237,34 @@ float CalcRangeFog( const float flProjPosZ, const float flFogStartOverRange, con
 #endif
 }
 
-float CalcPixelFogFactor( int iPIXELFOGTYPE, const float4 fogParams, const float flEyePosZ, const float flWorldPosZ, const float flProjPosZ )
+float CalcPixelFogFactor(int iPIXELFOGTYPE, const float4 fogParams, const float3 vEyePos, const float3 vWorldPos, const float flProjPosZ)
 {
-	float retVal;
-	if ( iPIXELFOGTYPE == PIXEL_FOG_TYPE_NONE )
+	float retVal = 0.0f;
+	if (iPIXELFOGTYPE == PIXEL_FOG_TYPE_NONE)
 	{
 		retVal = 0.0f;
 	}
-	if ( iPIXELFOGTYPE == PIXEL_FOG_TYPE_RANGE ) //range fog, or no fog depending on fog parameters
+	else if (iPIXELFOGTYPE == PIXEL_FOG_TYPE_RANGE) //range fog, or no fog depending on fog parameters
 	{
-		retVal = CalcRangeFog( flProjPosZ, fogParams.x, fogParams.z, fogParams.w );
+		float flFogMaxDensity = fogParams.z;
+		float flFogEndOverRange = fogParams.x;
+		float flFogOORange = fogParams.w;
+
+		retVal = CalcRadialFog_NonFixedFunction(vWorldPos, vEyePos, flFogMaxDensity, flFogEndOverRange, flFogOORange);
 	}
-	else if ( iPIXELFOGTYPE == PIXEL_FOG_TYPE_HEIGHT ) //height fog
+	else if (iPIXELFOGTYPE == PIXEL_FOG_TYPE_HEIGHT) //height fog
 	{
-		retVal = CalcWaterFogAlpha( fogParams.y, flEyePosZ, flWorldPosZ, flProjPosZ, fogParams.w );
+		retVal = CalcWaterFogAlpha(fogParams.y, vEyePos.z, vWorldPos.z, flProjPosZ, fogParams.w);
 	}
 
 	return retVal;
+}
+
+// Legacy support overload, without range fog support.
+float CalcPixelFogFactor(int iPIXELFOGTYPE, const float4 fogParams, const float flEyePosZ, const float flWorldPosZ, const float flProjPosZ)
+{
+	// Old HLSL hack support... Can't just set here.
+	return CalcPixelFogFactor(iPIXELFOGTYPE, fogParams, float3(0, 0, flEyePosZ), float3(0, 0, flWorldPosZ), flProjPosZ);
 }
 
 //g_FogParams not defined by default, but this is the same layout for every shader that does define it

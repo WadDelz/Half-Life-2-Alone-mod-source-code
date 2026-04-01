@@ -5,6 +5,7 @@
 #include "MapPropertiesEditorPanelFogTriggersPage.h"
 #include "MapPropertiesEditorPanelSkyboxPage.h"
 #include "MapPropertiesEditorPanelSunPage.h"
+#include "MapPropertiesEditorPanelHorizonFogPage.h"
 #include <vgui_controls/PropertyDialog.h>
 
 #define COMMAND_APPLY_PAGE_SETTINGS "ApplySettings"
@@ -50,6 +51,7 @@ private:
 
 	CMapPropertiesPanelSkyboxFiltersPage* m_SkyboxFilterPage;
 	CMapPropertiesPanelSunPage* m_SunPage;
+	CMapPropertiesPanelHorizonFogPage* m_HorizonPage;
 
 private:
 	//have we closed?

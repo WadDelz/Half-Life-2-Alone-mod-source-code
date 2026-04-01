@@ -1,0 +1,20 @@
+#include "common_ps_fxc.h" 
+
+sampler BaseTextureSampler : register( s0 ); 
+float g_Saturation : register(c0); 
+
+struct PS_INPUT 
+{ 
+	float2 baseTexCoord : TEXCOORD0; 
+}; 
+
+HALF4 main( PS_INPUT i ) : COLOR 
+{ 
+	HALF4 baseColor = tex2D(BaseTextureSampler, i.baseTexCoord); 
+	
+	HALF gray = dot(baseColor.rgb, HALF3(0.299, 0.587, 0.114)); 
+
+	HALF4 result; result.rgb = lerp(gray, baseColor.rgb, g_Saturation); // g_Saturation comes from c0 
+	result.a = 1.0; 
+	return FinalOutput(result, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE); 
+}

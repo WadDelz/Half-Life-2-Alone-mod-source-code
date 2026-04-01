@@ -50,11 +50,10 @@ $Project
 	$Folder	"Source Files"
 	{
 		$File	"BaseVSShader.cpp"
-
-		$File	"example_model_dx9.cpp"
-		$File	"example_model_dx9_helper.cpp"
-
-		$File	"Bloom.cpp"
+		$File	"blur_dx9.cpp"
+		$File	"lensdirt_dx9.cpp"
+		$File	"RadialFog_water.cpp"
+		$File	"saturation_dx9.cpp"
 		$File	"screenspace_general.cpp"
 	}
 
@@ -66,9 +65,43 @@ $Project
 		$File	"common_ps_fxc.h"
 		$File	"common_vertexlitgeneric_dx9.h"
 		$File	"common_vs_fxc.h"
+		$File	"lightmappedgeneric_ps2_3_x.h"
+		$File	"RadialFog_water_ps2x_helper.h"
 		$File	"shader_constant_register_map.h"
+	}
 
-		$File	"example_model_dx9_helper.h"
+	$Folder	"Shader Source"
+	{
+		$Folder	"fxc"
+		{
+			$File	"blur_ps2x.fxc"
+			$File	"cable_ps2x.fxc"
+			$File	"cable_vs20.fxc"
+			$File	"lensdirt_ps2x.fxc"
+			$File	"lightmappedgeneric_inc.vsh"
+			$File	"lightmappedgeneric_ps2x.fxc"
+			$File	"lightmappedgeneric_vs20.fxc"
+			$File	"macros.vsh"
+			$File	"RadialFog_water_ps2x.fxc"
+			$File	"RadialFog_Water_vs20.fxc"
+			$File	"RadialFog_WaterCheap_ps2x.fxc"
+			$File	"RadialFog_WaterCheap_vs20.fxc"
+			$File	"saturation_ps2x.fxc"
+			$File	"ScreenSpaceEffect.vsh"
+			$File	"screenspaceeffect_vs11.fxc"
+			$File	"screenspaceeffect_vs20.fxc"
+			$File	"sprite_ps2x.fxc"
+			$File	"sprite_vs20.fxc"
+			$File	"unlitgeneric_ps2x.fxc"
+			$File	"unlitgeneric_vs20.fxc"
+			$File	"vertexlit_and_unlit_generic_bump_ps2x.fxc"
+			$File	"vertexlit_and_unlit_generic_bump_vs20.fxc"
+			$File	"vertexlit_and_unlit_generic_ps2x.fxc"
+			$File	"vertexlit_and_unlit_generic_vs20.fxc"
+		}
+		
+		$File	"stdshader_dx9_20b.txt"
+		$File	"stdshader_dx9_30.txt"
 	}
 
 	$Folder	"Link Libraries" [$WIN32]

@@ -174,7 +174,7 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 	KeyValues* night = map->FindKey("Night");
 	if (night)
 	{
-		info.NightInfo.DefaultNightSky = gs_DayNightInfoSymbolsTable.AddString(night->GetString("DefaultNightSky", NIGHT_DEFAULT_SKY_NAME));
+		info.NightInfo.Skybox = gs_DayNightInfoSymbolsTable.AddString(night->GetString("DefaultNightSky", NIGHT_DEFAULT_SKY_NAME));
 
 		//set filter values
 		info.NightInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString(night->GetString("FilterName", NIGHT_DEFAULT_FILTER_NAME));
@@ -199,6 +199,18 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 				AddOrUpdateFogInfoInArray(info.NightInfo.FogInfo, value->GetName(), value->GetString());
 			}
 		}
+		
+		//get the horizon info
+		KeyValues* horizon = night->FindKey("horizon");
+		if (horizon)
+		{
+			info.NightInfo.HorizonEnabled = horizon->GetBool("r_horizonfog");
+			FOR_EACH_VALUE(horizon, value)
+			{
+				//add or update the value
+				AddOrUpdateFogInfoInArray(info.NightInfo.HorizonInfo, value->GetName(), value->GetString());
+			}
+		}
 
 #if FOG_CUBE_TRIGGER_TEST
 		//get the fog cube triggers
@@ -207,7 +219,7 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 	}
 	else
 	{
-		info.NightInfo.DefaultNightSky = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_SKY_NAME);
+		info.NightInfo.Skybox = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_SKY_NAME);
 		info.NightInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_FILTER_NAME);
 		info.NightInfo.FilterIntensity = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_FITLER_INTENSITY);
 		info.NightInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_CLOUD_COLOR);
@@ -216,11 +228,14 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 		info.NightInfo.BloomScalarFactor = NIGHT_DEFAULT_BLOOM_SCALAR;
 	}
 
+
+
+
 	//get the day info
 	KeyValues* day = map->FindKey("Day");
 	if (day)
 	{
-		info.DayInfo.DefaultDaySky = gs_DayNightInfoSymbolsTable.AddString(day->GetString("DefaultDaySky", DAY_DEFAULT_SKY_NAME));
+		info.DayInfo.Skybox = gs_DayNightInfoSymbolsTable.AddString(day->GetString("DefaultDaySky", DAY_DEFAULT_SKY_NAME));
 
 		//set filter values
 		info.DayInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString(day->GetString("FilterName", DAY_DEFAULT_FILTER_NAME));
@@ -264,6 +279,18 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 			}
 		}
 
+		//get the horizon info
+		KeyValues* horizon = day->FindKey("horizon");
+		if (horizon)
+		{
+			info.DayInfo.HorizonEnabled = horizon->GetBool("r_horizonfog");
+			FOR_EACH_VALUE(horizon, value)
+			{
+				//add or update the value
+				AddOrUpdateFogInfoInArray(info.DayInfo.HorizonInfo, value->GetName(), value->GetString());
+			}
+		}
+
 #if FOG_CUBE_TRIGGER_TEST
 		//get the fog cube triggers
 		InitalizeDayNightFogTriggersInfo(day->FindKey("FogCubeTriggers"), info.DayInfo.FogCubeTriggers);
@@ -272,7 +299,7 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 	}
 	else
 	{
-		info.DayInfo.DefaultDaySky = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_SKY_NAME);
+		info.DayInfo.Skybox = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_SKY_NAME);
 		info.DayInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_FILTER_NAME);
 		info.DayInfo.FilterIntensity = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_FILTER_INTENSITY);
 		info.DayInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_CLOUD_COLOR);
@@ -299,6 +326,15 @@ void InitalizeDayNightInfoFile(const char* file)
 	//go through each subkey
 	FOR_EACH_TRUE_SUBKEY(keyvalues, map)
 	{
+		//check the item already exists
+		bool found = false;
+		GetMapTimeInfo(map->GetName(), &found);
+		if (found)
+		{
+			//dont add the item if it already exists
+			continue;
+		}
+
 		//make the info
 		MapTimeInfo_t& info = baseinfo.base[baseinfo.base.AddToTail()];
 		Q_strncpy(info.mapname, map->GetName(), sizeof(info.mapname));
@@ -482,7 +518,9 @@ CON_COMMAND_F(_amod_daytimeinfo_reset, "", FCVAR_HIDDEN)
 	//clear the current fog/sun info then reload the info
 	info.DayInfo.FogInfo.RemoveAll();
 	info.DayInfo.SunInfo.RemoveAll();
+	info.DayInfo.HorizonInfo.RemoveAll();
 	info.NightInfo.FogInfo.RemoveAll();
+	info.NightInfo.HorizonInfo.RemoveAll();
 
 #if FOG_CUBE_TRIGGER_TEST
 	info.DayInfo.FogCubeTriggers.RemoveAll();
@@ -537,7 +575,7 @@ void WriteTimeInfoToKeyvalues(MapTimeInfo_t& info, KeyValues* out)
 		do
 		{
 			const char* namesarray[2] = { "DefaultDaySky", "DefaultNightSky" };
-			const char* skyesarray[2] = { StringFromMapTimeStringTableIndex(info.DayInfo.DefaultDaySky), StringFromMapTimeStringTableIndex(info.NightInfo.DefaultNightSky) };
+			const char* skyesarray[2] = { StringFromMapTimeStringTableIndex(info.DayInfo.Skybox), StringFromMapTimeStringTableIndex(info.NightInfo.Skybox) };
 
 			//write the filter
 			times[i]->SetString(namesarray[i], skyesarray[i]);
@@ -600,6 +638,29 @@ void WriteTimeInfoToKeyvalues(MapTimeInfo_t& info, KeyValues* out)
 
 			//add to day/night
 			times[i]->AddSubKey(fog);
+
+		} while (false);
+
+		//write all the horizon stuff
+		do
+		{
+			CUtlVector<MapTimeInfo_t::FogInfo_t>* horizonarray[2] = { &info.DayInfo.HorizonInfo, &info.NightInfo.HorizonInfo };
+
+			//write all keyvalues if the fog is invalid
+			if (horizonarray[i]->Count() <= 0)
+				break;
+
+			KeyValues* horizon = new KeyValues("horizon");
+
+			//write all the info
+			for (int j = 0; j < horizonarray[i]->Count(); j++)
+			{
+				horizon->SetString(StringFromMapTimeStringTableIndex((*horizonarray[i])[j].convar), StringFromMapTimeStringTableIndex((*horizonarray[i])[j].value));
+			}
+			horizon->SetBool("r_horizonfog", i == 0 ? info.DayInfo.HorizonEnabled : info.NightInfo.HorizonEnabled);
+
+			//add to day/night
+			times[i]->AddSubKey(horizon);
 
 		} while (false);
 
@@ -713,7 +774,7 @@ MapTimeInfo_t& GetDefaultMapTimeInfo()
 	def.AllowNightTime = true;
 
 	//reset set skyboxs/data INCASE ive ever used amod_timeinfo_reset to reset the symbol table
-	def.DayInfo.DefaultDaySky = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_SKY_NAME);
+	def.DayInfo.Skybox = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_SKY_NAME);
 	def.DayInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_FILTER_NAME);
 	def.DayInfo.FilterIntensity = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_FILTER_INTENSITY);
 	def.DayInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_CLOUD_COLOR);
@@ -721,7 +782,7 @@ MapTimeInfo_t& GetDefaultMapTimeInfo()
 	def.DayInfo.BloomScale = DAY_DEFAULT_BLOOM_SCALE;
 	def.DayInfo.BloomScalarFactor = DAY_DEFAULT_BLOOM_SCALAR;
 
-	def.NightInfo.DefaultNightSky = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_SKY_NAME);
+	def.NightInfo.Skybox = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_SKY_NAME);
 	def.NightInfo.FilterName = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_FILTER_NAME);
 	def.NightInfo.FilterIntensity = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_FITLER_INTENSITY);
 	def.NightInfo.CloudsColor = gs_DayNightInfoSymbolsTable.AddString(NIGHT_DEFAULT_CLOUD_COLOR);
@@ -734,7 +795,7 @@ MapTimeInfo_t& GetDefaultMapTimeInfo()
 //--------------------------------------------------------------------------------------------
 // Purpose: Returns the current day/night time infos
 //--------------------------------------------------------------------------------------------
-MapTimeInfo_t& GetMapTimeInfo(const char* mapname)
+MapTimeInfo_t& GetMapTimeInfo(const char* mapname, bool* found)
 {
 	//strip the extention
 	mapname = V_GetFileName(mapname);
@@ -795,7 +856,7 @@ void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool fromnight, bo
 		to.NightInfo.BloomScalarFactor = fromnight ? from.NightInfo.BloomScalarFactor : from.DayInfo.BloomScalarFactor;
 
 		//skybox
-		to.NightInfo.DefaultNightSky = fromnight ? from.NightInfo.DefaultNightSky : from.DayInfo.DefaultDaySky;
+		to.NightInfo.Skybox = fromnight ? from.NightInfo.Skybox : from.DayInfo.Skybox;
 
 		//filter info
 		to.NightInfo.FilterIntensity = fromnight ? from.NightInfo.FilterIntensity : from.DayInfo.FilterIntensity;
@@ -812,6 +873,18 @@ void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool fromnight, bo
 		for (int i = 0; i < fromfog.Count(); i++)
 		{
 			MapTimeInfo_t::FogInfo_t& info = to.NightInfo.FogInfo[to.NightInfo.FogInfo.AddToTail()];
+			info.convar = fromfog[i].convar;
+			info.value = fromfog[i].value;
+		}
+
+		//horizon
+		to.NightInfo.HorizonEnabled = fromnight ? from.NightInfo.HorizonEnabled : from.DayInfo.HorizonEnabled;
+		to.NightInfo.HorizonInfo.RemoveAll();
+		
+		fromfog = fromnight ? from.NightInfo.HorizonInfo : from.DayInfo.HorizonInfo;
+		for (int i = 0; i < fromfog.Count(); i++)
+		{
+			MapTimeInfo_t::FogInfo_t& info = to.NightInfo.HorizonInfo[to.NightInfo.HorizonInfo.AddToTail()];
 			info.convar = fromfog[i].convar;
 			info.value = fromfog[i].value;
 		}
@@ -849,7 +922,7 @@ void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool fromnight, bo
 		to.DayInfo.BloomScalarFactor = fromnight ? from.NightInfo.BloomScalarFactor : from.DayInfo.BloomScalarFactor;
 
 		//skybox
-		to.DayInfo.DefaultDaySky = fromnight ? from.NightInfo.DefaultNightSky : from.DayInfo.DefaultDaySky;
+		to.DayInfo.Skybox = fromnight ? from.NightInfo.Skybox : from.DayInfo.Skybox;
 
 		//filter info
 		to.DayInfo.FilterIntensity = fromnight ? from.NightInfo.FilterIntensity : from.DayInfo.FilterIntensity;
@@ -866,6 +939,18 @@ void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool fromnight, bo
 		for (int i = 0; i < fromfog.Count(); i++)
 		{
 			MapTimeInfo_t::FogInfo_t& info = to.DayInfo.FogInfo[to.DayInfo.FogInfo.AddToTail()];
+			info.convar = fromfog[i].convar;
+			info.value = fromfog[i].value;
+		}
+
+		//horizon
+		to.DayInfo.HorizonEnabled = fromnight ? from.NightInfo.HorizonEnabled : from.DayInfo.HorizonEnabled;
+		to.DayInfo.HorizonInfo.RemoveAll();
+
+		fromfog = fromnight ? from.NightInfo.HorizonInfo : from.DayInfo.HorizonInfo;
+		for (int i = 0; i < fromfog.Count(); i++)
+		{
+			MapTimeInfo_t::FogInfo_t& info = to.DayInfo.HorizonInfo[to.DayInfo.HorizonInfo.AddToTail()];
 			info.convar = fromfog[i].convar;
 			info.value = fromfog[i].value;
 		}

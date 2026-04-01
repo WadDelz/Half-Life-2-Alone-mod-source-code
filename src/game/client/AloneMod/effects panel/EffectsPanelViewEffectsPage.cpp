@@ -34,6 +34,12 @@ extern ConVar cl_pitchup;
 #define VIEWMODEL_FOV_SLIDER_MAX 360
 #define VIEWMODEL_FOV_SLIDER_DEFAULT 54
 
+//blur slider value
+#define BLUR_SLIDER_MIN 0
+#define BLUR_SLIDER_MAX 40
+#define BLUR_SLIDER_DIVISOR 20
+#define BLUR_SLIDER_DEFAULT 20
+
 //smooth angles slider value
 #define SMOOTH_ANGLES_SLIDER_MIN 50
 #define SMOOTH_ANGLES_SLIDER_MAX 2
@@ -115,6 +121,12 @@ CEffectsPanelViewEffects::CEffectsPanelViewEffects(vgui::Panel* parent, const ch
 	m_ViewmodelFovOverrideSlider->SetRange(VIEWMODEL_FOV_SLIDER_MIN, VIEWMODEL_FOV_SLIDER_MAX);
 	m_ViewmodelFovOverrideSlider->SetValue(v_viewmodel_fov.GetInt());
 
+	m_BlurAmountText = new vgui::Label(this, "ViewmodelFovOverrideText", "#Amod_EffectsPanel_ViewPage_BlurAmountText");
+	m_BlurAmountSlider = new WheelSlider(this, "ViewmodelFovOverrideSlider");
+	m_BlurAmountSlider->AddActionSignalTarget(this);
+	m_BlurAmountSlider->SetRange(BLUR_SLIDER_MIN, BLUR_SLIDER_MAX);
+	m_BlurAmountSlider->SetValue(BLUR_SLIDER_DEFAULT);
+
 	//verticle divider
 	m_VerticalDivider = new vgui::Divider(this, "VerticleDivider");
 
@@ -185,6 +197,7 @@ CEffectsPanelViewEffects::CEffectsPanelViewEffects(vgui::Panel* parent, const ch
 	ADD_TOOLTIP(m_ClaustrapphobiaAmountSlider, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_ClaustraphobiaAmountSlider", true);
 	ADD_TOOLTIP(m_ClaustrapphobiaFovSlider, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_ClaustraphobiaFovSlider", true);
 	ADD_TOOLTIP(m_ViewmodelFovOverrideSlider, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_ViewmodelFovOverrideSlider", true);
+	ADD_TOOLTIP(m_BlurAmountSlider, 100, "#Amod_EffectsPanel_ViewPage_Tooltip_BlurAmountSlider", true);
 
 	//reset these to the defaults
 	ResetEffects();
@@ -225,6 +238,9 @@ void CEffectsPanelViewEffects::ResetEffects()
 
 	m_ViewmodelFovOverrideSlider->SetEnabled(false);
 	m_ViewmodelFovOverrideSlider->SetValue(VIEWMODEL_FOV_SLIDER_DEFAULT);
+	
+	m_BlurAmountSlider->SetEnabled(false);
+	m_BlurAmountSlider->SetValue(BLUR_SLIDER_DEFAULT);
 
 	//right items
 	m_EnableCameraEditor->SetSelected(false);
@@ -284,6 +300,7 @@ void CEffectsPanelViewEffects::ReadFromFile(KeyValues* keyvalues, bool reset)
 	m_EnableTvStyledView->SetSelected(view->GetBool("Filter:TvView", false));
 	m_EnableColoredTvStyledView->SetSelected(view->GetBool("Filter:ColoredTvView", false));
 	m_EnableBlurredView->SetSelected(view->GetBool("Filter:BluredView", false));
+	m_BlurAmountSlider->SetValue(view->GetInt("Filter:BluredAmount", BLUR_SLIDER_DEFAULT));
 
 	//black boxes
 	m_EnableBlackBoxes->SetSelected(view->GetBool("Filter:BlackBoxes:Enable", false));
@@ -325,6 +342,7 @@ void CEffectsPanelViewEffects::WriteToFile(KeyValues* keyvalues)
 	view->SetBool("Filter:TvView", m_EnableTvStyledView->IsSelected());
 	view->SetBool("Filter:ColoredTvView", m_EnableColoredTvStyledView->IsSelected());
 	view->SetBool("Filter:BluredView", m_EnableBlurredView->IsSelected());
+	view->SetInt("Filter:BluredAmount", m_BlurAmountSlider->GetValue());
 	
 	//black boxes
 	view->SetBool("Filter:BlackBoxes:Enable", m_EnableBlackBoxes->IsSelected());
@@ -361,7 +379,7 @@ void CEffectsPanelViewEffects::WriteToFile(KeyValues* keyvalues)
 void CEffectsPanelViewEffects::OnTick()
 {
 	//get/set all the convars
-	static ConVar* mat_yuv = cvar->FindVar("mat_yuv");
+	static ConVar* mat_hsv = cvar->FindVar("mat_hsv");
 
 	//set the viewmodel stuff
 	r_drawviewmodel.SetValue(!m_DontDrawViewmodel->IsSelected());
@@ -406,6 +424,14 @@ void CEffectsPanelViewEffects::OnTick()
 
 
 
+
+	//blur
+	static ConVar* amod_blur_amount = cvar->FindVar("amod_blur_amount");
+	if (amod_blur_amount)
+	{
+		amod_blur_amount->SetValue((float)m_BlurAmountSlider->GetValue() / BLUR_SLIDER_DIVISOR);
+	}
+	m_BlurAmountSlider->SetEnabled(m_EnableBlurredView->IsSelected());
 
 
 
@@ -489,8 +515,8 @@ void CEffectsPanelViewEffects::OnTick()
 	amod_view_claustrophobia.SetValue(m_EnableClaustraphobia->IsSelected());
 
 	//check black and white
-	if (mat_yuv)
-		mat_yuv->SetValue(m_EnableBlackAndWhiteView->IsSelected());
+	if (mat_hsv)
+		mat_hsv->SetValue(m_EnableBlackAndWhiteView->IsSelected());
 }
 
 //---------------------------------------------------------------------------------
@@ -560,6 +586,7 @@ void CEffectsPanelViewEffects::PerformLayout()
 	SET_CHECKBUTTON_BOUNDS(m_OverrideViewmodelFov,		5, CheckButtonY, 225, CheckButtonTall);
 
 	CheckButtonY += 5;
+
 	// Horizontal divider (static position — doesn’t modify Y)
 	SET_STATIC_CONTROL_BOUNDS(m_HorizontalDivider, 0, CheckButtonY, 600, 2);
 
@@ -575,7 +602,9 @@ void CEffectsPanelViewEffects::PerformLayout()
 
 	SlidersY = CheckButtonY + 15;
 	SET_SLIDER_BOUNDS(m_ViewmodelFovOverrideText, m_ViewmodelFovOverrideSlider, 10 + (SliderWidth * 2), SlidersY, SliderWidth, CheckButtonTall);
-	// Vertical divider (also static)
+	SET_SLIDER_BOUNDS(m_BlurAmountText, m_BlurAmountSlider, 10 + (SliderWidth * 2), SlidersY, SliderWidth, CheckButtonTall);
+
+	//Vertical divider (also static)
 	SET_STATIC_CONTROL_BOUNDS(m_VerticalDivider, 250, 0, 2, CheckButtonY);
 
 	CheckButtonY = 10;

@@ -1435,6 +1435,9 @@ public:
 	Button* m_MoveUpButton = nullptr;
 	Button* m_MoveDownButton = nullptr;
 
+	//looping check button
+	CheckButton* m_LoopingCheckButton = nullptr;
+
 	Label* m_VolumeLabel = nullptr;
 	Label* m_PitchLabel = nullptr;
 
@@ -1547,11 +1550,13 @@ void CSongPanel::Init()
 	SONG_PANEL_KEYVALUES_FIND(VolumeSliderKv, "SliderVol");
 	SONG_PANEL_KEYVALUES_FIND(VolumeTextKv, "VolumeText");
 	SONG_PANEL_KEYVALUES_FIND(Divider1Kv, "Divider1");
+	SONG_PANEL_KEYVALUES_FIND(Divider2Kv, "Divider2");
 	SONG_PANEL_KEYVALUES_FIND(AddSongButtonKv, "AddSongButton");
 	SONG_PANEL_KEYVALUES_FIND(RemoveSongButtonKv, "RemoveSongButton");
 	SONG_PANEL_KEYVALUES_FIND(ChangeSongButtonKv, "ChangeSongButton");
 	SONG_PANEL_KEYVALUES_FIND(MoveSongUpButtonKv, "MoveSongUpButton");
 	SONG_PANEL_KEYVALUES_FIND(MoveSongDownButtonKv, "MoveSongDownButton");
+	SONG_PANEL_KEYVALUES_FIND(LoopSongCheckButtonKv, "LoopSongCheckButton");
 	SONG_PANEL_KEYVALUES_FIND(PitchSliderKv, "SliderPitch");
 	SONG_PANEL_KEYVALUES_FIND(PitchTextKv, "PitchText");
 	SONG_PANEL_KEYVALUES_FIND(SongListKv, "SongList");
@@ -1683,7 +1688,7 @@ void CSongPanel::Init()
 
 	m_AddSongButton->GetTooltip()->SetTooltipDelay(500);
 	m_AddSongButton->GetTooltip()->SetTooltipFormatToMultiLine();
-	m_AddSongButton->GetTooltip()->SetText("Adds the selected song from the dropdown menu above into the playlist.");
+	m_AddSongButton->GetTooltip()->SetText("#Amod_SongPanel_AddSongToPlaylist_Tooltip");
 
 	//remove song from playlist button
 	m_RemoveSongButton = new vgui::Button(this, "RemoveSongButton", RemoveSongButtonKv->GetString("Text"));
@@ -1692,7 +1697,7 @@ void CSongPanel::Init()
 
 	m_RemoveSongButton->GetTooltip()->SetTooltipDelay(500);
 	m_RemoveSongButton->GetTooltip()->SetTooltipFormatToMultiLine();
-	m_RemoveSongButton->GetTooltip()->SetText("Removes the selected song from inside the playlist.");
+	m_RemoveSongButton->GetTooltip()->SetText("#Amod_SongPanel_RemoveSongFromPlaylist_ToolTip");
 
 	//change song for playlist button
 	m_ChangeSongButton = new vgui::Button(this, "ChangeSongButton", ChangeSongButtonKv->GetString("Text"));
@@ -1701,16 +1706,7 @@ void CSongPanel::Init()
 
 	m_ChangeSongButton->GetTooltip()->SetTooltipDelay(500);
 	m_ChangeSongButton->GetTooltip()->SetTooltipFormatToMultiLine();
-	m_ChangeSongButton->GetTooltip()->SetText("When a song is selected in the playlist, Select a song from the dropdown menu above and press this button. That will change the selected song inside the playlist.");
-
-	//move song down song for playlist button
-	m_MoveDownButton = new vgui::Button(this, "MoveSongDown", MoveSongDownButtonKv->GetString("Text"));
-	m_MoveDownButton->SetBounds(MoveSongDownButtonKv->GetInt("XPos"), MoveSongDownButtonKv->GetInt("YPos"), MoveSongDownButtonKv->GetInt("Wide"), MoveSongDownButtonKv->GetInt("Tall"));
-	m_MoveDownButton->SetCommand(COMMAND_PLAYLIST_MOVE_SONG_DOWN);
-
-	m_MoveDownButton->GetTooltip()->SetTooltipDelay(500);
-	m_MoveDownButton->GetTooltip()->SetTooltipFormatToMultiLine();
-	m_MoveDownButton->GetTooltip()->SetText("Moves the selected button down the playlist");
+	m_ChangeSongButton->GetTooltip()->SetText("#Amod_SongPanel_ChangeSelectedSong_ToolTip");
 
 	//move song up song for playlist button
 	m_MoveUpButton = new vgui::Button(this, "MoveSongUp", MoveSongUpButtonKv->GetString("Text"));
@@ -1719,11 +1715,32 @@ void CSongPanel::Init()
 
 	m_MoveUpButton->GetTooltip()->SetTooltipDelay(500);
 	m_MoveUpButton->GetTooltip()->SetTooltipFormatToMultiLine();
-	m_MoveUpButton->GetTooltip()->SetText("Moves the selected button up the playlist");
+	m_MoveUpButton->GetTooltip()->SetText("#Amod_SongPanel_MoveSelectedUp_ToolTip");
+
+	//move song down song for playlist button
+	m_MoveDownButton = new vgui::Button(this, "MoveSongDown", MoveSongDownButtonKv->GetString("Text"));
+	m_MoveDownButton->SetBounds(MoveSongDownButtonKv->GetInt("XPos"), MoveSongDownButtonKv->GetInt("YPos"), MoveSongDownButtonKv->GetInt("Wide"), MoveSongDownButtonKv->GetInt("Tall"));
+	m_MoveDownButton->SetCommand(COMMAND_PLAYLIST_MOVE_SONG_DOWN);
+
+	m_MoveDownButton->GetTooltip()->SetTooltipDelay(500);
+	m_MoveDownButton->GetTooltip()->SetTooltipFormatToMultiLine();
+	m_MoveDownButton->GetTooltip()->SetText("#Amod_SongPanel_MoveSelectedDown_ToolTip");
+
+	//looping check button
+	m_LoopingCheckButton = new vgui::CheckButton(this, "LoopSong", LoopSongCheckButtonKv->GetString("Text"));
+	m_LoopingCheckButton->SetBounds(LoopSongCheckButtonKv->GetInt("XPos"), LoopSongCheckButtonKv->GetInt("YPos"), LoopSongCheckButtonKv->GetInt("Wide"), LoopSongCheckButtonKv->GetInt("Tall"));
+
+	m_LoopingCheckButton->GetTooltip()->SetTooltipDelay(500);
+	m_LoopingCheckButton->GetTooltip()->SetTooltipFormatToMultiLine();
+	m_LoopingCheckButton->GetTooltip()->SetText("#Amod_SongPanel_ShouldLoopPlaylist_ToolTip");
 
 	//create divider between volume label and change song button
 	Divider* divider1 = new Divider(this, "Divider1");
 	divider1->SetBounds(Divider1Kv->GetInt("XPos"), Divider1Kv->GetInt("YPos"), Divider1Kv->GetInt("Wide"), Divider1Kv->GetInt("Tall"));
+
+	//create divider playlist stuff and volume/pitch
+	Divider* divider2 = new Divider(this, "Divider2");
+	divider2->SetBounds(Divider2Kv->GetInt("XPos"), Divider2Kv->GetInt("YPos"), Divider2Kv->GetInt("Wide"), Divider2Kv->GetInt("Tall"));
 
 	//volume label
 	m_VolumeLabel = new Label(this, "VolumeLabel", VolumeTextKv->GetString("Text"));
@@ -1737,7 +1754,7 @@ void CSongPanel::Init()
 
 	m_VolumeSlider->GetTooltip()->SetTooltipDelay(500);
 	m_VolumeSlider->GetTooltip()->SetTooltipFormatToMultiLine();
-	m_VolumeSlider->GetTooltip()->SetText("The volume at which the song will play at. You can use the the right mouse button to reset the slider if needed.");
+	m_VolumeSlider->GetTooltip()->SetText("#Amod_SongPanel_VolumeSlider_ToolTip");
 
 	//pitch label
 	m_PitchLabel = new Label(this, "PitchLabel", PitchTextKv->GetString("Text"));
@@ -1751,7 +1768,7 @@ void CSongPanel::Init()
 
 	m_PitchSlider->GetTooltip()->SetTooltipDelay(500);
 	m_PitchSlider->GetTooltip()->SetTooltipFormatToMultiLine();
-	m_PitchSlider->GetTooltip()->SetText("The pitch and speed at which the song will play at. You can use the the right mouse button to reset the slider if needed.");
+	m_PitchSlider->GetTooltip()->SetText("#Amod_SongPanel_PitchSlider_ToolTip");
 
 	//add the previous song button
 	m_PreviousSongButton = new Button(this, "PreviousSong", PreviousSongButtonKv->GetString("Text", "Button"));
@@ -1785,7 +1802,7 @@ void CSongPanel::Init()
 
 	m_Playlist->GetTooltip()->SetTooltipDelay(500);
 	m_Playlist->GetTooltip()->SetTooltipFormatToMultiLine();
-	m_Playlist->GetTooltip()->SetText("The playlist section holds on to all of the playlist songs.\nWhen a playlist button is light grey it means that that song is currently selected.\nWhen the playlist button is yellow it means that that is the current song that is playing.\nPress on the playlist section to clear the selected button!\nPress the arrow keys when an item is selected to change the selected item.\nHold shift when pressing the arrow keys to move the selected item.");
+	m_Playlist->GetTooltip()->SetText("#Amod_SongPanel_Playlist_ToolTip");
 
 	//add the progress bar
 	m_ProgressBar = new CSongPanelProgressBar(this, "ProgressBar");
@@ -1898,6 +1915,9 @@ void CSongPanel::StartPlaylist(bool bMessWithPitch)
 {
 	if (!bInit)
 		return;
+	
+	//clear the selected song
+	m_Playlist->ClearSongPlaying();
 
 	//reset the pitch slider
 	if (bMessWithPitch)
@@ -1919,17 +1939,26 @@ void CSongPanel::StartPlaylist(bool bMessWithPitch)
 	//check the playlist size
 	if (g_CurrentQueuedSongIndex >= g_QueuedSongs.Count())
 	{
-		g_QueuedSongs.RemoveAll();
-		g_CurrentQueuedSongIndex = 0;
-		g_bIsPlayingPlaylist = false;
+		//check if we are looping
+		const bool looping = m_LoopingCheckButton->IsSelected();
+		if (looping)
+		{
+			g_CurrentQueuedSongIndex = 0;
+		}
+		else
+		{
+			g_QueuedSongs.RemoveAll();
+			g_CurrentQueuedSongIndex = 0;
+			g_bIsPlayingPlaylist = false;
 
-		//display notification
-		songpanel->AddNotification("Playlist Finished!");
+			//display notification
+			songpanel->AddNotification("Playlist Finished!");
 
-		//clear the selected playlist item
-		m_Playlist->ClearSelection();
-		m_Playlist->ClearSongPlaying();
-		return;
+			//clear the selected playlist item
+			m_Playlist->ClearSelection();
+			m_Playlist->ClearSongPlaying();
+			return;
+		}
 	}
 
 	if (g_CurrentQueuedSongIndex < 0)
@@ -2112,8 +2141,9 @@ void CSongPanel::OnTick()
 		return;
 
 	//if no playlist is playing then disable the playlist button
-	m_NextSongButton->SetEnabled(g_bIsPlayingPlaylist && g_CurrentQueuedSongIndex < g_QueuedSongs.Count() - 1);
-	m_PreviousSongButton->SetEnabled(g_bIsPlayingPlaylist && g_CurrentQueuedSongIndex > 0);
+	const bool looping = m_LoopingCheckButton->IsSelected();
+	m_NextSongButton->SetEnabled((g_bIsPlayingPlaylist && g_CurrentQueuedSongIndex < g_QueuedSongs.Count() - 1) || looping);
+	m_PreviousSongButton->SetEnabled((g_bIsPlayingPlaylist && g_CurrentQueuedSongIndex > 0) || looping);
 
 	//get the previous and current pitch
 	static int PreviousPitch = 100;
@@ -2395,6 +2425,13 @@ void CSongPanel::OnCommand(const char* pcCommand)
 		//decrement the current queued song
 		g_CurrentQueuedSongIndex--;
 
+		//check if we are looping
+		const bool looping = m_LoopingCheckButton->IsSelected();
+		if (g_CurrentQueuedSongIndex < 0 && looping)
+		{
+			g_CurrentQueuedSongIndex = g_QueuedSongs.Count() - 1;
+		}
+
 		m_Playlist->ClearSelection();
 
 		//play the previous song
@@ -2405,6 +2442,13 @@ void CSongPanel::OnCommand(const char* pcCommand)
 	{
 		//increment the current queued song
 		g_CurrentQueuedSongIndex++;
+
+		//check if we are looping
+		const bool looping = m_LoopingCheckButton->IsSelected();
+		if (g_CurrentQueuedSongIndex >= g_QueuedSongs.Count() && looping)
+		{
+			g_CurrentQueuedSongIndex = 0;
+		}
 
 		m_Playlist->ClearSelection();
 
@@ -2440,7 +2484,7 @@ void CSongPanel::OnCommand(const char* pcCommand)
 	else if (!Q_strcmp(pcCommand, COMMAND_PLAY_SONG))
 	{
 		//reset the pitch slider
-		m_PitchSlider->SetValue(100);
+		//m_PitchSlider->SetValue(100);
 
 		//clear the playlist queue
 		g_QueuedSongs.RemoveAll();
@@ -2689,6 +2733,9 @@ struct CurrentSongItem_t
 };
 static CurrentSongItem_t s_CurrentSongItem;
 
+
+
+//yo, just make me a usermessage instead of a whole system you dumb fuck.
 class CAutoPlaySongSystem : public CAutoGameSystemPerFrame
 {
 public:

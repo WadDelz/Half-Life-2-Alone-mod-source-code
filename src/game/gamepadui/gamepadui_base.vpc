@@ -82,7 +82,6 @@ $Project
         }
 
         $File "gamepadui_achievements.cpp"
-        $File "gamepadui_amod_options.cpp"
         $File "gamepadui_basepanel.cpp"
         $File "gamepadui_button.cpp"
         $File "gamepadui_frame.cpp"

@@ -440,7 +440,7 @@ void C_SoundscapeSystem::UpdateLoopingSounds( float frametime )
 		if ( sound.volumeCurrent != sound.volumeTarget )
 		{
 			sound.volumeCurrent = Approach( sound.volumeTarget, sound.volumeCurrent, amount );
-			if ( sound.volumeTarget == 0 && sound.volumeCurrent == 0 )
+			if ( sound.volumeTarget <= 0 && sound.volumeCurrent <= 0 )
 			{
 				// sound is done, remove from list.
 				StopLoopingSound( sound );
@@ -517,13 +517,14 @@ void C_SoundscapeSystem::StartNewSoundscape(KeyValues* pSoundscape)
 	// fade out the current loops
 	for (i = m_loopingSounds.Count() - 1; i >= 0; --i)
 	{
-		m_loopingSounds[i].volumeTarget = 0;
+		m_loopingSounds[i].volumeTarget = 0.0f;
 		if (!pSoundscape)
 		{
 			// if we're cancelling the soundscape, stop the sound immediately
 			m_loopingSounds[i].volumeCurrent = 0.01;
 		}
 	}
+
 	// update ID
 	m_loopingSoundId++;
 

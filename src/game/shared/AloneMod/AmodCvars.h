@@ -50,6 +50,7 @@ extern ConVar amod_view_filter_video7;
 extern ConVar amod_view_filter_video8;
 
 extern ConVar amod_mirrored;
+extern ConVar amod_saturation;
 extern ConVar amod_camera_cinematic;
 extern ConVar amod_camera_cinematic_lag_origin;
 extern ConVar amod_camera_cinematic_lag_angles;

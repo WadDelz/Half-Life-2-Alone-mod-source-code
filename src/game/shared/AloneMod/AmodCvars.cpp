@@ -64,6 +64,7 @@ ConVar amod_flashlightflicker_time_interval_max("amod_flashlightflicker_time_int
 
 //camera
 ConVar amod_mirrored("amod_mirrored", "0", FCVAR_CLIENTDLL);
+ConVar amod_saturation("amod_saturation", "0", FCVAR_CLIENTDLL);
 
 //idk why i made this i kinda just felt like it
 ConVar amod_camera_cinematic("amod_camera_cinematic", "0", FCVAR_CLIENTDLL);

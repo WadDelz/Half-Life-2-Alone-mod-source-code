@@ -1,0 +1,4 @@
+fxctmp9_tmp\vertexlit_and_unlit_generic_bump_ps30.inc
+fxctmp9_tmp\vertexlit_and_unlit_generic_bump_vs30.inc
+fxctmp9_tmp\vertexlit_and_unlit_generic_ps30.inc
+fxctmp9_tmp\vertexlit_and_unlit_generic_vs30.inc

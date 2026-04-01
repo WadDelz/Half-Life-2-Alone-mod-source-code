@@ -63,6 +63,9 @@ private:
 	
 	vgui::Label* m_ViewmodelFovOverrideText;
 	WheelSlider* m_ViewmodelFovOverrideSlider;
+	
+	vgui::Label* m_BlurAmountText;
+	WheelSlider* m_BlurAmountSlider;
 
 	//verticle divider
 	vgui::Divider* m_VerticalDivider;

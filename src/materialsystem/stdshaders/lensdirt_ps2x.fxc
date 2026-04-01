@@ -1,0 +1,35 @@
+#include "common_ps_fxc.h"
+
+sampler BrightPassSampler : register(s0); // engine's bright pass / bloom buffer
+sampler LensDirtSampler  : register(s1);
+
+// g_Params.x = intensity of lens dirt
+// g_Params.y = alpha/transparency
+float4 g_Params : register(c0);
+
+struct PS_INPUT
+{
+    float2 baseTexCoord : TEXCOORD0;
+};
+
+HALF4 main(PS_INPUT i) : COLOR
+{
+    float2 uv = i.baseTexCoord;
+
+    // Sample the bright pass (all light sources)
+    HALF3 bright = tex2D(BrightPassSampler, uv).rgb;
+
+    // Sample lens dirt mask
+    HALF3 dirt = tex2D(LensDirtSampler, uv).rgb;
+
+    // Dirt contribution scaled by intensity
+    HALF3 dirtEffect = dirt * bright * g_Params.x;
+
+    // Sample original scene color
+    HALF3 scene = tex2D(BrightPassSampler, uv).rgb; // or BaseTextureSampler if desired
+
+    // Blend scene + dirt based on g_Params.y (alpha)
+    HALF3 final = lerp(scene, scene + dirtEffect, saturate(g_Params.y));
+
+    return FinalOutput(HALF4(final,1.0), 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE);
+}

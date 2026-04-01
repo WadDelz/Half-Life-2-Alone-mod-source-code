@@ -1537,7 +1537,7 @@ static void GetFogColor(fogparams_t* pFogParams, float* pColor)
 	if (blend)
 	{
 		Vector dir = pFogParams->dirPrimary;
-
+		
 		//set the blend angle
 		if (fog_override.GetBool() && fog_blendangle.GetFloat() != -1)
 		{
@@ -1552,7 +1552,8 @@ static void GetFogColor(fogparams_t* pFogParams, float* pColor)
 		// The secondary fog color is at 180 degrees to the primary fog color.
 		//
 		Vector forward;
-		pbp->EyeVectors(&forward, NULL, NULL);
+		//pbp->EyeVectors(&forward, NULL, NULL);
+		AngleVectors(g_vecCurrentRenderAngles, &forward, NULL, NULL);
 		VectorNormalize(forward);
 
 		Vector vNormalized = dir;
@@ -1573,7 +1574,8 @@ static void GetFogColor(fogparams_t* pFogParams, float* pColor)
 		if (IsMapPropertiesPanelOpen() && fog_blendangle.GetInt() != -1)
 		{
 			//get the text positions
-			Vector eyePos = pbp->EyePosition();
+			//Vector eyePos = pbp->EyePosition();
+			Vector eyePos = g_vecCurrentRenderOrigin;
 			Vector primaryPos = eyePos + dir * 64.0f;
 			Vector secondaryPos = eyePos - dir * 64.0f;
 
@@ -1826,7 +1828,8 @@ static void GetSkyboxFogColor(float* pColor)
 		// The secondary fog color is at 180 degrees to the primary fog color.
 		//
 		Vector forward;
-		pbp->EyeVectors(&forward, NULL, NULL);
+		//pbp->EyeVectors(&forward, NULL, NULL);
+		AngleVectors(g_vecCurrentRenderAngles, &forward, NULL, NULL);
 
 		Vector vNormalized = dir;
 		VectorNormalize(vNormalized);
@@ -1846,7 +1849,8 @@ static void GetSkyboxFogColor(float* pColor)
 		if (IsMapPropertiesPanelOpen() && fog_blendangleskybox.GetInt() != -1)
 		{
 			//get the positions
-			Vector eyePos = pbp->EyePosition();
+			//Vector eyePos = pbp->EyePosition();
+			Vector eyePos = g_vecCurrentRenderOrigin;
 			Vector primaryPos = eyePos + dir * 64.0f;
 			Vector secondaryPos = eyePos - dir * 64.0f;
 
@@ -2320,6 +2324,135 @@ if (amod_view_filter_video##i.GetBool()) { \
 DrawQuad(m_filterVideo##i, view.width, view.height); \
 }
 
+static ConVar r_horizonfog("r_horizonfog", "0");
+static ConVar r_horizonfog_enable("r_horizonfog_enable", "1");
+static ConVar r_horizonfog_no3dskyclip("r_horizonfog_no3dskyclip", "1");
+static ConVar r_horizonfog_top_r("r_horizonfog_top_r", "0.5");
+static ConVar r_horizonfog_top_g("r_horizonfog_top_g", "0.7");
+static ConVar r_horizonfog_top_b("r_horizonfog_top_b", "1.0");
+static ConVar r_horizonfog_mid_r("r_horizonfog_mid_r", "1.0");
+static ConVar r_horizonfog_mid_g("r_horizonfog_mid_g", "0.5");
+static ConVar r_horizonfog_mid_b("r_horizonfog_mid_b", "0.2");
+static ConVar r_horizonfog_bot_r("r_horizonfog_bot_r", "0.1");
+static ConVar r_horizonfog_bot_g("r_horizonfog_bot_g", "0.1");
+static ConVar r_horizonfog_bot_b("r_horizonfog_bot_b", "0.05");
+static ConVar r_horizonfog_pitch("r_horizonfog_pitch", "0");
+static ConVar r_horizonfog_yaw("r_horizonfog_yaw", "0");
+static ConVar r_horizonfog_offset_x("r_horizonfog_offset_x", "0");
+static ConVar r_horizonfog_offset_y("r_horizonfog_offset_y", "0");
+static ConVar r_horizonfog_offset_z("r_horizonfog_offset_z", "0");
+static ConVar r_horizonfog_height("r_horizonfog_height", "1.0");
+static ConVar r_horizonfog_width("r_horizonfog_width", "360");
+static ConVar r_horizonfog_scale("r_horizonfog_scale", "0.5");
+
+static void DrawHorizonFog3D(const Vector& origin, IMaterial* material)
+{
+	if (!r_horizonfog.GetBool() || !material)
+		return;
+
+	CMatRenderContextPtr pRenderContext(materials);
+	pRenderContext->Bind(material);
+
+	pRenderContext->OverrideDepthEnable(true, false);
+
+	pRenderContext->MatrixMode(MATERIAL_MODEL);
+	pRenderContext->PushMatrix();
+	pRenderContext->LoadIdentity();
+
+	pRenderContext->Translate(
+		origin.x + r_horizonfog_offset_x.GetFloat(),
+		origin.y + r_horizonfog_offset_y.GetFloat(),
+		origin.z + r_horizonfog_offset_z.GetFloat()
+	);
+
+	QAngle ang(r_horizonfog_pitch.GetFloat(), r_horizonfog_yaw.GetFloat(), 0);
+
+	pRenderContext->Rotate(ang.y, 0, 0, 1);
+	pRenderContext->Rotate(ang.x, 0, 1, 0);
+
+	float radius = 10000.0f * r_horizonfog_scale.GetFloat();
+	float height = r_horizonfog_height.GetFloat();
+
+	pRenderContext->Scale(radius, radius, radius);
+
+	const int slices = 64;
+	const int stacks = 16;
+
+	float width = r_horizonfog_width.GetFloat();
+	float widthRad = DEG2RAD(width);
+	float yawRad = DEG2RAD(r_horizonfog_yaw.GetFloat());
+
+	IMesh* pMesh = pRenderContext->GetDynamicMesh();
+	CMeshBuilder meshBuilder;
+
+	const float maxPhi = M_PI * 0.98f;
+
+	for (int i = 0; i < stacks; ++i)
+	{
+		meshBuilder.Begin(pMesh, MATERIAL_TRIANGLE_STRIP, (slices + 1) * 2);
+
+		float phi0 = ((float)i / stacks) * maxPhi;
+		float phi1 = ((float)(i + 1) / stacks) * maxPhi;
+
+		for (int j = 0; j <= slices; ++j)
+		{
+			float t = (float)j / slices;
+			float theta = yawRad + (t * widthRad) - (widthRad * 0.5f);
+
+			float x0 = sinf(phi0) * cosf(theta);
+			float y0 = sinf(phi0) * sinf(theta);
+			float z0 = cosf(phi0) * height;
+
+			float x1 = sinf(phi1) * cosf(theta);
+			float y1 = sinf(phi1) * sinf(theta);
+			float z1 = cosf(phi1) * height;
+
+			auto CalcColor = [](float z) -> Vector
+			{
+				if (z >= 0.0f)
+				{
+					float t = z;
+					return Vector(
+						r_horizonfog_mid_r.GetFloat() * (1 - t) + r_horizonfog_top_r.GetFloat() * t,
+						r_horizonfog_mid_g.GetFloat() * (1 - t) + r_horizonfog_top_g.GetFloat() * t,
+						r_horizonfog_mid_b.GetFloat() * (1 - t) + r_horizonfog_top_b.GetFloat() * t
+					);
+				}
+				else
+				{
+					float t = -z;
+					return Vector(
+						r_horizonfog_bot_r.GetFloat() * t + r_horizonfog_mid_r.GetFloat() * (1 - t),
+						r_horizonfog_bot_g.GetFloat() * t + r_horizonfog_mid_g.GetFloat() * (1 - t),
+						r_horizonfog_bot_b.GetFloat() * t + r_horizonfog_mid_b.GetFloat() * (1 - t)
+					);
+				}
+			};
+
+			Vector col0 = CalcColor(z0);
+			Vector col1 = CalcColor(z1);
+
+			meshBuilder.Position3f(x0, y0, z0);
+			meshBuilder.Normal3f(x0, y0, z0);
+			meshBuilder.TexCoord2f(0, t, (float)i / stacks);
+			meshBuilder.Color4f(col0.x, col0.y, col0.z, 1.0f);
+			meshBuilder.AdvanceVertex();
+
+			meshBuilder.Position3f(x1, y1, z1);
+			meshBuilder.Normal3f(x1, y1, z1);
+			meshBuilder.TexCoord2f(0, t, (float)(i + 1) / stacks);
+			meshBuilder.Color4f(col1.x, col1.y, col1.z, 1.0f);
+			meshBuilder.AdvanceVertex();
+		}
+
+		meshBuilder.End();
+		pMesh->Draw();
+	}
+
+	pRenderContext->OverrideDepthEnable(false, true);
+	pRenderContext->PopMatrix();
+}
+
 void CViewRender::RenderView(const CViewSetup& viewtmp, int nClearFlags, int whatToDraw)
 {
 	m_UnderWaterOverlayMaterial.Shutdown();					// underwater view will set
@@ -2440,6 +2573,10 @@ void CViewRender::RenderView(const CViewSetup& viewtmp, int nClearFlags, int wha
 			}
 		}
 
+		//draw the horizon fog
+		if (r_horizonfog_enable.GetBool() && !r_horizonfog_no3dskyclip.GetBool())
+			DrawHorizonFog3D(view.origin, m_HorizonFogMaterial);
+
 		// Render world and all entities, particles, etc.
 		if (!g_pIntroData)
 		{
@@ -2508,18 +2645,27 @@ void CViewRender::RenderView(const CViewSetup& viewtmp, int nClearFlags, int wha
 			DrawQuad(m_ScreenFlipMaterial, view.width, view.height);
 		}
 
-		if (amod_view_lense_dirt.GetBool()) {
-			DrawQuad(m_lenseDirtMaterial, view.width, view.height);
+		//saturation
+		if (amod_saturation.GetBool()) {
+			Amod_PerformScreenOverlay(m_SaturationMaterial, view.x, view.y, view.width, view.height);
 		}
 
+		//lens dirt
+		if (amod_view_lense_dirt.GetBool()) {
+			Amod_PerformScreenOverlay(m_lenseDirtMaterial, view.x, view.y, view.width, view.height);
+		}
+
+		//binoculars
 		if (amod_view_binoculars.GetBool()) {
 			Amod_PerformScreenOverlay(m_filterBinoculars, view.x, view.y, view.width, view.height);
 		}
 
+		//bodycam
 		if (amod_view_bodycam.GetBool()) {
 			Amod_PerformScreenOverlay(m_filterBodyCam, view.x, view.y, view.width, view.height);
 		}
 
+		//view square
 		if (amod_view_square.GetBool())
 		{
 			int width, height;
@@ -5077,7 +5223,6 @@ void CRendering3dView::DrawTranslucentRenderables(bool bInSkybox, bool bShadowDe
 	render->SetBlend(1);
 }
 
-
 //-----------------------------------------------------------------------------
 //
 //-----------------------------------------------------------------------------
@@ -5311,7 +5456,27 @@ void CSkyboxView::DrawInternal(view_id_t iSkyBoxViewID, bool bInvokePreAndPostRe
 		ModBase_DrawSkyBox(view->GetZFar());
 #endif
 
-	DrawWorld(0.0f);
+	//HACK HACK for the horizon fog
+	if (r_horizonfog.GetBool() && r_horizonfog_enable.GetBool() && r_horizonfog_no3dskyclip.GetBool())
+	{
+		//set our temporary flags
+		int temp = m_DrawFlags & ~(DF_DRAWSKYBOX);
+
+		//draw ONLY the 2d skybox
+		m_DrawFlags = DF_DRAWSKYBOX;
+		DrawWorld(0.0f);
+
+		//draw the horizon fog now
+		DrawHorizonFog3D(origin, ((CViewRender*)view)->m_HorizonFogMaterial);
+
+		//set our flags then draw only the 3d skybox
+		m_DrawFlags = temp;
+		DrawWorld(0.0f);
+	}
+	else
+	{
+		DrawWorld(0.0f);
+	}
 
 	// Iterate over all leaves and render objects in those leaves
 	DrawOpaqueRenderables(DEPTH_MODE_NORMAL);

@@ -1,0 +1,37 @@
+#define HDRTYPE HDR_TYPE_NONE
+#include "common_ps_fxc.h"
+
+// Sampler
+sampler BaseTextureSampler : register(s0);
+
+// Dynamic constant for blur
+float g_BlurAmount : register(c0);
+
+struct PS_INPUT
+{
+    float2 baseTexCoord : TEXCOORD0;
+};
+
+HALF4 main(PS_INPUT i) : COLOR
+{
+    HALF4 sum = HALF4(0,0,0,0);
+    float2 uv = i.baseTexCoord;
+
+    // Screen resolution offsets (you can adjust for your target resolution)
+    float2 offset = float2(1.0/1024.0, 1.0/768.0) * g_BlurAmount;
+
+    // 5-tap horizontal blur
+    sum += tex2D(BaseTextureSampler, uv + float2(-2,0)*offset) * 0.1;
+    sum += tex2D(BaseTextureSampler, uv + float2(-1,0)*offset) * 0.2;
+    sum += tex2D(BaseTextureSampler, uv) * 0.4;
+    sum += tex2D(BaseTextureSampler, uv + float2(1,0)*offset) * 0.2;
+    sum += tex2D(BaseTextureSampler, uv + float2(2,0)*offset) * 0.1;
+
+    // Mix with original based on blur amount
+    HALF4 baseColor = tex2D(BaseTextureSampler, uv);
+    HALF4 result;
+    result.rgb = lerp(baseColor.rgb, sum.rgb, g_BlurAmount);
+    result.a = 1.0;
+
+    return FinalOutput(result, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE);
+}

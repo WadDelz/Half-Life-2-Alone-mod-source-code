@@ -243,7 +243,7 @@ void CMapPropertiesEditorPageBase::Populate(CUtlVector<MapTimeInfo_t>& base)
 		maptext->SetFont(m_MapTextFont);
 		maptext->SetContentAlignment(Label::Alignment::a_northwest);
 
-		const char* skyName = m_bIsNightPage ? StringFromMapTimeStringTableIndex(base[i].NightInfo.DefaultNightSky) : StringFromMapTimeStringTableIndex(base[i].DayInfo.DefaultDaySky);
+		const char* skyName = m_bIsNightPage ? StringFromMapTimeStringTableIndex(base[i].NightInfo.Skybox) : StringFromMapTimeStringTableIndex(base[i].DayInfo.Skybox);
 
 		//create the 6 skybox faces
 		struct SkyFace_t

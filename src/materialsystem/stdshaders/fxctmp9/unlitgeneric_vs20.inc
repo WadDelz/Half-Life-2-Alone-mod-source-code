@@ -1,21 +1,48 @@
 #include "shaderlib/cshader.h"
-class example_model_vs20_Static_Index
+class unlitgeneric_vs20_Static_Index
 {
+private:
+	int m_nVERTEXCOLOR;
+#ifdef _DEBUG
+	bool m_bVERTEXCOLOR;
+#endif
 public:
-	example_model_vs20_Static_Index( )
+	void SetVERTEXCOLOR( int i )
 	{
+		Assert( i >= 0 && i <= 1 );
+		m_nVERTEXCOLOR = i;
+#ifdef _DEBUG
+		m_bVERTEXCOLOR = true;
+#endif
+	}
+	void SetVERTEXCOLOR( bool i )
+	{
+		m_nVERTEXCOLOR = i ? 1 : 0;
+#ifdef _DEBUG
+		m_bVERTEXCOLOR = true;
+#endif
+	}
+public:
+	unlitgeneric_vs20_Static_Index( )
+	{
+#ifdef _DEBUG
+		m_bVERTEXCOLOR = false;
+#endif // _DEBUG
+		m_nVERTEXCOLOR = 0;
 	}
 	int GetIndex()
 	{
 		// Asserts to make sure that we aren't using any skipped combinations.
 		// Asserts to make sure that we are setting all of the combination vars.
 #ifdef _DEBUG
+		bool bAllStaticVarsDefined = m_bVERTEXCOLOR;
+		Assert( bAllStaticVarsDefined );
 #endif // _DEBUG
-		return 0;
+		return ( 8 * m_nVERTEXCOLOR ) + 0;
 	}
 };
-#define shaderStaticTest_example_model_vs20 0
-class example_model_vs20_Dynamic_Index
+#define shaderStaticTest_unlitgeneric_vs20 vsh_forgot_to_set_static_VERTEXCOLOR + 0
+class unlitgeneric_vs20_Dynamic_Index
 {
 private:
 	int m_nCOMPRESSED_VERTS;
@@ -80,50 +107,8 @@ public:
 		m_bSKINNING = true;
 #endif
 	}
-private:
-	int m_nLIGHTING_PREVIEW;
-#ifdef _DEBUG
-	bool m_bLIGHTING_PREVIEW;
-#endif
 public:
-	void SetLIGHTING_PREVIEW( int i )
-	{
-		Assert( i >= 0 && i <= 1 );
-		m_nLIGHTING_PREVIEW = i;
-#ifdef _DEBUG
-		m_bLIGHTING_PREVIEW = true;
-#endif
-	}
-	void SetLIGHTING_PREVIEW( bool i )
-	{
-		m_nLIGHTING_PREVIEW = i ? 1 : 0;
-#ifdef _DEBUG
-		m_bLIGHTING_PREVIEW = true;
-#endif
-	}
-private:
-	int m_nNUM_LIGHTS;
-#ifdef _DEBUG
-	bool m_bNUM_LIGHTS;
-#endif
-public:
-	void SetNUM_LIGHTS( int i )
-	{
-		Assert( i >= 0 && i <= 4 );
-		m_nNUM_LIGHTS = i;
-#ifdef _DEBUG
-		m_bNUM_LIGHTS = true;
-#endif
-	}
-	void SetNUM_LIGHTS( bool i )
-	{
-		m_nNUM_LIGHTS = i ? 1 : 0;
-#ifdef _DEBUG
-		m_bNUM_LIGHTS = true;
-#endif
-	}
-public:
-	example_model_vs20_Dynamic_Index()
+	unlitgeneric_vs20_Dynamic_Index()
 	{
 #ifdef _DEBUG
 		m_bCOMPRESSED_VERTS = false;
@@ -137,24 +122,16 @@ public:
 		m_bSKINNING = false;
 #endif // _DEBUG
 		m_nSKINNING = 0;
-#ifdef _DEBUG
-		m_bLIGHTING_PREVIEW = false;
-#endif // _DEBUG
-		m_nLIGHTING_PREVIEW = 0;
-#ifdef _DEBUG
-		m_bNUM_LIGHTS = false;
-#endif // _DEBUG
-		m_nNUM_LIGHTS = 0;
 	}
 	int GetIndex()
 	{
 		// Asserts to make sure that we aren't using any skipped combinations.
 		// Asserts to make sure that we are setting all of the combination vars.
 #ifdef _DEBUG
-		bool bAllDynamicVarsDefined = m_bCOMPRESSED_VERTS && m_bDOWATERFOG && m_bSKINNING && m_bLIGHTING_PREVIEW && m_bNUM_LIGHTS;
+		bool bAllDynamicVarsDefined = m_bCOMPRESSED_VERTS && m_bDOWATERFOG && m_bSKINNING;
 		Assert( bAllDynamicVarsDefined );
 #endif // _DEBUG
-		return ( 1 * m_nCOMPRESSED_VERTS ) + ( 2 * m_nDOWATERFOG ) + ( 4 * m_nSKINNING ) + ( 8 * m_nLIGHTING_PREVIEW ) + ( 16 * m_nNUM_LIGHTS ) + 0;
+		return ( 1 * m_nCOMPRESSED_VERTS ) + ( 2 * m_nDOWATERFOG ) + ( 4 * m_nSKINNING ) + 0;
 	}
 };
-#define shaderDynamicTest_example_model_vs20 vsh_forgot_to_set_dynamic_COMPRESSED_VERTS + vsh_forgot_to_set_dynamic_DOWATERFOG + vsh_forgot_to_set_dynamic_SKINNING + vsh_forgot_to_set_dynamic_LIGHTING_PREVIEW + vsh_forgot_to_set_dynamic_NUM_LIGHTS + 0
+#define shaderDynamicTest_unlitgeneric_vs20 vsh_forgot_to_set_dynamic_COMPRESSED_VERTS + vsh_forgot_to_set_dynamic_DOWATERFOG + vsh_forgot_to_set_dynamic_SKINNING + 0

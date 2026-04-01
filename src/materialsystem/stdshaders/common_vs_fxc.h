@@ -558,7 +558,7 @@ float CalcFog( const float3 worldPos, const float3 projPos, const int fogType )
 
 	if( fogType == FOGTYPE_RANGE )
 	{
-		return RangeFog( projPos );
+		return CalcRadialFog_FixedFunction(worldPos, cEyePos, cFogMaxDensity, cFogEndOverFogRange, cOOFogRange);
 	}
 	else
 	{
@@ -581,7 +581,8 @@ float CalcFog( const float3 worldPos, const float3 projPos, const bool bWaterFog
 	float flFog;
 	if( !bWaterFog )
 	{
-		flFog = RangeFog( projPos );
+		//TODO VDC: add change message
+		flFog = CalcRadialFog_FixedFunction(worldPos, cEyePos, cFogMaxDensity, cFogEndOverFogRange, cOOFogRange);
 	}
 	else
 	{

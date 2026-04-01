@@ -1,8 +1,8 @@
 #include "shaderlib/cshader.h"
-class sdk_bloomadd_ps20_Static_Index
+class blur_ps20b_Static_Index
 {
 public:
-	sdk_bloomadd_ps20_Static_Index( )
+	blur_ps20b_Static_Index( )
 	{
 	}
 	int GetIndex()
@@ -14,11 +14,11 @@ public:
 		return 0;
 	}
 };
-#define shaderStaticTest_sdk_bloomadd_ps20 0
-class sdk_bloomadd_ps20_Dynamic_Index
+#define shaderStaticTest_blur_ps20b 0
+class blur_ps20b_Dynamic_Index
 {
 public:
-	sdk_bloomadd_ps20_Dynamic_Index()
+	blur_ps20b_Dynamic_Index()
 	{
 	}
 	int GetIndex()
@@ -30,4 +30,4 @@ public:
 		return 0;
 	}
 };
-#define shaderDynamicTest_sdk_bloomadd_ps20 0
+#define shaderDynamicTest_blur_ps20b 0

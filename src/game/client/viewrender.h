@@ -426,7 +426,7 @@ public:
 	{
 		m_UnderWaterOverlayMaterial.Init( pMaterial );
 	}
-private:
+public:
 	int				m_BuildWorldListsNumber;
 
 
@@ -490,6 +490,10 @@ private:
 	CMaterialReference	m_ModulateSingleColor;
 	CMaterialReference	m_ScreenOverlayMaterial;
 	CMaterialReference m_UnderWaterOverlayMaterial;
+
+	//alone mod
+	CMaterialReference m_HorizonFogMaterial;
+	CMaterialReference m_SaturationMaterial;
 	CMaterialReference m_ScreenFlipMaterial;
 	CMaterialReference m_lenseDirtMaterial;
 	CMaterialReference m_filterBinoculars;

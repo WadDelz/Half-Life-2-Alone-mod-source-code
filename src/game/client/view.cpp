@@ -325,7 +325,15 @@ void CViewRender::Init( void )
 	m_flLastFOV = default_fov.GetFloat();
 #endif
 
-	//waddelz - added this
+	//horizon fog material
+	m_HorizonFogMaterial.Init(materials->FindMaterial("nature/horizon_fog", TEXTURE_GROUP_VGUI));
+	m_HorizonFogMaterial->IncrementReferenceCount();
+
+	//saturation
+	m_SaturationMaterial.Init(materials->FindMaterial("effects/view/saturation", TEXTURE_GROUP_VGUI));
+	m_SaturationMaterial->IncrementReferenceCount();
+
+	//mirrored view
 	m_ScreenFlipMaterial.Init(materials->FindMaterial("engine/mirror_screen", TEXTURE_GROUP_VGUI));
 	m_ScreenFlipMaterial->IncrementReferenceCount();
 
@@ -872,6 +880,7 @@ void CViewRender::SetUpViews()
 
 //fov hack
 int g_CustomFovHack = -1;
+float g_ImageBrightnessMultiplyer = 1.0f;
 
 void CViewRender::WriteSaveGameScreenshotOfSize( const char *pFilename, int width, int height, bool bCreatePowerOf2Padded/*=false*/,
 												 bool bWriteVTF/*=false*/ )
@@ -962,8 +971,32 @@ void CViewRender::WriteSaveGameScreenshotOfSize( const char *pFilename, int widt
 		{
 			// Copy the image data over to the VTF
 			unsigned char *pDestBits = pVTFTexture->ImageData();
-			int nDstSize = nSrcWidth * nSrcHeight * 3;
-			V_memcpy( pDestBits, pSrcImage, nDstSize );
+			if (g_ImageBrightnessMultiplyer != 1.0f)
+			{
+				for (int i = 0; i < nSrcWidth * nSrcHeight; i++)
+				{
+					int idx = i * 3;
+					int r = (int)(pSrcImage[idx + 0] * g_ImageBrightnessMultiplyer);
+					int g = (int)(pSrcImage[idx + 1] * g_ImageBrightnessMultiplyer);
+					int b = (int)(pSrcImage[idx + 2] * g_ImageBrightnessMultiplyer);
+
+					if (r > 255)
+						r = 255;
+					if (g > 255)
+						g = 255;
+					if (b > 255)
+						b = 255;
+
+					pDestBits[idx + 0] = (unsigned char)r;
+					pDestBits[idx + 1] = (unsigned char)g;
+					pDestBits[idx + 2] = (unsigned char)b;
+				}
+			}
+			else
+			{
+				int nDstSize = nSrcWidth * nSrcHeight * 3;
+				V_memcpy(pDestBits, pSrcImage, nDstSize);
+			}
 
 			// Allocate output buffer
 			int iMaxVTFSize = 1024 + ( nSrcWidth * nSrcHeight * 3 );
@@ -1050,9 +1083,11 @@ void CViewRender::WriteSaveGameScreenshot( const char *pFilename )
 	WriteSaveGameScreenshotOfSize( pFilename, SAVEGAME_SCREENSHOT_WIDTH, SAVEGAME_SCREENSHOT_HEIGHT );
 }
 
-static ConVar amod_write_game_screenshot_current_config_fov("amod_write_game_screenshot_current_config_fov", "75");
+static ConVar amod_write_game_screenshot_current_config_fov("amod_write_game_screenshot_current_config_fov", "75", 0, "When writing a screenshot for the current map->theme using the amod_write_game_screenshot_current_config command, change this variable to change the fov of the image");
+static ConVar amod_write_game_screenshot_current_config_brightness_multiplyer_night("amod_write_game_screenshot_current_config_brightness_multiplyer_night", "1.225", 0, "When writing a screenshot for the current map->theme using the amod_write_game_screenshot_current_config command, change this variable to change the brightness multiplyer of the image", true, 0, true, 255);
+static ConVar amod_write_game_screenshot_current_config_brightness_multiplyer_day("amod_write_game_screenshot_current_config_brightness_multiplyer_day", "1", 0, "When writing a screenshot for the current map->theme using the amod_write_game_screenshot_current_config command, change this variable to change the brightness multiplyer of the image", true, 0, true, 255);
 
-CON_COMMAND(amod_write_game_screenshot, "")
+CON_COMMAND_F(amod_write_game_screenshot, "", FCVAR_HIDDEN)
 {
 	//get the mod folder name
 	const char* modfolder = args.Arg(1);
@@ -1103,6 +1138,7 @@ CON_COMMAND(amod_write_game_screenshot, "")
 
 	//set our fov hack to amod_write_game_screenshot_current_config_fov
 	g_CustomFovHack = amod_write_game_screenshot_current_config_fov.GetFloat();
+	g_ImageBrightnessMultiplyer = daytime ? amod_write_game_screenshot_current_config_brightness_multiplyer_day.GetFloat() : amod_write_game_screenshot_current_config_brightness_multiplyer_night.GetFloat();
 
 	char filenamebase[512];
 	Q_strncpy(filenamebase, CFmtStr("%s/chapter%d%s", dir, chapter, daytime ? "_day" : ""), sizeof(filenamebase));
@@ -1110,6 +1146,7 @@ CON_COMMAND(amod_write_game_screenshot, "")
 
 	//reset our hack
 	g_CustomFovHack = -1;
+	g_ImageBrightnessMultiplyer = 1.0f;
 
 	//write the keyvalues file
 	KeyValuesAD vmt(new KeyValues("UnlitGeneric"));
@@ -1214,7 +1251,7 @@ int FindChapterCfgForMap(char* outFolder, int outLen)
 }
 
 //writes a screenshot for the current config
-CON_COMMAND(amod_write_game_screenshot_current_config, "")
+CON_COMMAND(amod_write_game_screenshot_current_config, "Writes a game screenshot for the current map FOR the current active theme. This is used for creating your own themes. Modify the amod_write_game_screenshot_current_config_* convars if you want.")
 {
 	//go through each folder in the cfg directory and look for a .cfg that starts the same mapname
 	//as the current map name.

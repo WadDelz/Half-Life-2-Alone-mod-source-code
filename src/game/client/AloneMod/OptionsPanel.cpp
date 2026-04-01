@@ -1048,11 +1048,11 @@ private:
 	CheckButton* m_NoHudCheckButton;
 	CheckButton* m_MirroredCheckButton;
 	CheckButton* m_VignetteCheckButton;
+	CheckButton* m_SaturationCheckButton;
 	CheckButton* m_ViewBobCheckButton;
 	CheckButton* m_StandBobCheckButton;
 	CheckButton* m_JumpViewpunchCheckButton;
 	CheckButton* m_LandViewpunchCheckButton;
-	CheckButton* m_RollAngleCheckButton;
 	Slider* m_RollAngleSlider;
 
 	//---------- filters and effects -----------//
@@ -1288,7 +1288,7 @@ void COptionsPanel::Init()
 	OPTIONS_KEYVALUES_FIND(StandBobCheckButtonKv, "StandBobCB");
 	OPTIONS_KEYVALUES_FIND(JumpViewpunchCheckButtonKv, "JumpViewpunchCB");
 	OPTIONS_KEYVALUES_FIND(LandViewpunchCheckButtonKv, "LandViewpunchCB");
-	OPTIONS_KEYVALUES_FIND(RollAngleCheckButtonKv, "RollAngleCB");
+	OPTIONS_KEYVALUES_FIND(SaturationCheckButtonKv, "SaturationCB");
 	OPTIONS_KEYVALUES_FIND(RollAngleSliderKv, "RollAngleSlider");
 	OPTIONS_KEYVALUES_FIND(RollAngleLabelKv, "RollAngleLabel");
 
@@ -1414,6 +1414,12 @@ void COptionsPanel::Init()
 	m_VignetteCheckButton->SetSelected(amod_vignette.GetInt());
 	OPTIONS_ELEMENT_ADD_TOOLTIP(m_VignetteCheckButton, VignetteCheckButtonKv);
 
+	//saturation check button
+	m_SaturationCheckButton = new CheckButton(this, "SaturationAngleSlider", SaturationCheckButtonKv->GetString("Text", ""));
+	m_SaturationCheckButton->SetBounds(SaturationCheckButtonKv->GetInt("XPos"), SaturationCheckButtonKv->GetInt("YPos"), SaturationCheckButtonKv->GetInt("Wide"), SaturationCheckButtonKv->GetInt("Tall"));
+	m_SaturationCheckButton->SetSelected(amod_saturation.GetBool());
+	OPTIONS_ELEMENT_ADD_TOOLTIP(m_SaturationCheckButton, SaturationCheckButtonKv);
+
 	//view bobbing
 	ConVarRef amod_viewbob_enabled("amod_viewbob_enabled");
 	m_ViewBobCheckButton = new CheckButton(this, "ViewBobCheckButton", ViewBobCheckButtonKv->GetString("Text", ""));
@@ -1441,13 +1447,6 @@ void COptionsPanel::Init()
 	m_LandViewpunchCheckButton->SetBounds(LandViewpunchCheckButtonKv->GetInt("XPos"), LandViewpunchCheckButtonKv->GetInt("YPos"), LandViewpunchCheckButtonKv->GetInt("Wide"), LandViewpunchCheckButtonKv->GetInt("Tall"));
 	m_LandViewpunchCheckButton->SetSelected(amod_land_punch_enable.GetInt());
 	OPTIONS_ELEMENT_ADD_TOOLTIP(m_LandViewpunchCheckButton, LandViewpunchCheckButtonKv);
-
-	//roll angle check button
-	ConVarRef sv_rollangle("sv_rollangle");
-	m_RollAngleCheckButton = new CheckButton(this, "RollAngleSlider", RollAngleCheckButtonKv->GetString("Text", ""));
-	m_RollAngleCheckButton->SetBounds(RollAngleCheckButtonKv->GetInt("XPos"), RollAngleCheckButtonKv->GetInt("YPos"), RollAngleCheckButtonKv->GetInt("Wide"), RollAngleCheckButtonKv->GetInt("Tall"));
-	m_RollAngleCheckButton->SetSelected(sv_rollangle.GetInt());
-	OPTIONS_ELEMENT_ADD_TOOLTIP(m_RollAngleCheckButton, RollAngleCheckButtonKv);
 
 	//roll angle slider
 	m_RollAngleSlider = new Slider(this, "RollAngleSlider");
@@ -1738,8 +1737,8 @@ void COptionsPanel::OnTick()
 	//if initalized then enable some of the elements based on check buttons
 	if (m_bInit)
 	{
-		m_RollAngleSlider->SetEnabled(m_RollAngleCheckButton->IsSelected());
 		m_NoSoundscapesCheckButton->SetEnabled(!g_NeedSoundscapeEnable);
+		m_SaturationCheckButton->SetEnabled(engine->GetDXSupportLevel() >= 90);
 	}
 }
 
@@ -1781,11 +1780,12 @@ void COptionsPanel::OnCommand(const char* pcCommand)
 			{"hidehud",									m_NoHudCheckButton->IsSelected() ? 8 : 0,										nullptr},
 			{"amod_mirrored",							m_MirroredCheckButton->IsSelected(),											nullptr},
 			{"amod_vignette",							m_VignetteCheckButton->IsSelected(),											nullptr},
+			{"amod_saturation",							m_SaturationCheckButton->IsSelected(),											nullptr},
 			{"amod_viewbob_enabled",					m_ViewBobCheckButton->IsSelected(),												nullptr},
 			{"amod_standbob_enabled",					m_StandBobCheckButton->IsSelected(),											nullptr},
 			{"amod_jump_punch_enable",					m_JumpViewpunchCheckButton->IsSelected(),										nullptr},
 			{"amod_land_punch_enable",					m_LandViewpunchCheckButton->IsSelected(),										nullptr},
-			{"sv_rollangle",							m_RollAngleCheckButton->IsSelected() ? m_RollAngleSlider->GetValue() : 0,		nullptr},
+			{"sv_rollangle",							m_RollAngleSlider->GetValue(),													nullptr},
 
 			//effects and filter
 			{"amod_filter_brightness_on",				m_FilterOnBrightnessSlider->GetValue(),											nullptr},

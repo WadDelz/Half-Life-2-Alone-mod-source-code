@@ -1,0 +1,4 @@
+..\..\..\game\hl2\shaders\fxc\vertexlit_and_unlit_generic_bump_ps30.vcs
+..\..\..\game\hl2\shaders\fxc\vertexlit_and_unlit_generic_bump_vs30.vcs
+..\..\..\game\hl2\shaders\fxc\vertexlit_and_unlit_generic_ps30.vcs
+..\..\..\game\hl2\shaders\fxc\vertexlit_and_unlit_generic_vs30.vcs

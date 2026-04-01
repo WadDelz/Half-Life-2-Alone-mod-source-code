@@ -347,7 +347,7 @@ void CMapPropertiesPanelSkyboxFiltersPage::InitSkyboxAndFilter(MapTimeInfo_t& in
 	m_bNightTimeMode = IsNightPage;
 
 	{
-		const char* skybox = IsNightPage ? StringFromMapTimeStringTableIndex(info.NightInfo.DefaultNightSky) : StringFromMapTimeStringTableIndex(info.DayInfo.DefaultDaySky);
+		const char* skybox = IsNightPage ? StringFromMapTimeStringTableIndex(info.NightInfo.Skybox) : StringFromMapTimeStringTableIndex(info.DayInfo.Skybox);
 
 		//get the image
 		char image[512];
@@ -492,9 +492,9 @@ void CMapPropertiesPanelSkyboxFiltersPage::GetSkyboxFilterInfo(MapTimeInfo_t& in
 	{
 		//set the value
 		if (m_bNightTimeMode)
-			info.NightInfo.DefaultNightSky = StringToMapTimeStringTableIndex(m_SkyboxNames->GetActiveItemUserData()->GetName());
+			info.NightInfo.Skybox = StringToMapTimeStringTableIndex(m_SkyboxNames->GetActiveItemUserData()->GetName());
 		else
-			info.DayInfo.DefaultDaySky = StringToMapTimeStringTableIndex(m_SkyboxNames->GetActiveItemUserData()->GetName());
+			info.DayInfo.Skybox = StringToMapTimeStringTableIndex(m_SkyboxNames->GetActiveItemUserData()->GetName());
 
 	} while (false);
 

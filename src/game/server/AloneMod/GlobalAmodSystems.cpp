@@ -230,6 +230,31 @@ void SetFogForTime(MapTimeInfo_t& info)
 }
 
 //--------------------------------------------------------------------------------------------
+// Purpose: Sets the horizon for the day/night stuff
+//--------------------------------------------------------------------------------------------
+void SetHorizonForTime(MapTimeInfo_t& info)
+{
+	bool disabled = !info.DayInfo.HorizonEnabled || info.DayInfo.HorizonInfo.Count() <= 0;
+	if (!IsDaytimeEnabled())
+		disabled = !info.NightInfo.HorizonEnabled || info.NightInfo.HorizonInfo.Count() <= 0;
+
+	//is fog override disabled?
+	if (disabled)
+	{
+		clientengine->ClientCmd("r_horizonfog 0");
+		return;
+	}
+
+	CUtlVector<MapTimeInfo_t::FogInfo_t>& finfo = IsDaytimeEnabled() ? info.DayInfo.HorizonInfo : info.NightInfo.HorizonInfo;
+
+	for (int i = 0; i < finfo.Count(); i++)
+	{
+		//execute the fog vars
+		clientengine->ClientCmd_Unrestricted(CFmtStr("%s %s", StringFromMapTimeStringTableIndex(finfo[i].convar), StringFromMapTimeStringTableIndex(finfo[i].value)));
+	}
+}
+
+//--------------------------------------------------------------------------------------------
 // Purpose: Sets the env_sun for the daytime stuff
 //--------------------------------------------------------------------------------------------
 void SetSunForDaytime(MapTimeInfo_t& info)
@@ -274,6 +299,9 @@ void AmodSunChangeCallback(IConVar* var, const char*, float)
 //static ConVar amod_ep2_bg_brush_color_day("amod_ep2_bg_brush_color_day", "255 255 255", 0, "The color the _bg_brush (skybox trees) will be for the episodes if amod_day is enabled.");
 //static ConVar amod_ep2_bg_brush_color_night("amod_ep2_bg_brush_color_night", "41 41 41", 0, "The color the _bg_brush (skybox trees) will be for the episodes if amod_day is not enabled.");
 
+//should we call the music transition commands
+static bool s_ShouldTransitionSongs = true;
+
 //alone mod auto game system for epic filter and day/night system
 class CAmodAutoGameSystem : public CAutoGameSystem
 {
@@ -304,17 +332,35 @@ public:
 		clientengine->ClientCmd_Unrestricted("fog_endskybox -1");
 		clientengine->ClientCmd_Unrestricted("fog_maxdensity -1");
 		clientengine->ClientCmd_Unrestricted("fog_maxdensityskybox -1");
-
 		clientengine->ClientCmd_Unrestricted("fog_blend -1");
 		clientengine->ClientCmd_Unrestricted("fog_blendangle -1");
 		clientengine->ClientCmd_Unrestricted("fog_blendcolor -1 -1 -1");
-
 		clientengine->ClientCmd_Unrestricted("fog_blendskybox -1");
 		clientengine->ClientCmd_Unrestricted("fog_blendangleskybox -1");
 		clientengine->ClientCmd_Unrestricted("fog_blendcolorskybox -1 -1 -1");
-
 		clientengine->ClientCmd_Unrestricted("r_pixelfog 1");
 		clientengine->ClientCmd_Unrestricted("r_farz -1");
+
+		//reset the horizon variables
+		clientengine->ClientCmd_Unrestricted("r_horizonfog 0");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_no3dskyclip 1");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_top_r 0.5");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_top_g 0.7");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_top_b 1.0");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_mid_r 1.0");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_mid_g 0.5");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_mid_b 0.2");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_bot_r 0.1");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_bot_g 0.1");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_bot_b 0.05");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_pitch 0");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_yaw 0");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_offset_x 0");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_offset_y 0");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_offset_z 0");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_height 1.0");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_width 360");
+		clientengine->ClientCmd_Unrestricted("r_horizonfog_scale 0.5");
 
 		//get the time info
 		MapTimeInfo_t& info = GetCurrentMapTimeInfo();
@@ -337,13 +383,13 @@ public:
 		const char* skyname = "";
 		if (daytime)
 		{
-			skyname = StringFromMapTimeStringTableIndex(info.DayInfo.DefaultDaySky);
+			skyname = StringFromMapTimeStringTableIndex(info.DayInfo.Skybox);
 			if (amod_day_sky.GetString()[0])
 				skyname = amod_day_sky.GetString();
 		}
 		else
 		{
-			skyname = StringFromMapTimeStringTableIndex(info.NightInfo.DefaultNightSky);
+			skyname = StringFromMapTimeStringTableIndex(info.NightInfo.Skybox);
 			if (amod_night_sky.GetString()[0])
 				skyname = amod_night_sky.GetString();
 		}
@@ -365,8 +411,9 @@ public:
 			bDidFilterOn = false;
 		}
 
-		//set the fog
+		//set the fog + horizon
 		SetFogForTime(info);
+		SetHorizonForTime(info);
 	}
 
 	void LevelInitPostEntity()
@@ -413,11 +460,14 @@ public:
 		else
 			cc->AcceptInput("Disable", nullptr, nullptr, variant_t{}, 0);
 
-		//transition the song panel
-		if (gpGlobals->eLoadType == MapLoad_Transition)
-			clientengine->ClientCmd_Unrestricted("amod_songpanel_changelevel");
-		else
-			clientengine->ClientCmd_Unrestricted("amod_songpanel_newlevel");
+		if (s_ShouldTransitionSongs)
+		{
+			//transition the song panel
+			if (gpGlobals->eLoadType == MapLoad_Transition)
+				clientengine->ClientCmd_Unrestricted("amod_songpanel_changelevel");
+			else
+				clientengine->ClientCmd_Unrestricted("amod_songpanel_newlevel");
+		}
 
 		//set the sun for the daytime info
 		SetSunForDaytime(info);
@@ -507,8 +557,10 @@ static CAmodAutoGameSystem g_AmodAutoGameSystem;
 //resets the time system
 CON_COMMAND_F(_amod_day_do, "", FCVAR_HIDDEN)
 {
+	s_ShouldTransitionSongs = false;
 	g_AmodAutoGameSystem.LevelInitPreEntity();
 	g_AmodAutoGameSystem.LevelInitPostEntity();
+	s_ShouldTransitionSongs = true;
 }
 
 

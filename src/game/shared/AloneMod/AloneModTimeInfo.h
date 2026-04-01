@@ -51,8 +51,8 @@ struct MapTimeInfo_t
 	};
 #endif
 
-	//night info
-	struct NightInfo_t
+	//base time info
+	struct BaseTimeInfo_t
 	{
 		//fog info stuff
 		bool FogEnabled = false;
@@ -62,8 +62,6 @@ struct MapTimeInfo_t
 		//fog cube triggers
 		CUtlVector<FogCubeTrigger_t> FogCubeTriggers;
 #endif
-
-		UtlSymId_t DefaultNightSky;		//the default night sky name
 
 		//optional filter name + value
 		UtlSymId_t FilterName;
@@ -76,10 +74,23 @@ struct MapTimeInfo_t
 		bool BloomEnabled;
 		int BloomScale;
 		float BloomScalarFactor;
+
+		//skybox
+		UtlSymId_t Skybox;
+
+		//horizon info. Just use the FogInfo_t struct cause it uses the same convar/value structure the
+		//horizon convars need + i can use the AddOrUpdateFogInfoInArray function.
+		bool HorizonEnabled = false;
+		CUtlVector<FogInfo_t> HorizonInfo;
+	};
+
+	//night info
+	struct NightInfo_t : public BaseTimeInfo_t
+	{
 	};
 
 	//day info
-	struct DayInfo_t
+	struct DayInfo_t : public BaseTimeInfo_t
 	{
 		//sun info
 		struct SunInfo_t
@@ -88,32 +99,8 @@ struct MapTimeInfo_t
 			UtlSymId_t key;
 			UtlSymId_t value;
 		};
-		UtlSymId_t DefaultDaySky;			//default day sky name
-
-		//fog info stuff
-		bool FogEnabled = false;
-		CUtlVector<FogInfo_t> FogInfo;
-
-#if FOG_CUBE_TRIGGER_TEST
-		//fog cube triggers
-		CUtlVector<FogCubeTrigger_t> FogCubeTriggers;
-#endif
-
-		//the sun info
 		bool SunInfoEnabled = false;
 		CUtlVector<SunInfo_t> SunInfo;
-
-		//optional filter name + value
-		UtlSymId_t FilterName;
-		float FilterIntensity;
-
-		//optional clouds color
-		UtlSymId_t CloudsColor;
-
-		//bloom
-		bool BloomEnabled;
-		int BloomScale;
-		float BloomScalarFactor;
 	};
 
 	char mapname[128];		//mapname (e.g d2_coast_01_d). do NOT keep the / of a map name (like bonus_maps/d1_trainstation_01_snowey).
@@ -137,7 +124,7 @@ CUtlVector<MapTimeInfoBase_t>& GetDayNightInfo();
 
 //is daytime enabled or not
 bool IsDaytimeEnabled();
-MapTimeInfo_t& GetMapTimeInfo(const char* mapname);
+MapTimeInfo_t& GetMapTimeInfo(const char* mapname, bool* found = nullptr);
 
 //returns the current day night info
 extern MapTimeInfo_t* g_CurrentDayNightInfo;
