@@ -156,7 +156,7 @@ static char previousefilemod[512];
 //-----------------------------------------------------------------------
 // Purpose: This function returns the day/night 'allowed' states for the map selector panel.
 //-----------------------------------------------------------------------
-bool GetMapDayEnabledStateFromTimeinfoFromFile(const char* mapname, bool& allowDaytime, bool& allowNighttime, const char* modname)
+bool GetMapDayEnabledStateFromTimeinfoFromFile(const char* mapname, bool& allowDaytime, bool& allowNighttime, const char* modname, bool& shouldflip)
 {
 	//check the current mod is amod_timeinfo_load_mod.
 	extern ConVar amod_timeinfo_load_mod;
@@ -165,6 +165,7 @@ bool GetMapDayEnabledStateFromTimeinfoFromFile(const char* mapname, bool& allowD
 		MapTimeInfo_t& info = GetMapTimeInfo(mapname);
 		allowDaytime = info.AllowDaytime;
 		allowNighttime = info.AllowNightTime;
+		shouldflip = info.FlipTimes;
 		return true;
 	}
 
@@ -176,12 +177,15 @@ bool GetMapDayEnabledStateFromTimeinfoFromFile(const char* mapname, bool& allowD
 		{
 			allowDaytime = find->GetBool("AllowDayTime");
 			allowNighttime = find->GetBool("AllowNightTime");
+			shouldflip = find->GetBool("FlipTimes");
 			return true;
 		}
 	}
 
 	//delete previousfile
-	previousfile->deleteThis();
+	if (previousfile)
+		previousfile->deleteThis();
+
 	previousfile = nullptr;
 	previousefilemod[0] = '\0';
 
@@ -217,8 +221,12 @@ bool GetMapDayEnabledStateFromTimeinfoFromFile(const char* mapname, bool& allowD
 			{
 				allowDaytime = find->GetBool("AllowDayTime");
 				allowNighttime = find->GetBool("AllowNightTime");
+				shouldflip = find->GetBool("FlipTimes");
 				Q_strncpy(previousefilemod, modname, sizeof(previousefilemod));
-				break;
+
+				//close the file
+				firstfile = filesystem->FindNext(handle);
+				return true;
 			}
 		}
 
@@ -230,7 +238,7 @@ bool GetMapDayEnabledStateFromTimeinfoFromFile(const char* mapname, bool& allowD
 	}
 
 	filesystem->FindClose(handle);
-	return true;
+	return false;
 }
 
 //-----------------------------------------------------------------------
@@ -610,25 +618,21 @@ void CNewGamePanel::SelectPage(int page)
 
 
 
-		//check if m_ThemesComboBox->GetActiveItemUserData()->GetName() is not amod_timeinfo_load_mod.GetString()
-		bool succeed = true;
-		extern ConVar amod_timeinfo_load_mod;
 
-		if (Q_stricmp(m_ThemesComboBox->GetActiveItemUserData()->GetName(), amod_timeinfo_load_mod.GetString()))
-		{
-			succeed = GetMapFromConfig(CFmtStr("cfg/%s/chapter%d.cfg", m_CurrentSelectedGameInfo->prefix, realindex), output, sizeof(output));
-		}
-
-		if (succeed)
+		//get the data
+		if (GetMapFromConfig(CFmtStr("cfg/%s/chapter%d.cfg", m_CurrentSelectedGameInfo->prefix, realindex), output, sizeof(output)))
 		{
 			//get the time enabled state from the file
 			bool allowDaytime = true;
 			bool allowNighttime = true;
-			if (GetMapDayEnabledStateFromTimeinfoFromFile(output, allowDaytime, allowNighttime, m_ThemesComboBox->GetActiveItemUserData()->GetName()))
+			bool shouldflip = true;
+			if (GetMapDayEnabledStateFromTimeinfoFromFile(output, allowDaytime, allowNighttime, m_ThemesComboBox->GetActiveItemUserData()->GetName(), shouldflip))
 			{
 				//check info
-				if (!allowDaytime || !allowNighttime && !(allowDaytime && allowNighttime))
+				if (allowDaytime ^ allowNighttime)
 					sDayTime = allowDaytime ? "_day" : "";
+				else if (shouldflip)
+					sDayTime = daytime ? "" : "_day";
 			}
 		}
 

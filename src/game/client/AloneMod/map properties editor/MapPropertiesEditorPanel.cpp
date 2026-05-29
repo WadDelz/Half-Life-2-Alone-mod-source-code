@@ -272,17 +272,22 @@ void CMapPropertiesPanel::OnThink()
 	if (m_bClosed)
 		goto end;
 
-	//call each pages Update function
-	m_FogPage->Update();
+	//Dont update the pages if the m_FogTriggersPage is false. This will get run inside the fog triggers code
+#if FOG_CUBE_TRIGGER_TEST
+	if (GetActivePage() != m_FogTriggersPage)
+	{
+		//update the pages
+		m_FogPage->Update();
+		m_SkyboxFilterPage->Update();
+		m_HorizonPage->Update();
+	}
+#endif
 
 #if FOG_CUBE_TRIGGER_TEST
 	m_FogTriggersPage->Update();
 #endif
 
-	m_SkyboxFilterPage->Update();
-	m_HorizonPage->Update();
-
-	//only update the sun page if not using the daytime panel
+	//only update the sun page if using the daytime panel
 	if (!m_bNightTimeMode)
 		m_SunPage->Update();
 
@@ -394,11 +399,6 @@ void CMapPropertiesPanel::Init(MapTimeInfo_t& info, bool IsNightPage)
 	//create and set our pages
 	AddPage(m_FogPage = new CMapPropertiesPanelFogPage(this, "FogPage"), "#MapProperties_FogPage_Title");
 	m_FogPage->InitFogInfo(info, IsNightPage);
-	
-#if FOG_CUBE_TRIGGER_TEST
-	AddPage(m_FogTriggersPage = new CMapPropertiesPanelFogTriggersPage(this, "FogTriggersPage"), "#MapProperties_FogTriggersPage_Title");
-	m_FogTriggersPage->InitFogTriggerInfo(info, IsNightPage);
-#endif
 
 	AddPage(m_SkyboxFilterPage = new CMapPropertiesPanelSkyboxFiltersPage(this, "SkyboxFilterPage"), "#MapProperties_SkyboxPage_Title");
 	m_SkyboxFilterPage->InitSkyboxAndFilter(info, IsNightPage);
@@ -414,8 +414,13 @@ void CMapPropertiesPanel::Init(MapTimeInfo_t& info, bool IsNightPage)
 	AddPage(m_HorizonPage = new CMapPropertiesPanelHorizonFogPage(this, "HorizonPage"), "#MapProperties_HorizonPage_Title");
 	m_HorizonPage->InitHorizonInfo(info, IsNightPage);
 
-	//HACK: reset the undo steps because setting the values (with like SetSelected or SetActiveItem can
-	//		add an undo step)
+#if FOG_CUBE_TRIGGER_TEST
+	AddPage(m_FogTriggersPage = new CMapPropertiesPanelFogTriggersPage(this, "FogTriggersPage"), "#MapProperties_FogTriggersPage_Title");
+	m_FogTriggersPage->InitFogTriggerInfo(info, IsNightPage);
+#endif
+
+	//HACK: reset the undo steps because setting the values (with like SetSelected or SetActiveItem) can
+	//		add an undo step
 	PostMessage(this, new KeyValues("ResetUndoSteps"), 0.05f);
 
 	//set our active page
@@ -430,14 +435,34 @@ void CMapPropertiesPanel::GetData(MapTimeInfo_t& info)
 {
 	m_FogPage->GetFogInfo(info);
 
-#if FOG_CUBE_TRIGGER_TEST
-	m_FogTriggersPage->GetFogTriggerInfo(info);
-#endif
-
 	m_SkyboxFilterPage->GetSkyboxFilterInfo(info);
 	m_HorizonPage->GetHorizonInfo(info);
 
 	//dont get the sun data if this is the night page
 	if (!m_bNightTimeMode)
 		m_SunPage->GetSunInfo(info);
+
+#if FOG_CUBE_TRIGGER_TEST
+	m_FogTriggersPage->GetFogTriggerInfo(info);
+#endif
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Returns if the map properties fog triggers page is open or not
+//----------------------------------------------------------------------------------------------------
+const bool IsMapPropertiesFogTriggersPanelOpen()
+{
+	if (g_MapPropertiesPanel)
+		return g_MapPropertiesPanel->GetActivePage() == g_MapPropertiesPanel->m_FogTriggersPage;
+
+	return false;
+}
+
+//----------------------------------------------------------------------------------------------------
+// Purpose: Updates the fog triggers page after saving
+//----------------------------------------------------------------------------------------------------
+CON_COMMAND_F(amod_update_triggers_page, "", FCVAR_HIDDEN)
+{
+	if (IsMapPropertiesFogTriggersPanelOpen())
+		g_MapPropertiesPanel->UpdateTriggersPage();
 }

@@ -39,6 +39,8 @@ private:
 
 	//skybox
 private:
+	friend class CMapPropertiesPanel;
+
 	//skybox background brush
 	ImagePanel* m_SkyboxBackground;
 

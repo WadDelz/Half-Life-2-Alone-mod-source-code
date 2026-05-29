@@ -5,6 +5,7 @@
 #include <vgui_controls/ScrollBar.h>
 
 #define ENABLE_MAP_PREFIX "EnableTimeForMap"
+#define FLIP_MAP_PREFIX "SetShouldFlipTimeForMap"
 #define MODIFY_MAP_PREFIX "OpenModifyMapWindow"
 #define COPY_MAP_STATE_PREFIX "CopyMapState"
 #define PASTE_MAP_STATE_PREFIX "PasteMapState"

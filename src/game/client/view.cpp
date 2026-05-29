@@ -289,8 +289,6 @@ static ConCommand centerview( "centerview", StartPitchDrift );
 
 extern ConVar default_fov;
 
-
-
 //-----------------------------------------------------------------------------
 // Purpose: Initializes all view systems
 //-----------------------------------------------------------------------------

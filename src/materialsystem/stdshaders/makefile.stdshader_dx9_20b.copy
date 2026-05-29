@@ -25,9 +25,16 @@ vertexlit_and_unlit_generic_bump_vs20.fxc-----vertexlit_and_unlit_generic_bump_v
 vertexlit_and_unlit_generic_ps2x.fxc-----vertexlit_and_unlit_generic_ps20
 vertexlit_and_unlit_generic_ps2x.fxc-----vertexlit_and_unlit_generic_ps20b
 vertexlit_and_unlit_generic_vs20.fxc-----vertexlit_and_unlit_generic_vs20
+skin_ps20b.fxc-----skin_ps20b
+skin_vs20.fxc-----skin_vs20
 sprite_ps2x.fxc-----sprite_ps20
 sprite_ps2x.fxc-----sprite_ps20b
 sprite_vs20.fxc-----sprite_vs20
 cable_ps2x.fxc-----cable_ps20
 cable_ps2x.fxc-----cable_ps20b
 cable_vs20.fxc-----cable_vs20
+refract_ps2x.fxc-----refract_ps20
+refract_ps2x.fxc-----refract_ps20b
+Refract_vs20.fxc-----Refract_vs20
+cloud_ps20.fxc-----cloud_ps20
+cloud_vs20.fxc-----cloud_vs20

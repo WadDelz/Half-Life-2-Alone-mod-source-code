@@ -27,7 +27,6 @@ private:
 
 
 //max fog variables
-#define MAX_FOG_VARIABLES 18
 #define LERP_SLIDER_DIVISOR 100
 
 #define SIZE_EDITOR_MODE_NONE 0
@@ -52,11 +51,13 @@ public:
 	~CMapPropertiesPanelFogTriggersPage();
 
 	//panel funcs
+	virtual void Update(bool ForceUpdate);
 	virtual void Update();
 	virtual void Paint();
 	virtual void PerformLayout();
 	virtual void OnCommand(const char* pszCommand);
 	virtual void OnKeyCodePressed(KeyCode code);
+	virtual void OnPageShow();
 
 	//init funcs
 	virtual void InitFogTriggerInfo(MapTimeInfo_t& info, bool IsNightPage);
@@ -70,15 +71,21 @@ public:
 
 	void OnPageHide();
 
+	//teleports the player to an edge of a trigger
+	void TeleportToTrigger(int num);
+
 	//callbacks
 	void OnOverrideButtonEnabled();
 	void OnOverrideButtonDisabled();
 
+	//update funcs
+	void UpdateSizes();
 	void UpdateArrayValue();
 
 	//override OnCheckButtonChecked
 	void OnCheckButtonChecked(KeyValues* subkey);
 
+	MESSAGE_FUNC_PARAMS(OnTextChanged, "TextChanged", data);
 	MESSAGE_FUNC_PARAMS(OnSliderMoved, "SliderMoved", data);
 	MESSAGE_FUNC_PARAMS(OnColorSelected, "ColorSelected", data);
 	MESSAGE_FUNC_PARAMS(OnAddTrigger, "OnAddTrigger", data);
@@ -95,18 +102,29 @@ private:
 	Label* m_DataLabel;
 	CheckButton* m_ShouldOverrideButton;
 
+	//slider data
 	CMapPropertiesPanelSlider* m_DataSlider;
 
+	//filter combo box
+	class CMapPropertiesEditorComboBox* m_FilterBox;
+
+	//skybox combo box
+	class CMapPropertiesEditorComboBox* m_SkyboxBox;
+
+	//color data stuff
 	Button* m_DataButton;
 	Rect_t m_DataButtonRect;
 	Color m_DataButtonColor;
+	CheckButton* m_ShouldOverrideColorButton;	//this determines if the color for the fog should be overriden
 
 	//apply button
-	Button* m_ApplyButton;
+	//Button* m_ApplyButton;
 
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 	//fog lerp slider
 	Label* m_FogLerpSliderText;
 	CMapPropertiesPanelSlider* m_FogLerpSlider;
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 
 	//list for each var
 	ListPanel* m_VarList;
@@ -120,6 +138,8 @@ private:
 	Button* m_RemoveButton;
 
 	//set size button
+	TextEntry* m_MinsTextEntry, *m_MaxsTextEntry;
+
 	Button* m_SetSizeButton;
 
 	//for setting the size

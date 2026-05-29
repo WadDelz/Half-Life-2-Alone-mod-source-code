@@ -108,6 +108,13 @@ void CMapPropertiesPanelSkyboxFiltersPage::FormatImage(const char* input, char* 
 	}
 }
 
+//HACK
+static bool s_ShouldUpdateSkyboxAndFilter = false;
+void HACKShouldUpdateSkyboxAndFilter()
+{
+	s_ShouldUpdateSkyboxAndFilter = true;
+}
+
 //----------------------------------------------------------------------------------------------------
 // Purpose: Called on think
 //----------------------------------------------------------------------------------------------------
@@ -119,15 +126,11 @@ void CMapPropertiesPanelSkyboxFiltersPage::Update()
 		m_FilterIntensityText->SetText(CFmtStr("%.2f", (float)m_FilterIntensitySlider->GetValue() / m_FilterIntensitySlider->GetMax()));
 
 		//convars
-		static ConVar* intensity_day = cvar->FindVar("amod_epic_filter_day_intensity");
-		static ConVar* intensity_night = cvar->FindVar("amod_epic_filter_night_intensity");
+		static ConVar* intensity_var = cvar->FindVar("amod_trigger_filterintensity");
 
 		//set the convar value
 		float value = (float)m_FilterIntensitySlider->GetValue() / m_FilterIntensitySlider->GetMax();
-		if (m_bNightTimeMode)
-			intensity_night->SetValue(value);
-		else
-			intensity_day->SetValue(value);
+		intensity_var->SetValue(value);
 	}
 
 	//clouds color
@@ -158,6 +161,23 @@ void CMapPropertiesPanelSkyboxFiltersPage::Update()
 		//set enabled state
 		m_BloomScaleSlider->SetEnabled(m_EnableBloomCheckButton->IsSelected());
 		m_BloomScalarSlider->SetEnabled(m_EnableBloomCheckButton->IsSelected());
+	}
+
+	//skybox and filter if needed
+	if (s_ShouldUpdateSkyboxAndFilter)
+	{
+		//make the keyvalues
+		KeyValuesAD keyvalues("OnTextChanged");
+
+		//update the skybox names
+		keyvalues->SetPtr("Panel", m_SkyboxNames);
+		OnTextChanged(keyvalues);
+
+		//update the filter names
+		keyvalues->SetPtr("Panel", m_FilterComboBox);
+		OnTextChanged(keyvalues);
+
+		s_ShouldUpdateSkyboxAndFilter = false;
 	}
 
 	BaseClass::Update();
@@ -310,7 +330,7 @@ void CMapPropertiesPanelSkyboxFiltersPage::OnTextChanged(KeyValues* data)
 		}
 
 		//set amod_filter_filename
-		ConVarRef amod_filter_filename(m_bNightTimeMode ? "amod_epic_filter_night_filename" : "amod_epic_filter_day_filename");
+		ConVarRef amod_filter_filename("amod_trigger_filtername");
 		amod_filter_filename.SetValue(m_FilterComboBox->GetActiveItemUserData()->GetName());
 
 		//add a step

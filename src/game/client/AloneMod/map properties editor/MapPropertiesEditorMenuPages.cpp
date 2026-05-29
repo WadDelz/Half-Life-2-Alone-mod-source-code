@@ -203,6 +203,9 @@ void CMapPropertiesEditorPageBase::OnApplyPageSetting()
 
 		//tell server to read the info
 		engine->ClientCmd(CFmtStr("_amod_daytimeinfo_reset %d %d", file, map));
+
+		//reload server settings. This could have been the map that was changed.
+		engine->ClientCmd("_amod_day_do");
 	}
 
 	//clear then restore the panel to show the changes
@@ -298,6 +301,15 @@ void CMapPropertiesEditorPageBase::Populate(CUtlVector<MapTimeInfo_t>& base)
 		enabledCheckButton->AddActionSignalTarget(this);
 		enabledCheckButton->SetSelected(enabled);
 		ADD_TOOLTIP(enabledCheckButton, 100, "#MapProperties_CheckButton_AllowTime_Tooltip", true)
+			
+		//create the flip time check button
+		CheckButton* flipCheckButton = new CheckButton(divider, "flipCheckButton", "#MapProperties_CheckButton_FlipTime");
+		flipCheckButton->SetBounds(4, MAP_CONTAINER_HEIGHT - 115, 218, 24);
+		flipCheckButton->SetCommand(CFmtStr(FLIP_MAP_PREFIX "%d", i));
+		flipCheckButton->AddActionSignalTarget(this);
+		flipCheckButton->SetEnabled((base[i].AllowDaytime && base[i].AllowNightTime) || (!base[i].AllowDaytime && !base[i].AllowNightTime));
+		flipCheckButton->SetSelected(base[i].FlipTimes);
+		ADD_TOOLTIP(flipCheckButton, 100, "#MapProperties_CheckButton_FlipTime_Tooltip", true)
 
 		//create the copy map settings button
 		Button* copyButton = new Button(divider, "copyButton", "#MapProperties_Button_CopyState");
@@ -323,6 +335,7 @@ void CMapPropertiesEditorPageBase::Populate(CUtlVector<MapTimeInfo_t>& base)
 		//hack: when enabledCheckButton gets checked. We will need a way to toggle the modify button on/off.
 		//		To fix this i can use 'checkButton->GetNavUp()' in OnCommand
 		enabledCheckButton->SetNavUp(modifyButton);
+		enabledCheckButton->SetNavDown(flipCheckButton);
 
 		m_MapList.AddToTail(divider);
 	}
@@ -550,6 +563,39 @@ void CMapPropertiesEditorPageBase::OnCommand(KeyValues* data)
 
 		//get the button to disable/enable. this uses the hack i mentioned before.
 		checkbutton->GetNavUp()->SetEnabled(checkbutton->IsSelected());
+		checkbutton->GetNavDown()->SetEnabled(!info.AllowDaytime || !info.AllowNightTime);
+
+		//send the data to the server. The only time we do this is when we change something (i.e paste data from 1 panel to another).
+		{
+			KeyValuesAD temp(new KeyValues("temp_file"));
+			WriteTimeInfoToKeyvalues(info, temp);
+			temp->SaveToFile(filesystem, "__temptime.txt", "MOD", true, true);
+
+			//tell server to read the info
+			engine->ClientCmd(CFmtStr("_amod_daytimeinfo_reset %d %d", m_FileList->GetActiveItem(), index));
+
+			//reload server settings. This could have been the map that was changed.
+			engine->ClientCmd("_amod_day_do");
+		}
+	}
+
+
+	//check for ENABLE_MAP_PREFIX
+	else if (Q_strstr(cmd, FLIP_MAP_PREFIX))
+	{
+		//get the index
+		int index = Q_atoi(cmd + Q_strlen(FLIP_MAP_PREFIX));
+
+		//get the time info
+		CUtlVector<MapTimeInfoBase_t>& baseinfo = GetDayNightInfo();
+		if (index < 0 || index >= baseinfo[m_FileList->GetActiveItem()].base.Count())
+			return;
+
+		MapTimeInfo_t& info = baseinfo[m_FileList->GetActiveItem()].base[index];
+
+		//get the check button
+		CheckButton* checkbutton = (CheckButton*)data->GetPtr("panel");
+		info.FlipTimes = checkbutton->IsSelected();
 
 		//send the data to the server. The only time we do this is when we change something (i.e paste data from 1 panel to another).
 		{

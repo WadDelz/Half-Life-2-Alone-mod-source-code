@@ -1,8 +1,11 @@
 #include "cbase.h"
 #include "MapPropertiesEditorPanelFogTriggersPage.h"
+#include "MapPropertiesEditorMenuPanel.h"
 #include "debugoverlay_shared.h"
 
 #if FOG_CUBE_TRIGGER_TEST
+
+extern bool s_bUpdateTriggerValuesThisFrame;
 
 //-------------------------------------------------------------------------------------------------------
 // Purpose: Draws a debug box
@@ -174,42 +177,139 @@ CAddTriggerDialogPanel::~CAddTriggerDialogPanel()
 //fog trigger var struct
 struct FogTriggerData_t
 {
-	const char* convar;			//convar name
-	const char* text;			//text to display in the listpanel + the label
+	char convar[512];		//convar name
+	char text[128];			//text to display in the listpanel + the label
+	char tooltip[128];		//tooltip to display on the button/combo box
 
 	//type. Used for the slider/button
 	enum
 	{
+		TYPE_DIVIDER,
 		TYPE_SLIDER,
-		TYPE_COLORPICKER
+		TYPE_COLORPICKER,
+		TYPE_FILTER,
+		TYPE_SKYBOX
 	} type;
 
 	//diviser to divide this value by
 	float val_divisor;
 	int sval_min;
 	int sval_max;
+
 };
 
-static FogTriggerData_t FogDatas[MAX_FOG_VARIABLES] = {
-	{"fog_override",			"Override Fog",					FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
-	{"r_pixelfog",				"Enable Pixel Fog",				FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
-	{"fog_enable",				"Enable Fog",					FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
-	{"fog_enableskybox",		"Enable Skybox Fog",			FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
-	{"fog_color",				"Fog Color",					FogTriggerData_t::TYPE_COLORPICKER,		1.0f,			0,				0},
-	{"fog_colorskybox",			"Fog Skybox Color",				FogTriggerData_t::TYPE_COLORPICKER,		1.0f,			0,				0},
-	{"fog_start",				"Fog Start Pos",				FogTriggerData_t::TYPE_SLIDER,			1.0f,			-25000,			50000},
-	{"fog_end",					"Fog End Pos",					FogTriggerData_t::TYPE_SLIDER,			1.0f,			-10000,			150000},
-	{"fog_startskybox",			"Fog Skybox Start Pos",			FogTriggerData_t::TYPE_SLIDER,			1.0f,			-25000,			50000},
-	{"fog_endskybox",			"Fog Skybox End Pos",			FogTriggerData_t::TYPE_SLIDER,			1.0f,			-10000,			150000},
-	{"fog_maxdensity",			"Fog Density",					FogTriggerData_t::TYPE_SLIDER,			1000.0f,		-1,				1000},
-	{"fog_maxdensityskybox",	"Fog Skybox Density",			FogTriggerData_t::TYPE_SLIDER,			1000.0f,		-1,				1000},
-	{"fog_blend",				"Enable Fog Blending",			FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
-	{"fog_blendskybox",			"Enable Fog Skybox Blending",	FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
-	{"fog_blendangle",			"Fog Blending Angle",			FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
-	{"fog_blendangleskybox",	"Skybox Fog Blending Angle",	FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
-	{"fog_blendcolor",			"Fog Blend Color",				FogTriggerData_t::TYPE_COLORPICKER,		1.0f,			-1,				359},
-	{"fog_blendcolorskybox",	"Skybox Fog Blend Color",		FogTriggerData_t::TYPE_COLORPICKER,		1.0f,			-1,				359}
-};
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Returns the type of the fog trigger data based on the inputted string
+//-------------------------------------------------------------------------------------------------------
+int GetFogTriggerDataTypeFromString(const char* string)
+{
+	if (!Q_stricmp(string, "TYPE_DIVIDER"))
+	{
+		return FogTriggerData_t::TYPE_DIVIDER;
+	}
+	if (!Q_stricmp(string, "TYPE_SLIDER"))
+	{
+		return FogTriggerData_t::TYPE_SLIDER;
+	}
+	else if (!Q_stricmp(string, "TYPE_COLORPICKER"))
+	{
+		return FogTriggerData_t::TYPE_COLORPICKER;
+	}
+	else if (!Q_strnicmp(string, "TYPE_COMBO_BOX", Q_strlen("TYPE_COMBO_BOX")))
+	{
+		string += Q_strlen("TYPE_COMBO_BOX");
+		if (!Q_stricmp(string, ":SKYBOX"))
+		{
+			return FogTriggerData_t::TYPE_SKYBOX;
+		}
+		else if (!Q_stricmp(string, ":FILTERS"))
+		{
+			return FogTriggerData_t::TYPE_FILTER;
+		}
+	}
+
+	return FogTriggerData_t::TYPE_SLIDER;
+}
+
+
+//const int MAX_FOG_VARIABLES = 24;
+//
+//static FogTriggerData_t FogDatas[MAX_FOG_VARIABLES] = {
+//	{"fog_override",					"Override Fog",					FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
+//	{"r_pixelfog",						"Enable Pixel Fog",				FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
+//	{"fog_enable",						"Enable Fog",					FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
+//	{"fog_enableskybox",				"Enable Skybox Fog",			FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
+//	{"fog_color",						"Fog Color",					FogTriggerData_t::TYPE_COLORPICKER,		1.0f,			0,				0},
+//	{"fog_colorskybox",					"Fog Skybox Color",				FogTriggerData_t::TYPE_COLORPICKER,		1.0f,			0,				0},
+//	{"fog_start",						"Fog Start Pos",				FogTriggerData_t::TYPE_SLIDER,			1.0f,			-25000,			50000},
+//	{"fog_end",							"Fog End Pos",					FogTriggerData_t::TYPE_SLIDER,			1.0f,			-10000,			150000},
+//	{"fog_startskybox",					"Fog Skybox Start Pos",			FogTriggerData_t::TYPE_SLIDER,			1.0f,			-25000,			50000},
+//	{"fog_endskybox",					"Fog Skybox End Pos",			FogTriggerData_t::TYPE_SLIDER,			1.0f,			-10000,			150000},
+//	{"fog_maxdensity",					"Fog Density",					FogTriggerData_t::TYPE_SLIDER,			1000.0f,		-1,				1000},
+//	{"fog_maxdensityskybox",			"Fog Skybox Density",			FogTriggerData_t::TYPE_SLIDER,			1000.0f,		-1,				1000},
+//	{"fog_blend",						"Enable Fog Blending",			FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
+//	{"fog_blendskybox",					"Enable Fog Skybox Blending",	FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				1},
+//	{"fog_blendangle",					"Fog Blending Angle",			FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				359},
+//	{"fog_blendangleskybox",			"Skybox Fog Blending Angle",	FogTriggerData_t::TYPE_SLIDER,			1.0f,			-1,				359},
+//	{"fog_blendcolor",					"Fog Blend Color",				FogTriggerData_t::TYPE_COLORPICKER,		1.0f,			-1,				-1},
+//	{"fog_blendcolorskybox",			"Skybox Fog Blend Color",		FogTriggerData_t::TYPE_COLORPICKER,		1.0f,			-1,				-1},
+//	{"mat_force_bloom",					"Enable bloom",					FogTriggerData_t::TYPE_SLIDER,			1.0f,			0,				1},
+//	{"mat_bloomscale",					"Bloom Scale",					FogTriggerData_t::TYPE_SLIDER,			1.0f,			0,				500},
+//	{"mat_bloom_scalefactor_scalar",	"Bloom scale factor",			FogTriggerData_t::TYPE_SLIDER,			100.0f,			0,				10000},
+//	{"amod_trigger_filterintensity",	"Filter Intensity",				FogTriggerData_t::TYPE_SLIDER,			100.0f,			1,				100},
+//	{"amod_trigger_filtername",			"Filter Name",					FogTriggerData_t::TYPE_FILTER,			1.0f,			-1,				-1},
+//	{"sv_skyname",						"Skybox name",					FogTriggerData_t::TYPE_SKYBOX,			1.0f,			-1,				-1}
+//};
+
+//fog triggers data
+static CUtlVector<FogTriggerData_t> FogDatas;
+static int MAX_FOG_VARIABLES = 0;				//legacy support
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Loads the fog datas for the fog panel
+//-------------------------------------------------------------------------------------------------------
+static bool ReloadFogData(KeyValues* data)
+{
+	//check the data
+	if (!data)
+		return false;
+
+	//remove the fog datas if not already deleted
+	FogDatas.RemoveAll();
+	MAX_FOG_VARIABLES = 0;
+
+	//load all the data
+	FOR_EACH_TRUE_SUBKEY(data, fogdata)
+	{
+		//make the data ptr
+		FogTriggerData_t& dataptr = FogDatas[FogDatas.AddToTail()];
+		memset(&dataptr, 0, sizeof(dataptr));
+
+		//load the type
+		dataptr.type = decltype(dataptr.type)(GetFogTriggerDataTypeFromString(fogdata->GetString("Type")));
+
+		//load the convar
+		Q_strncpy(dataptr.convar, fogdata->GetName(), sizeof(dataptr.convar));
+		if (!cvar->FindVar(dataptr.convar) && dataptr.type != FogTriggerData_t::TYPE_DIVIDER)
+		{
+			FogDatas.Remove(FogDatas.Count() - 1);
+			continue;
+		}
+
+		//load the text and tooltip
+		Q_strncpy(dataptr.text, fogdata->GetString("DisplayText"), sizeof(dataptr.text));
+		Q_strncpy(dataptr.tooltip, fogdata->GetString("DisplayTooltip"), sizeof(dataptr.tooltip));
+
+		//min, max and divisor
+		dataptr.sval_min = fogdata->GetInt("Min", 0);
+		dataptr.sval_max = fogdata->GetInt("Max", 1);
+		dataptr.val_divisor = fogdata->GetFloat("Divisor", 1.0f);
+	}
+
+	//set and return
+	MAX_FOG_VARIABLES = FogDatas.Count();
+	return MAX_FOG_VARIABLES > 0;
+}
 
 //-------------------------------------------------------------------------------------------------------
 // Purpose: Finds the convar and index from the input convar. -1 on failure
@@ -228,7 +328,9 @@ static int FindFogConvar(const char* convar)
 
 
 
-#define SIZE_EDITOR_SNAP_SIZE 32
+ConVar amod_mappropertieseditor_triggers_snapsize("amod_mappropertieseditor_triggers_snapsize", "8", 0, "snapsize for the triggers for the triggers page for the time properties panel");
+
+#define SIZE_EDITOR_SNAP_SIZE amod_mappropertieseditor_triggers_snapsize.GetFloat()
 
 //-------------------------------------------------------------------------------------------------------
 // Purpose: helper func to snap a vector to a pos
@@ -266,17 +368,43 @@ static Vector GetForwardPosForSizeEditor()
 	return vecAbsEnd;
 }
 
+extern ConVar amod_fog_cubeinfo_debug;
+
 //-------------------------------------------------------------------------------------------------------
 // Purpose: Constructor for the map properties fog ptriggers age
 //-------------------------------------------------------------------------------------------------------
 CMapPropertiesPanelFogTriggersPage::CMapPropertiesPanelFogTriggersPage(Panel* parent, const char* name) : BaseClass(parent, name, "resource/panels/MapPropertiesEditor/FogTriggersPage.res")
 {
+	//check for our keyvalues file
+	if (!m_KeyValuesFile)
+	{
+		//abort
+		ConWarning("WARNING! WARNING! WARNING!\nGot NO fog data for the map properties editor fog triggers page!! Add data to the ''Data'' keyvalues of the fog triggers .res file!!\n");
+		m_KeyValuesFile->deleteThis();
+		m_KeyValuesFile = nullptr;
+		return;
+	}
+
+	//load the fog data
+	if (!ReloadFogData(m_KeyValuesFile->FindKey("FogData")))
+	{
+		//abort
+		ConWarning("WARNING! WARNING! WARNING!\nGot NO fog data for the map properties editor fog triggers page!! Add data to the ''Data'' keyvalues of the fog triggers .res file!!\n");
+		m_KeyValuesFile->deleteThis();
+		m_KeyValuesFile = nullptr;
+		return;
+	}
+
+	//set our debug info
+	amod_fog_cubeinfo_debug.SetValue(true);
+
+	//sizes
 	m_Sizes[0] = vec3_origin;
 	m_Sizes[1] = vec3_origin;
 
 	//apply button
-	m_ApplyButton = new Button(this, "ApplyButton", "", this, COMMAND_APPLY_SETTING);
-	m_ApplyButton->SetEnabled(false);
+	//m_ApplyButton = new Button(this, "ApplyButton", "", this, COMMAND_APPLY_SETTING);
+	//m_ApplyButton->SetEnabled(false);
 
 	//create our data stuff
 	m_ShouldOverrideButton = new CheckButton(this, "ShouldOverrideButton", "");
@@ -286,25 +414,51 @@ CMapPropertiesPanelFogTriggersPage::CMapPropertiesPanelFogTriggersPage(Panel* pa
 	m_DataLabel = new Label(this, "DataLabel", "");
 	m_DataLabel->SetEnabled(false);
 
-	m_DataSlider = new CMapPropertiesPanelSlider(this, "DataSlider", 250);
+	m_DataSlider = new CMapPropertiesPanelSlider(this, "DataSlider", 250, false);
 	m_DataSlider->SetEnabled(false);
 
 	m_DataButton = new Button(this, "DataButton", "", this, COMMAND_SET_COLOR);
 	m_DataButton->SetEnabled(false);
 	m_DataButton->SetVisible(false);
 
+	m_FilterBox = new CMapPropertiesEditorComboBox(this, "FilterBox", 20, false);
+	m_FilterBox->SetEnabled(false);
+	m_FilterBox->SetVisible(false);
+	
+	m_SkyboxBox = new CMapPropertiesEditorComboBox(this, "FilterBox", 20, false);
+	m_SkyboxBox->SetEnabled(false);
+	m_SkyboxBox->SetVisible(false);
+
 	m_DataButtonRect = Rect_t{ 0, 0, 0, 0 };
 	m_DataButtonColor.SetColor(0, 0, 0, 0);
+
+	m_ShouldOverrideColorButton = new CheckButton(this, "DataButton", "");
+	m_ShouldOverrideColorButton->SetEnabled(false);
+	m_ShouldOverrideColorButton->SetVisible(false);
+	m_ShouldOverrideColorButton->SetSelected(true);
 
 	//create the set size button
 	m_SetSizeButton = new Button(this, "RenameButton", "", this, COMMAND_SET_SIZE);
 	m_SetSizeButton->SetEnabled(false);
+	
+	//create the mins/maxs text entries
+	m_MinsTextEntry = new TextEntry(this, "MinsTextEntry");
+	m_MinsTextEntry->AddActionSignalTarget(this);
+	m_MinsTextEntry->SetEnabled(false);
+	m_MinsTextEntry->SetText("0 0 0");
+	
+	m_MaxsTextEntry = new TextEntry(this, "MaxsTextEntry");
+	m_MaxsTextEntry->AddActionSignalTarget(this);
+	m_MaxsTextEntry->SetEnabled(false);
+	m_MaxsTextEntry->SetText("0 0 0");
 
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 	//make the fog lerp slider
 	m_FogLerpSliderText = new Label(this, "LerpSliderText", "");
 
 	m_FogLerpSlider = new CMapPropertiesPanelSlider(this, "LerpSlider");
 	m_FogLerpSlider->SetEnabled(false);
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 
 	//create the fog data list
 	m_VarList = new ListPanel(this, "TriggersData");
@@ -330,6 +484,69 @@ CMapPropertiesPanelFogTriggersPage::CMapPropertiesPanelFogTriggersPage(Panel* pa
 	m_RemoveButton = new Button(this, "RemoveButton", "", this, COMMAND_REMOVE_TRIGGER);
 	m_RemoveButton->SetEnabled(false);
 
+	//collect our color corrections. ALWAYS add an empty color correction first
+	{
+		m_FilterBox->AddItem("#Amod_SkyboxPanel_UseDefaultFilter", new KeyValues(""));
+
+		FileFindHandle_t find;
+		const char* first = filesystem->FindFirst("scripts/colorcorrection/*.raw", &find);
+		while (first)
+		{
+			//check for . and ..
+			if (!Q_stricmp(first, ".") || !Q_stricmp(first, ".."))
+			{
+				first = filesystem->FindNext(find);
+				continue;
+			}
+
+			//check the extention
+			const char* ext = Q_GetFileExtension(first);
+			if (Q_stricmp(ext, "raw"))
+			{
+				first = filesystem->FindNext(find);
+				continue;
+			}
+
+			//add the item
+			const char* cc_string = CFmtStr("scripts/colorcorrection/%s", first);
+			m_FilterBox->AddItem(first, new KeyValues(cc_string));
+
+			//next file
+			first = filesystem->FindNext(find);
+		}
+		m_FilterBox->ActivateItem(0);
+	}
+
+	//collect our skyboxs. ALWAYS add an empty skybox first
+	do
+	{
+		m_SkyboxBox->AddItem("#Amod_SkyboxPanel_UseDefaultSkybox", new KeyValues(""));
+
+		//load keyvalues file
+		KeyValuesAD keyvalues(new KeyValues("SkyPanel"));
+		if (!keyvalues->LoadFromFile(filesystem, "resource/panels/skypanel.txt"))
+			break;
+
+		KeyValues* timekey = keyvalues->FindKey(m_bNightTimeMode ? "Night" : "Day");
+		if (!timekey)
+			break;
+
+		//go through each key
+		FOR_EACH_VALUE(timekey, value)
+		{
+			//remove percent sigh
+			char temp[512];
+			Q_strncpy(temp, value->GetString(), sizeof(temp));
+			char* percent = Q_strstr(temp, "%");
+			if (percent)
+				*percent = '\0';
+
+			//add the item
+			m_SkyboxBox->AddItem(value->GetName(), new KeyValues(temp));
+		}
+
+	} while (false);
+
 	//perform layout to set the range sliders and such
 	PerformLayout();
 }
@@ -343,6 +560,9 @@ void ResetCubeTriggerData();
 //-------------------------------------------------------------------------------------------------------
 CMapPropertiesPanelFogTriggersPage::~CMapPropertiesPanelFogTriggersPage()
 {
+	//disable our debug var
+	amod_fog_cubeinfo_debug.SetValue(false);
+
 #if FOG_CUBE_TRIGGER_TEST
 	//reset the cube trigger info so it doesnt lerp to the trigger we're inside
 	ResetCubeTriggerData();
@@ -354,24 +574,35 @@ CMapPropertiesPanelFogTriggersPage::~CMapPropertiesPanelFogTriggersPage()
 //-------------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelFogTriggersPage::PerformLayout()
 {
+	//check for m_KeyValuesFile
+	if (!m_KeyValuesFile)
+		return;
+
 	BaseClass::PerformLayout();
 
 	//apply button
-	ApplySettingsToPanel(m_KeyValuesFile->FindKey("ApplyButton"), m_ApplyButton);
+	//ApplySettingsToPanel(m_KeyValuesFile->FindKey("ApplyButton"), m_ApplyButton);
 
 	//data stuff
 	ApplySettingsToPanel(m_KeyValuesFile->FindKey("ShouldOverrideButton"), m_ShouldOverrideButton);
 	ApplySettingsToPanel(m_KeyValuesFile->FindKey("DataLabel"), m_DataLabel);
 	ApplySettingsToPanel(m_KeyValuesFile->FindKey("DataSlider"), m_DataSlider);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("DataFilter"), m_FilterBox);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("DataFilter"), m_SkyboxBox);	//HACK: set m_SkyboxBox to the bounds of the filter combo box
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("DataShouldOverrideColor"), m_ShouldOverrideColorButton);
 	ApplySettingsToPanel(m_KeyValuesFile->FindKey("DataButton"), m_DataButton);
 	sscanf(m_KeyValuesFile->GetString("DataColorRect"), "%d %d %d %d", &m_DataButtonRect.x, &m_DataButtonRect.y, &m_DataButtonRect.width, &m_DataButtonRect.height);
 
 	//set size button
 	ApplySettingsToPanel(m_KeyValuesFile->FindKey("SetSizeButton"), m_SetSizeButton);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("MinsTextEntry"), m_MinsTextEntry);
+	ApplySettingsToPanel(m_KeyValuesFile->FindKey("MaxsTextEntry"), m_MaxsTextEntry);
 
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 	//lerp slider stuff
 	ApplySettingsToPanel(m_KeyValuesFile->FindKey("TransitionSliderText"), m_FogLerpSliderText);
 	ApplySettingsToPanel(m_KeyValuesFile->FindKey("TransitionSlider"), m_FogLerpSlider);
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 
 	//triggers
 	ApplySettingsToPanel(m_KeyValuesFile->FindKey("TriggerData"), m_VarList);
@@ -388,6 +619,10 @@ void CMapPropertiesPanelFogTriggersPage::PerformLayout()
 //----------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelFogTriggersPage::InitFogTriggerInfo(MapTimeInfo_t& info, bool IsNightPage)
 {
+	//check for m_KeyValuesFile
+	if (!m_KeyValuesFile)
+		return;
+
 	m_bNightTimeMode = IsNightPage;
 
 	//get each trigger
@@ -403,6 +638,10 @@ void CMapPropertiesPanelFogTriggersPage::InitFogTriggerInfo(MapTimeInfo_t& info,
 //----------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelFogTriggersPage::GetFogTriggerInfo(MapTimeInfo_t& info)
 {
+	//check for m_KeyValuesFile
+	if (!m_KeyValuesFile)
+		return;
+
 	//array to add to
 	CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& CubeInfo = m_bNightTimeMode ? info.NightInfo.FogCubeTriggers : info.DayInfo.FogCubeTriggers;
 	CubeInfo.RemoveAll();
@@ -417,7 +656,10 @@ void CMapPropertiesPanelFogTriggersPage::GetFogTriggerInfo(MapTimeInfo_t& info)
 		for (int j = 0; j < m_TriggerInfos[i].foginfo.Count(); j++)
 			trigger.foginfo.AddToTail({ m_TriggerInfos[i].foginfo[j].convar, m_TriggerInfos[i].foginfo[j].value });
 
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 		trigger.lerptime = m_TriggerInfos[i].lerptime;
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
+
 		trigger.mins = m_TriggerInfos[i].mins;
 		trigger.maxs = m_TriggerInfos[i].maxs;
 		Q_strncpy(trigger.name, m_TriggerInfos[i].name, sizeof(trigger.name));
@@ -429,18 +671,26 @@ void CMapPropertiesPanelFogTriggersPage::GetFogTriggerInfo(MapTimeInfo_t& info)
 //----------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelFogTriggersPage::AddFogTrigger(const char* name, MapTimeInfo_t::FogCubeTrigger_t* Data, bool addtoarray)
 {
+	//check for m_KeyValuesFile
+	if (!m_KeyValuesFile)
+		return;
+
 	//add to the trigger list
 	int index = m_TriggerList->AddItem(new KeyValues("Trigger", "TriggersName", name), m_TriggerList->GetItemCount(), false, false);
 	m_TriggerList->ClearSelectedItems();
 	m_TriggerList->AddSelectedItem(index);
 
-	//if (!addtoarray)
-	//	return;
-
+	if (!addtoarray)
+		return;
+	
 	//add to m_TriggerInfos
 	MapTimeInfo_t::FogCubeTrigger_t& trigger = m_TriggerInfos[m_TriggerInfos.AddToTail()];
 	memset(&trigger, 0, sizeof(trigger));
 	Q_strncpy(trigger.name, name, sizeof(trigger.name));
+
+	//add the 'fog_lerp_system_lerp_time' var
+	if (Data && Data->foginfo.Count() <= 0)
+		AddOrUpdateFogInfoInArray(trigger.foginfo, "fog_lerp_system_lerp_time", "0");
 
 	//set to Data if needed
 	if (Data)
@@ -458,7 +708,10 @@ void CMapPropertiesPanelFogTriggersPage::AddFogTrigger(const char* name, MapTime
 		}
 
 		//copy the other stuff
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 		trigger.lerptime = Data->lerptime;
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
+
 		trigger.mins = Data->mins;
 		trigger.maxs = Data->maxs;
 	}
@@ -469,6 +722,10 @@ void CMapPropertiesPanelFogTriggersPage::AddFogTrigger(const char* name, MapTime
 //----------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelFogTriggersPage::RenameFogTrigger(int index, const char* newname)
 {
+	//check for m_KeyValuesFile
+	if (!m_KeyValuesFile)
+		return;
+
 	//this SHOULDNT be false but just to be safe, Check m_TriggerInfos.Count()
 	if (index < 0 || index >= m_TriggerInfos.Count() || !newname)
 		return;
@@ -518,15 +775,25 @@ void CMapPropertiesPanelFogTriggersPage::OnItemSelected(KeyValues* data)
 		//enable our items
 		m_RenameButton->SetEnabled(true);
 		m_RemoveButton->SetEnabled(true);
+
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 		m_FogLerpSlider->SetEnabled(true);
 		m_FogLerpSlider->SetValue(m_TriggerInfos[index].lerptime * LERP_SLIDER_DIVISOR);
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
+
 		m_SetSizeButton->SetEnabled(true);
+		m_MinsTextEntry->SetEnabled(true);
+		m_MaxsTextEntry->SetEnabled(true);
+
+		//set the mins/maxs text
+		m_MinsTextEntry->SetText(CFmtStr("%.0f %.0f %.0f", m_TriggerInfos[index].mins.x, m_TriggerInfos[index].mins.y, m_TriggerInfos[index].mins.z));
+		m_MaxsTextEntry->SetText(CFmtStr("%.0f %.0f %.0f", m_TriggerInfos[index].maxs.x, m_TriggerInfos[index].maxs.y, m_TriggerInfos[index].maxs.z));
 
 		//add our vars
 		for (int i = 0; i < MAX_FOG_VARIABLES; i++)
 		{
 			const char* text = CFmtStr("%s - Override = %d", FogDatas[i].text, FindFogInfoFromArray(m_TriggerInfos[index].foginfo, FogDatas[i].convar, nullptr) != nullptr);
-			m_VarList->AddItem(new KeyValues("Data", "TriggersData", text), m_VarList->GetItemCount(), false, false);
+			m_VarList->AddItem(new KeyValues("Data", "TriggersData", FogDatas[i].type == FogTriggerData_t::TYPE_DIVIDER ? "" : text), m_VarList->GetItemCount(), false, false);
 		}
 	}
 	else
@@ -543,40 +810,103 @@ void CMapPropertiesPanelFogTriggersPage::OnItemSelected(KeyValues* data)
 
 		//is our convar enabled?
 		const char* info = FindFogInfoFromArray(m_TriggerInfos[trigger_index].foginfo, FogDatas[index].convar, nullptr);
-		bool enabled = info != nullptr;
+		bool enabled = info != nullptr && FogDatas[index].type != FogTriggerData_t::TYPE_DIVIDER;
 
 		//enable our items
-		m_ApplyButton->SetEnabled(true);
-		m_ShouldOverrideButton->SetEnabled(true);
+		//m_ApplyButton->SetEnabled(true);
+		m_ShouldOverrideButton->SetEnabled(FogDatas[index].type != FogTriggerData_t::TYPE_DIVIDER);
 		m_ShouldOverrideButton->SetSelected(enabled);
 
 		//set our data stuff
 		m_DataLabel->SetEnabled(enabled);
 
-		//enable
+		//enable the color buttons
 		m_DataButton->SetVisible(FogDatas[index].type == FogTriggerData_t::TYPE_COLORPICKER);
 		m_DataButton->SetEnabled(FogDatas[index].type == FogTriggerData_t::TYPE_COLORPICKER && enabled);
+		m_DataButton->GetTooltip()->SetText(FogDatas[index].tooltip);
+		m_ShouldOverrideColorButton->SetVisible(m_DataButton->IsVisible());
+		m_ShouldOverrideColorButton->SetEnabled(m_DataButton->IsEnabled());
+
+		//enable the data sliders
 		m_DataSlider->SetVisible(FogDatas[index].type == FogTriggerData_t::TYPE_SLIDER);
 		m_DataSlider->SetEnabled(FogDatas[index].type == FogTriggerData_t::TYPE_SLIDER && enabled);
+		m_DataSlider->GetTooltip()->SetText(FogDatas[index].tooltip);
+
+		//enable the filters
+		m_FilterBox->SetVisible(FogDatas[index].type == FogTriggerData_t::TYPE_FILTER);
+		m_FilterBox->SetEnabled(FogDatas[index].type == FogTriggerData_t::TYPE_FILTER && enabled);
+		m_FilterBox->GetTooltip()->SetText(FogDatas[index].tooltip);
+
+		//enable the skybox
+		m_SkyboxBox->SetVisible(FogDatas[index].type == FogTriggerData_t::TYPE_SKYBOX);
+		m_SkyboxBox->SetEnabled(FogDatas[index].type == FogTriggerData_t::TYPE_SKYBOX && enabled);
+		m_SkyboxBox->GetTooltip()->SetText(FogDatas[index].tooltip);
 
 		//set our var
 		if (FogDatas[index].type == FogTriggerData_t::TYPE_COLORPICKER && enabled)
 		{
 			//set button color
 			int r = 0, g = 0, b = 0;
-			sscanf(info, "%d %d %d", &r, &g, &b);
+			sscanf(info ? info : "-1 -1 -1", "%d %d %d", &r, &g, &b);
 			m_DataButtonColor._color[0] = (unsigned char)r;
 			m_DataButtonColor._color[1] = (unsigned char)g;
 			m_DataButtonColor._color[2] = (unsigned char)b;
+
+			//check for -1 -1 -1
+			if (r == -1 && g == -1 && b == -1)
+			{
+				m_ShouldOverrideColorButton->SetSelected(false);
+				m_DataButton->SetEnabled(false);
+			}
+
 			return;
 		}
 		else if (FogDatas[index].type == FogTriggerData_t::TYPE_SLIDER)
 		{
+			//set info
+			info = info ? info : "";
+
 			//set the slider stuff
 			m_DataSlider->SetRange(FogDatas[index].sval_min, FogDatas[index].sval_max);
+			m_DataSlider->SetValue((int)(atof(info) * FogDatas[index].val_divisor));
+		}
+		else if (FogDatas[index].type == FogTriggerData_t::TYPE_FILTER)
+		{
+			//check for info
+			if (!info)
+			{
+				m_FilterBox->ActivateItem(0);
+				return;
+			}
 
-			if (enabled)
-				m_DataSlider->SetValue((int)(atof(info) * FogDatas[index].val_divisor));
+			//look for the item
+			for (int i = 0; i < m_FilterBox->GetItemCount(); i++)
+			{
+				if (!Q_stricmp(m_FilterBox->GetItemUserData(i)->GetName(), info))
+				{
+					m_FilterBox->ActivateItem(i);
+					break;
+				}
+			}
+		}
+		else if (FogDatas[index].type == FogTriggerData_t::TYPE_SKYBOX)
+		{
+			//check for info
+			if (!info)
+			{
+				m_SkyboxBox->ActivateItem(0);
+				return;
+			}
+
+			//look for the item
+			for (int i = 0; i < m_SkyboxBox->GetItemCount(); i++)
+			{
+				if (!Q_stricmp(m_SkyboxBox->GetItemUserData(i)->GetName(), info))
+				{
+					m_SkyboxBox->ActivateItem(i);
+					break;
+				}
+			}
 		}
 	}
 }
@@ -594,8 +924,13 @@ void CMapPropertiesPanelFogTriggersPage::OnItemDeselected(KeyValues* data)
 		m_RenameButton->SetEnabled(false);
 		m_RemoveButton->SetEnabled(false);
 		m_SetSizeButton->SetEnabled(false);
+		m_MinsTextEntry->SetEnabled(false);
+		m_MaxsTextEntry->SetEnabled(false);
+
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 		m_FogLerpSlider->SetEnabled(false);
 		m_FogLerpSlider->SetValue(0);
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 
 		//remove all the items from m_VarList
 		m_VarList->RemoveAll();
@@ -605,19 +940,33 @@ void CMapPropertiesPanelFogTriggersPage::OnItemDeselected(KeyValues* data)
 
 		//tell our property sheet to regain keyboard input
 		GetParent()->SetKeyBoardInputEnabled(true);
+		GetParent()->SetMouseInputEnabled(true);
 	}
 	else
 	{
 		//set our data stuff
 		m_ShouldOverrideButton->SetEnabled(false);
-		m_ApplyButton->SetEnabled(false);
+		//m_ApplyButton->SetEnabled(false);
 
+		//hide the data label
 		m_DataLabel->SetEnabled(false);
 		m_DataLabel->SetText("#MapProperties_FogTriggersPage_NoItemSelected");
 
+		//hide the data button
 		m_DataButton->SetVisible(false);
 		m_DataButton->SetEnabled(false);
+		m_ShouldOverrideColorButton->SetVisible(false);
+		m_ShouldOverrideColorButton->SetEnabled(false);
+		
+		//hide the filter box
+		m_FilterBox->SetVisible(false);
+		m_FilterBox->SetEnabled(false);
+		
+		//hide the skybox box
+		m_SkyboxBox->SetVisible(false);
+		m_SkyboxBox->SetEnabled(false);
 
+		//show only the data slider
 		m_DataSlider->SetEnabled(false);
 		m_DataSlider->SetVisible(true);
 		m_DataSlider->SetValue(0);
@@ -629,16 +978,57 @@ void CMapPropertiesPanelFogTriggersPage::OnItemDeselected(KeyValues* data)
 //-------------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelFogTriggersPage::OnSliderMoved(KeyValues* data)
 {
+	//check for m_KeyValuesFile
+	if (!m_KeyValuesFile)
+		return;
+
 	//check index
 	int index = m_TriggerList->GetSelectedItem(0);
 	if (index < 0 || index >= m_TriggerInfos.Count())
 		return;
 
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 	//check whos which slider
 	if (data->GetPtr("Panel") == m_FogLerpSlider)
 	{
 		//set the lerp time
 		m_TriggerInfos[index].lerptime = (float)m_FogLerpSlider->GetValue() / LERP_SLIDER_DIVISOR;
+	}
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
+
+	UpdateArrayValue();
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Called when some text is changed
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelFogTriggersPage::OnTextChanged(KeyValues* data)
+{
+	//check for m_KeyValuesFile
+	if (!m_KeyValuesFile)
+		return;
+
+	Panel* panelptr = (Panel*)data->GetPtr("panel");
+
+	//update the array value
+	if (panelptr == m_FilterBox || panelptr == m_SkyboxBox)
+		UpdateArrayValue();
+
+	//check for the size text entries
+	else if (panelptr == m_MinsTextEntry || panelptr == m_MaxsTextEntry)
+	{
+		//get the mins
+		char mins[64];
+		m_MinsTextEntry->GetText(mins, sizeof(mins));
+		sscanf(mins, "%f %f %f", &m_Sizes[0].x, &m_Sizes[0].y, &m_Sizes[0].z);
+			
+		//get the maxs
+		char maxs[64];
+		m_MaxsTextEntry->GetText(maxs, sizeof(maxs));
+		sscanf(maxs, "%f %f %f", &m_Sizes[1].x, &m_Sizes[1].y, &m_Sizes[1].z);
+
+		//update the trigger bbox
+		UpdateSizes();
 	}
 }
 
@@ -647,6 +1037,10 @@ void CMapPropertiesPanelFogTriggersPage::OnSliderMoved(KeyValues* data)
 //-------------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelFogTriggersPage::RepopulateList()
 {
+	//check for m_KeyValuesFile
+	if (!m_KeyValuesFile)
+		return;
+
 	//remove + re-add
 	m_TriggerList->RemoveAll();
 
@@ -654,7 +1048,7 @@ void CMapPropertiesPanelFogTriggersPage::RepopulateList()
 		AddFogTrigger(m_TriggerInfos[i].name, &m_TriggerInfos[i], false);
 }
 
-void UpdateFogTriggers(CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& CubeTriggers, bool forcend);
+void UpdateFogTriggers(CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& CubeTriggers, bool UpdateFogTriggers);
 
 //-------------------------------------------------------------------------------------------------------
 // Purpose: Called whent the page is hidden
@@ -666,6 +1060,7 @@ void CMapPropertiesPanelFogTriggersPage::OnPageHide()
 
 	//tell our property sheet to regain keyboard input
 	GetParent()->SetKeyBoardInputEnabled(true);
+	GetParent()->SetMouseInputEnabled(true);
 
 	BaseClass::OnPageHide();
 }
@@ -675,12 +1070,29 @@ void CMapPropertiesPanelFogTriggersPage::OnPageHide()
 //-------------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelFogTriggersPage::Update()
 {
+	Update(false);
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Called on panel think
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelFogTriggersPage::Update(bool ForceUpdate)
+{
+	//check for m_KeyValuesFile
+	if (!m_KeyValuesFile)
+		return;
+
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 	//set our m_FogLerpSliderText text
 	wchar_t* lerptext = g_pVGuiLocalize->Find("MapProperties_FogTriggersPage_TransitionLabel");
 	wchar_t text[128];
 	swprintf(text, SIZE_OF_ARRAY(text), L"%ws %.2f", lerptext, (float)m_FogLerpSlider->GetValue() / LERP_SLIDER_DIVISOR);
-
 	m_FogLerpSliderText->SetText(text);
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
+
+	//set s_bUpdateTriggerValuesThisFrame if this isnt the active page
+	if (((PropertyDialog*)GetParent()->GetParent())->GetActivePage() != this || ForceUpdate)
+		s_bUpdateTriggerValuesThisFrame = true;
 
 	//update the trigger infos
 	UpdateFogTriggers(m_TriggerInfos, true);
@@ -707,7 +1119,44 @@ void CMapPropertiesPanelFogTriggersPage::Update()
 	if (FogDatas[index].type != FogTriggerData_t::TYPE_SLIDER)
 		return;
 
-	m_DataLabel->SetText(CFmtStr("%s: %d", FogDatas[index].text, (int)((float)m_DataSlider->GetValue() / FogDatas[index].val_divisor)));
+	//set our label
+	int value = m_DataSlider->GetValue();
+	if (value == -1)
+		m_DataLabel->SetText(CFmtStr("%s: -1", FogDatas[index].text));
+	else
+		m_DataLabel->SetText(CFmtStr("%s: %.2f", FogDatas[index].text, ((float)value / FogDatas[index].val_divisor)));
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Called on command
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelFogTriggersPage::TeleportToTrigger(int num)
+{
+	//enable noclip
+	engine->ClientCmd("noclip_set 1");
+
+	//dont do the following code if both bounds are the same
+	if (m_Sizes[0] == m_Sizes[1])
+		return;
+
+	//teleport to the first trigger
+	CBasePlayer* pPlayer = CBasePlayer::GetLocalPlayer();
+	if (!pPlayer)
+		return;
+
+	//teleport to the mins
+	Vector forward;
+	AngleVectors(pPlayer->EyeAngles(), &forward);
+
+	Vector targetPos = m_Sizes[num] - (forward * 100.0f);
+
+	Vector dir = m_Sizes[num] - targetPos;
+	QAngle ang;
+	VectorAngles(dir, ang);
+
+	//HACK: use setpos + setang
+	engine->ClientCmd(CFmtStr("setpos %f %f %f", targetPos.x, targetPos.y, targetPos.z - 64.0f));
+	engine->ClientCmd(CFmtStr("setang %f %f %f", ang.x, ang.y, ang.z));
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -766,9 +1215,8 @@ void CMapPropertiesPanelFogTriggersPage::OnCommand(const char* pszCommand)
 			modal->MoveToCenterOfScreen();
 			modal->Activate();
 			modal->DoModal();
-			modal->SetOKCommand(new KeyValues("Command", "command", "ConfirmClose"));
+			modal->SetOKCommand(new KeyValues("Command", "command", "DoModal"));
 			modal->SetCancelCommand(new KeyValues("Command", "command", "DoModal"));
-
 			bDidPrompt = true;
 		}
 
@@ -777,8 +1225,16 @@ void CMapPropertiesPanelFogTriggersPage::OnCommand(const char* pszCommand)
 		m_Sizes[1] = m_TriggerInfos[index].maxs;
 		m_iInSizeEditor = SIZE_EDITOR_MODE_MINS;
 
+		//disable the mins/maxs entries
+		m_MinsTextEntry->SetEnabled(false);
+		m_MaxsTextEntry->SetEnabled(false);
+
 		//tell our property sheet to lose keyboard input
 		GetParent()->SetKeyBoardInputEnabled(false);
+		GetParent()->SetMouseInputEnabled(false);
+	
+		//teleport 
+		TeleportToTrigger(0);
 	}
 
 	//check for COMMAND_SHOULD_OVERRIDE
@@ -796,10 +1252,10 @@ void CMapPropertiesPanelFogTriggersPage::OnCommand(const char* pszCommand)
 	}
 
 	//check for COMMAND_APPLY_SETTING
-	else if (!Q_stricmp(pszCommand, COMMAND_APPLY_SETTING))
-	{
-		UpdateArrayValue();
-	}
+	//else if (!Q_stricmp(pszCommand, COMMAND_APPLY_SETTING))
+	//{
+	//	UpdateArrayValue();
+	//}
 
 	//check for COMMAND_SET_COLOR
 	else if (!Q_stricmp(pszCommand, COMMAND_SET_COLOR))
@@ -811,6 +1267,15 @@ void CMapPropertiesPanelFogTriggersPage::OnCommand(const char* pszCommand)
 		m_ColorPicker->SetColor(m_DataButtonColor);
 		m_ColorPicker->DoModal();
 	}
+
+	//check for DoModal
+	else if (!Q_stricmp(pszCommand, "DoModal"))
+	{
+		//redirect to panel (this->property sheet->panel)
+		GetParent()->GetParent()->OnCommand("DoModal");
+	}
+
+	BaseClass::OnCommand(pszCommand);
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -828,6 +1293,10 @@ void CMapPropertiesPanelFogTriggersPage::UpdateArrayValue()
 	if (index < 0 || index >= MAX_FOG_VARIABLES)
 		return;
 
+	//check for divider
+	if (FogDatas[index].type == FogTriggerData_t::TYPE_DIVIDER)
+		return;
+
 	//check if the override button is selected
 	if (!m_ShouldOverrideButton->IsSelected())
 	{
@@ -837,11 +1306,34 @@ void CMapPropertiesPanelFogTriggersPage::UpdateArrayValue()
 	{
 		const char* string = "";
 
-		//get our string to add
+		//get our string to add to the data array
 		if (FogDatas[index].type == FogTriggerData_t::TYPE_SLIDER)
-			string = CFmtStr("%f", (float)m_DataSlider->GetValue() / FogDatas[index].val_divisor);
+		{
+			//get the value
+			int value = m_DataSlider->GetValue();
+
+			//check for -1
+			if (value == -1)
+				string = "-1";
+			else
+				string = CFmtStr("%f", (float)m_DataSlider->GetValue() / FogDatas[index].val_divisor);
+		}
 		else if (FogDatas[index].type == FogTriggerData_t::TYPE_COLORPICKER)
-			string = CFmtStr("%d %d %d", m_DataButtonColor.r(), m_DataButtonColor.g(), m_DataButtonColor.b());
+		{
+			//check m_ShouldOverrideColorButton
+			if (m_ShouldOverrideColorButton->IsSelected())
+				string = CFmtStr("%d %d %d", m_DataButtonColor.r(), m_DataButtonColor.g(), m_DataButtonColor.b());
+			else
+				string = "-1 -1 -1";
+		}
+		else if (FogDatas[index].type == FogTriggerData_t::TYPE_FILTER)
+		{
+			string = m_FilterBox->GetActiveItemUserData()->GetName();
+		}
+		else if (FogDatas[index].type == FogTriggerData_t::TYPE_SKYBOX)
+		{
+			string = m_SkyboxBox->GetActiveItemUserData()->GetName();
+		}
 
 		//update
 		AddOrUpdateFogInfoInArray(m_TriggerInfos[trigger_index].foginfo, FogDatas[index].convar, string);
@@ -855,6 +1347,9 @@ void CMapPropertiesPanelFogTriggersPage::UpdateArrayValue()
 	const char* text = CFmtStr("%s - Override = %d", FogDatas[index].text, m_ShouldOverrideButton->IsSelected());
 	item->kv->SetString("TriggersData", text);
 	m_VarList->Repaint();
+
+	//set s_bUpdateTriggerValuesThisFrame to make sure we update the trigger values
+	s_bUpdateTriggerValuesThisFrame = true;
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -865,7 +1360,10 @@ void CMapPropertiesPanelFogTriggersPage::OnOverrideButtonEnabled()
 	//enable our items
 	m_DataLabel->SetEnabled(m_DataLabel->IsVisible());
 	m_DataButton->SetEnabled(m_DataButton->IsVisible());
-	m_DataSlider->SetEnabled(true);
+	m_ShouldOverrideColorButton->SetEnabled(m_ShouldOverrideColorButton->IsVisible());
+	m_DataSlider->SetEnabled(m_DataSlider->IsVisible());
+	m_FilterBox->SetEnabled(m_FilterBox->IsVisible());
+	m_SkyboxBox->SetEnabled(m_SkyboxBox->IsVisible());
 
 	//update our value
 	UpdateArrayValue();
@@ -879,10 +1377,68 @@ void CMapPropertiesPanelFogTriggersPage::OnOverrideButtonDisabled()
 	//disable our items
 	m_DataLabel->SetEnabled(false);
 	m_DataButton->SetEnabled(false);
+	m_ShouldOverrideColorButton->SetEnabled(false);
 	m_DataSlider->SetEnabled(false);
+	m_FilterBox->SetEnabled(false);
+	m_SkyboxBox->SetEnabled(false);
 
 	//update our value
 	UpdateArrayValue();
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Updates the sizes of the trigger
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelFogTriggersPage::UpdateSizes()
+{
+	//check index
+	int index = m_TriggerList->GetSelectedItem(0);
+	if (index < 0 || index >= m_TriggerInfos.Count())
+		return;
+
+	//swap mins + maxs if needed
+	Vector mins = m_Sizes[0];
+	Vector maxs = m_Sizes[1];
+
+	//swap the x
+	if (mins.x > maxs.x)
+	{
+		float t = mins.x;
+		mins.x = maxs.x;
+		maxs.x = t;
+	}
+
+	//swap the y
+	if (mins.y > maxs.y)
+	{
+		float t = mins.y;
+		mins.y = maxs.y;
+		maxs.y = t;
+	}
+
+	//swap the z
+	if (mins.z > maxs.z)
+	{
+		float t = mins.z;
+		mins.z = maxs.z;
+		maxs.z = t;
+	}
+
+	//set the lerp time
+	m_TriggerInfos[index].mins = mins;
+	m_TriggerInfos[index].maxs = maxs;
+}
+
+//-------------------------------------------------------------------------------------------------------
+// Purpose: Called when the page is shown
+//-------------------------------------------------------------------------------------------------------
+void CMapPropertiesPanelFogTriggersPage::OnPageShow()
+{
+	//hack: reset run the OnItemSelected function
+	int selected = m_TriggerList->GetSelectedItem(0);
+	m_TriggerList->ClearSelectedItems();
+	m_TriggerList->AddSelectedItem(selected);
+	BaseClass::OnPageShow();
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -890,57 +1446,43 @@ void CMapPropertiesPanelFogTriggersPage::OnOverrideButtonDisabled()
 //-------------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelFogTriggersPage::OnKeyCodePressed(KeyCode code)
 {
+	//check for m_KeyValuesFile
+	if (!m_KeyValuesFile)
+		return;
+
 	if ((code == KeyCode::KEY_LSHIFT || code == KeyCode::KEY_RSHIFT) && m_iInSizeEditor != SIZE_EDITOR_MODE_NONE)
 	{
 		//check m_iInSizeEditor
 		if (m_iInSizeEditor == SIZE_EDITOR_MODE_MINS)
 		{
+			//set
 			m_iInSizeEditor = SIZE_EDITOR_MODE_MAXS;
+			
+			//set m_MinsTextEntry
+			m_MinsTextEntry->SetText(CFmtStr("%.2f %.2f %.2f", m_Sizes[0].x, m_Sizes[0].y, m_Sizes[0].z));
+
+			//teleport ONLY if the maxs isnt 0 0 0
+			if (m_Sizes[1] != vec3_origin)
+				TeleportToTrigger(1);
 		}
 		else
 		{
+			//enable the mins/maxs entries
+			m_MinsTextEntry->SetEnabled(true);
+			m_MaxsTextEntry->SetEnabled(true);
+
 			//tell our property sheet to regain keyboard input
 			GetParent()->SetKeyBoardInputEnabled(true);
+			GetParent()->SetMouseInputEnabled(true);
+
+			//set m_MaxsTextEntry
+			m_MaxsTextEntry->SetText(CFmtStr("%.2f %.2f %.2f", m_Sizes[1].x, m_Sizes[1].y, m_Sizes[1].z));
 
 			//set our mode
 			m_iInSizeEditor = SIZE_EDITOR_MODE_NONE;
 
-			//check index
-			int index = m_TriggerList->GetSelectedItem(0);
-			if (index < 0 || index >= m_TriggerInfos.Count())
-				return;
-
-			//swap mins + maxs if needed
-			Vector mins = m_Sizes[0];
-			Vector maxs = m_Sizes[1];
-
-			//swap the x
-			if (mins.x > maxs.x)
-			{
-				float t = mins.x;
-				mins.x = maxs.x;
-				maxs.x = t;
-			}
-
-			//swap the y
-			if (mins.y > maxs.y)
-			{
-				float t = mins.y;
-				mins.y = maxs.y;
-				maxs.y = t;
-			}
-
-			//swap the z
-			if (mins.z > maxs.z)
-			{
-				float t = mins.z;
-				mins.z = maxs.z;
-				maxs.z = t;
-			}
-
-			//set the lerp time
-			m_TriggerInfos[index].mins = mins;
-			m_TriggerInfos[index].maxs = maxs;
+			//update the sizes
+			UpdateSizes();
 		}
 
 		return;
@@ -954,6 +1496,10 @@ void CMapPropertiesPanelFogTriggersPage::OnKeyCodePressed(KeyCode code)
 //-------------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelFogTriggersPage::Paint()
 {
+	//check for m_KeyValuesFile
+	if (!m_KeyValuesFile)
+		return;
+
 	BaseClass::Paint();
 
 	//check index
@@ -987,6 +1533,9 @@ void CMapPropertiesPanelFogTriggersPage::OnColorSelected(KeyValues* data)
 	//set our color
 	m_DataButtonColor = Color(data->GetInt("r"), data->GetInt("g"), data->GetInt("b"), 255);
 
+	//update the array
+	UpdateArrayValue();
+
 	//call base func
 	BaseClass::OnColorSelected(data);
 }
@@ -996,6 +1545,17 @@ void CMapPropertiesPanelFogTriggersPage::OnColorSelected(KeyValues* data)
 //-------------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelFogTriggersPage::OnCheckButtonChecked(KeyValues* subkey)
 {
+	//check for m_KeyValuesFile
+	if (!m_KeyValuesFile)
+		return;
+
+	//check the panel
+	if (subkey->GetPtr("panel") == m_ShouldOverrideColorButton)
+	{
+		m_DataButton->SetEnabled(m_ShouldOverrideColorButton->IsSelected());
+	}
+
+	UpdateArrayValue();
 }
 
 #endif //FOG_CUBE_TRIGGER_TEST

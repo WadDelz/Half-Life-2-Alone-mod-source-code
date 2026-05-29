@@ -16,11 +16,14 @@
 
 static const char *s_pFadeInContextThink = "ColorCorrectionFadeInThink";
 static const char *s_pFadeOutContextThink = "ColorCorrectionFadeOutThink";
+static const char *s_pLerpContextThink = "ColorCorrectionLerpThink";
  
 //------------------------------------------------------------------------------
 // FIXME: This really should inherit from something	more lightweight
 //------------------------------------------------------------------------------
 
+//epic filter lerp time
+static ConVar amod_epic_filter_lerp_time("amod_epic_filter_lerp_time", "0.25", 0, "The amount of time it takes for the alone mod post processing filter to lerp from 1 value to the next");
 
 //------------------------------------------------------------------------------
 // Purpose : Shadow control entity
@@ -55,6 +58,25 @@ public:
 			Q_strncpy(m_netlookupFilename.GetForModify(), value, MAX_PATH);
 			return true;
 		}
+		else if (!Q_stricmp(key, "maxweight"))
+		{
+			//HACK FOR EPIC FILTER
+			if (m_bEnabled && m_bActive && !Q_stricmp(GetEntityName().ToCStr(), "_cc_epic_filter_"))
+			{
+				m_flMaxWeight = clamp(atof(value), 0.0f, 1.0f);
+
+				//check the epic filter is less than 0
+				if (m_flMaxWeight <= 0)
+					m_flMaxWeight = 0.001;
+
+				//fade either in or out
+				m_flLerpDuration = amod_epic_filter_lerp_time.GetFloat();
+				m_flTimeStartLerp = gpGlobals->curtime;
+				m_flStartLerpWeight = m_flCurWeight;
+				SetNextThink(gpGlobals->curtime + COLOR_CORRECTION_ENT_THINK_RATE, s_pLerpContextThink);
+				return true;
+			}
+		}
 
 		return BaseClass::KeyValue(key, value);
 	}
@@ -65,6 +87,7 @@ private:
 
 	void FadeInThink( void );	// Fades lookup weight from Cur->MaxWeight 
 	void FadeOutThink( void );	// Fades lookup weight from CurWeight->0.0
+	void LerpThink( void );		// Fade think
 
 	
 	
@@ -75,6 +98,14 @@ private:
 	float	m_flTimeStartFadeIn;
 	float	m_flTimeStartFadeOut;
 	
+	//lerp
+	float	m_flLerpDuration;		// Duration for a full 0->MaxWeight transition
+	float	m_flStartLerpWeight;
+	float	m_flTimeStartLerp;
+
+	//active or not
+	bool	m_bActive = false;
+
 	float	m_flMaxWeight;
 
 	bool	m_bStartDisabled;
@@ -94,12 +125,18 @@ BEGIN_DATADESC( CColorCorrection )
 
 	DEFINE_THINKFUNC( FadeInThink ),
 	DEFINE_THINKFUNC( FadeOutThink ),
+	DEFINE_THINKFUNC( LerpThink ),
 
 	DEFINE_FIELD( m_flCurWeight,	      FIELD_FLOAT ),
 	DEFINE_FIELD( m_flTimeStartFadeIn,	  FIELD_FLOAT ),
 	DEFINE_FIELD( m_flTimeStartFadeOut,	  FIELD_FLOAT ),
 	DEFINE_FIELD( m_flStartFadeInWeight,  FIELD_FLOAT ),
 	DEFINE_FIELD( m_flStartFadeOutWeight, FIELD_FLOAT ),
+
+	DEFINE_FIELD( m_flLerpDuration,		  FIELD_FLOAT),
+	DEFINE_FIELD( m_flStartLerpWeight,	  FIELD_FLOAT),
+	DEFINE_FIELD( m_flTimeStartLerp,	  FIELD_FLOAT),
+	DEFINE_FIELD( m_bActive,			  FIELD_BOOLEAN ),
 
 	DEFINE_KEYFIELD( m_MinFalloff,		  FIELD_FLOAT,   "minfalloff" ),
 	DEFINE_KEYFIELD( m_MaxFalloff,		  FIELD_FLOAT,   "maxfalloff" ),
@@ -169,6 +206,7 @@ void CColorCorrection::Spawn( void )
 	// To fade in/out the weight.
 	SetContextThink( &CColorCorrection::FadeInThink, TICK_NEVER_THINK, s_pFadeInContextThink );
 	SetContextThink( &CColorCorrection::FadeOutThink, TICK_NEVER_THINK, s_pFadeOutContextThink );
+	SetContextThink( &CColorCorrection::LerpThink, TICK_NEVER_THINK, s_pLerpContextThink );
 	
 	if( m_bStartDisabled )
 	{
@@ -186,8 +224,15 @@ void CColorCorrection::Spawn( void )
 
 void CColorCorrection::Activate( void )
 {
-	BaseClass::Activate();
+	//check for alone mod epic filter
+	if (!Q_stricmp(GetEntityName().ToCStr(), "_cc_epic_filter_"))
+	{
+		m_flFadeInDuration = 0.25f;
+		m_flFadeOutDuration = 0.25f;
+	}
+	m_bActive = true;
 
+	BaseClass::Activate();
 	Q_strncpy( m_netlookupFilename.GetForModify(), STRING( m_lookupFilename ), MAX_PATH );
 }
 
@@ -281,6 +326,40 @@ void CColorCorrection::FadeOutThink( void )
 	m_flCurWeight = Lerp( 1.0f - flFadeRatio, 0.0f, m_flStartFadeOutWeight );
 
 	SetNextThink( gpGlobals->curtime + COLOR_CORRECTION_ENT_THINK_RATE, s_pFadeOutContextThink );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Lerp think
+//-----------------------------------------------------------------------------
+void CColorCorrection::LerpThink(void)
+{
+	//finished or invalid
+	if (m_flLerpDuration <= 0.0f ||
+		gpGlobals->curtime >= (m_flTimeStartLerp + m_flLerpDuration))
+	{
+		m_flCurWeight = m_flMaxWeight;
+
+		SetNextThink(TICK_NEVER_THINK, s_pLerpContextThink);
+		return;
+	}
+
+	//calculate lerp fraction
+	float flLerpFrac = (gpGlobals->curtime - m_flTimeStartLerp) / m_flLerpDuration;
+	flLerpFrac = clamp(flLerpFrac, 0.0f, 1.0f);
+
+	//interpolate from start -> target
+	m_flCurWeight = Lerp(flLerpFrac, m_flStartLerpWeight, m_flMaxWeight);
+
+	//done
+	if (fabs(m_flCurWeight - m_flMaxWeight) <= 0.001f)
+	{
+		m_flCurWeight = m_flMaxWeight;
+
+		SetNextThink(TICK_NEVER_THINK, s_pLerpContextThink);
+		return;
+	}
+
+	SetNextThink(gpGlobals->curtime + COLOR_CORRECTION_ENT_THINK_RATE, s_pLerpContextThink);
 }
 
 //------------------------------------------------------------------------------

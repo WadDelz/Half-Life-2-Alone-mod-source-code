@@ -163,6 +163,16 @@ void AmodEpicFilterCallback(IConVar* var, const char*, float)
 	if (!cc)
 		return;
 
+	//enable or disable
+	if (amod_epic_filter.GetBool())
+		cc->AcceptInput("Enable", nullptr, nullptr, variant_t{}, 0);
+	else
+		cc->AcceptInput("Disable", nullptr, nullptr, variant_t{}, 0);
+
+	//check if this was called by amod_epic_filter convar
+	if (var == &amod_epic_filter)
+		return;
+
 	//get the map info
 	MapTimeInfo_t& info = GetCurrentMapTimeInfo();
 
@@ -196,12 +206,6 @@ void AmodEpicFilterCallback(IConVar* var, const char*, float)
 		cc->KeyValue("filename", filename);
 		cc->KeyValue("maxweight", atof(intensity));
 	}
-
-	//enable or disable
-	if (amod_epic_filter.GetBool())
-		cc->AcceptInput("Enable", nullptr, nullptr, variant_t{}, 0);
-	else
-		cc->AcceptInput("Disable", nullptr, nullptr, variant_t{}, 0);
 }
 
 //--------------------------------------------------------------------------------------------
@@ -317,6 +321,9 @@ public:
 		if (!sname)
 			return;
 
+		//disable fog lerping
+		clientengine->ClientCmd_Unrestricted("fog_lerp_system_enable 0");
+
 		bool daytime = IsDaytimeEnabled();
 
 		//reset all the vars that can get set
@@ -338,6 +345,7 @@ public:
 		clientengine->ClientCmd_Unrestricted("fog_blendskybox -1");
 		clientengine->ClientCmd_Unrestricted("fog_blendangleskybox -1");
 		clientengine->ClientCmd_Unrestricted("fog_blendcolorskybox -1 -1 -1");
+		clientengine->ClientCmd_Unrestricted("fog_lerp_system_lerp_time 0.0");
 		clientengine->ClientCmd_Unrestricted("r_pixelfog 1");
 		clientengine->ClientCmd_Unrestricted("r_farz -1");
 
@@ -414,6 +422,13 @@ public:
 		//set the fog + horizon
 		SetFogForTime(info);
 		SetHorizonForTime(info);
+
+		//fog lerp stuff
+		ConVarRef fog_lerp_system_enable("fog_lerp_system_enable");
+		clientengine->ClientCmd_Unrestricted(CFmtStr("fog_lerp_system_enable %d", fog_lerp_system_enable.GetBool()));
+
+		clientengine->ClientCmd_Unrestricted("amod_update_triggers_page");
+		clientengine->ClientCmd_Unrestricted("fog_lerp_startdisabletimer");
 	}
 
 	void LevelInitPostEntity()
@@ -553,7 +568,6 @@ public:
 };
 static CAmodAutoGameSystem g_AmodAutoGameSystem;
 
-
 //resets the time system
 CON_COMMAND_F(_amod_day_do, "", FCVAR_HIDDEN)
 {
@@ -564,6 +578,78 @@ CON_COMMAND_F(_amod_day_do, "", FCVAR_HIDDEN)
 }
 
 
+
+
+
+
+
+//this convar is used for the cube triggers.
+void AmodTriggerFilterIntensityChange(IConVar* var, const char*, float);
+void AmodTriggerFilterNameChange(IConVar* var, const char*, float);
+
+ConVar amod_trigger_filterintensity("amod_trigger_filterintensity", "0", FCVAR_HIDDEN, nullptr, AmodTriggerFilterIntensityChange);
+ConVar amod_trigger_filtername("amod_trigger_filtername", "0", FCVAR_HIDDEN, nullptr, AmodTriggerFilterNameChange);
+
+//changes the intensity of the epic filter
+void AmodTriggerFilterIntensityChange(IConVar* var, const char*, float)
+{
+	CBaseEntity* cc = gEntList.FindEntityByName(nullptr, "_cc_epic_filter_");
+	if (!cc)
+		return;
+
+	//get the map info
+	MapTimeInfo_t& info = GetCurrentMapTimeInfo();
+	const char* string = ConVarRef(var).GetString();
+
+	//set the color correction differently if daytime
+	if (IsDaytimeEnabled())
+	{
+		if (!string[0])
+			string = StringFromMapTimeStringTableIndex(info.DayInfo.FilterIntensity);
+
+		cc->KeyValue("maxweight", atof(string));
+	}
+	else
+	{
+		if (!string[0])
+			string = StringFromMapTimeStringTableIndex(info.NightInfo.FilterIntensity);
+
+		//set vars
+		cc->KeyValue("maxweight", atof(string));
+	}
+}
+
+//changes the name of the epic filter
+void AmodTriggerFilterNameChange(IConVar* var, const char*, float)
+{
+	CBaseEntity* cc = gEntList.FindEntityByName(nullptr, "_cc_epic_filter_");
+	if (!cc)
+		return;
+
+	//get the map info
+	MapTimeInfo_t& info = GetCurrentMapTimeInfo();
+	const char* string = ConVarRef(var).GetString();
+
+	//set the color correction differently if daytime
+	if (IsDaytimeEnabled())
+	{
+		//check the convars
+		if (!string[0])
+			string = StringFromMapTimeStringTableIndex(info.DayInfo.FilterName);
+
+		cc->KeyValue("filename", string);
+	}
+	else
+	{
+		//check the convars
+		if (!string[0])
+			string = StringFromMapTimeStringTableIndex(info.NightInfo.FilterName);
+
+		//set vars
+		cc->KeyValue("filename", string);
+	}
+
+}
 
 //simple fog setter for background06_d
 //class CAmodFogSetter : public CBaseEntity

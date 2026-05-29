@@ -333,6 +333,19 @@ void CMapPropertiesPanelSunPage::OnColorSelected(KeyValues* data)
 }
 
 //----------------------------------------------------------------------------------------------------
+// Purpose: Quick helper function to fix the angles into -180 to 180 range
+//----------------------------------------------------------------------------------------------------
+int NormalizeInto180(int input)
+{
+	if (input > 180)
+		return input - 360;
+	else if (input < -180)
+		return input + 360;
+
+	return input;
+}
+
+//----------------------------------------------------------------------------------------------------
 // Purpose: Initalizes the data
 //----------------------------------------------------------------------------------------------------
 void CMapPropertiesPanelSunPage::InitSunInfo(MapTimeInfo_t& info, bool IsNightPage)
@@ -353,14 +366,14 @@ void CMapPropertiesPanelSunPage::InitSunInfo(MapTimeInfo_t& info, bool IsNightPa
 			int _, y;
 			sscanf(angles, "%d %d", &_, &y);
 
-			m_SunPitchSlider->SetValue(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "pitch", "90")));
-			m_SunYawSlider->SetValue(y);
+			m_SunPitchSlider->SetValue(NormalizeInto180(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "pitch", "90"))));
+			m_SunYawSlider->SetValue(NormalizeInto180(y));
 
 		}
 		else
 		{
-			m_SunYawSlider->SetValue(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "angle", "0")));
-			m_SunPitchSlider->SetValue(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "pitch", "90")));
+			m_SunYawSlider->SetValue(NormalizeInto180(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "angle", "0"))));
+			m_SunPitchSlider->SetValue(NormalizeInto180(atoi(FindSunInfoFromArray(info.DayInfo.SunInfo, "pitch", "90"))));
 		}
 
 		//set the size

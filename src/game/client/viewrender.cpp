@@ -61,6 +61,7 @@
 #include "debugoverlay_shared.h"
 #include "shaderapi/ishaderapi.h"
 #include "vgui/IInput.h"
+#include "fmtstr.h"
 
 extern IShaderAPI* g_pShaderAPI;
 
@@ -133,29 +134,273 @@ ConVar r_DrawDetailProps("r_DrawDetailProps", "1", FCVAR_NONE, "0=Off, 1=Normal,
 
 ConVar r_worldlistcache("r_worldlistcache", "1");
 
+
+//TEST FOG LERP VALUES LERP SYSTEM!!!!!
+struct FogLerpVar_t
+{
+	enum class LerpType_e
+	{
+		INTERPOLATOR_LINEAR,
+		INTERPOLATOR_ACCEL,
+		INTERPOLATOR_DEACCEL,
+		INTERPOLATOR_BIAS,
+		INTERPOLATOR_GAIN,
+		INTERPOLATOR_SIMPLESPLINE,
+	};
+
+	//target value
+	int ArgCount;
+	float target[3];	//max 3. can be r, g, b.
+	float start[3];		//max 3. can be r, g, b.
+
+	//lerp stuff
+	LerpType_e lerptype;
+	float lerparam;
+
+	//times
+	float StartTime;
+	float EndTime;
+
+	//convars
+	ConVar* var;
+};
+static CUtlVector<FogLerpVar_t> g_LerpSystemVars;	//variables
+static bool g_bForceLerpEnd = false;				//should we force the lerp to end or not
+static bool g_bCalledFromLerpSystem = false;		//was the convar change called from the lerp system or not
+static bool g_sLerpEnabled = true;					//is the lerp system enabled?
+
+
+
+//these vars are to disable the lerp for the first .1 second when the map loads so the
+//fog cube triggers dont lerp when spawning in them
+float m_flEnableTime = 0.0f;
+bool m_bInEnableWait = true;
+bool m_bEnableSetTo = true;
+
+CON_COMMAND_F(fog_lerp_startdisabletimer, nullptr, FCVAR_HIDDEN)
+{
+	m_flEnableTime = gpGlobals->curtime + 0.2f;
+	m_bInEnableWait = true;
+	m_bEnableSetTo = ConVarRef("fog_lerp_system_enable").GetBool();
+	g_sLerpEnabled = false;
+}
+
+//lerp system test
+class CFogLerpSystem : public CAutoGameSystemPerFrame
+{
+public:
+	//called on level startup
+	void LevelInitPreEntity()
+	{
+		//clear the lerp system
+		g_LerpSystemVars.RemoveAll();
+
+		//disable the lerp
+		m_flEnableTime = gpGlobals->curtime + 0.2f;
+		m_bInEnableWait = true;
+		m_bEnableSetTo = ConVarRef("fog_lerp_system_enable").GetBool();
+		g_sLerpEnabled = false;
+	}
+
+	//called every frame
+	void PreRender()
+	{
+		//see if we are enabled
+		if (m_bInEnableWait && gpGlobals->curtime >= m_flEnableTime)
+		{
+			g_sLerpEnabled = m_bEnableSetTo;
+			m_bInEnableWait = false;
+		}
+
+		//we will be calling the vars from the lerp system
+		g_bCalledFromLerpSystem = true;
+
+		//go through all the vars
+		for (int i = 0; i < g_LerpSystemVars.Count(); i++)
+		{
+			//get the var
+			FogLerpVar_t& var = g_LerpSystemVars[i];
+
+			//build the output string early
+			char format[64];
+			format[0] = '\0';
+			for (int j = 0; j < var.ArgCount; j++)
+			{
+				strcat(format, "%f");
+
+				if (j != (var.ArgCount - 1))
+					strcat(format, " ");
+			}
+
+			//lerp the values
+			float output[3] = { 0,0,0 };
+
+			//get our lerp pos
+			float pos = (gpGlobals->curtime - var.StartTime) / (var.EndTime - var.StartTime);
+			pos = clamp(pos, 0.0f, 1.0f);
+
+			//get the lerp type
+			switch ((FogLerpVar_t::LerpType_e)var.lerptype)
+			{
+			case FogLerpVar_t::LerpType_e::INTERPOLATOR_ACCEL:
+				pos *= pos;
+				break;
+			case FogLerpVar_t::LerpType_e::INTERPOLATOR_DEACCEL:
+				pos = sqrtf(pos);
+				break;
+			case FogLerpVar_t::LerpType_e::INTERPOLATOR_SIMPLESPLINE:
+				pos = SimpleSpline(pos);
+				break;
+			case FogLerpVar_t::LerpType_e::INTERPOLATOR_BIAS:
+				pos = Bias(pos, var.lerparam);
+				break;
+			case FogLerpVar_t::LerpType_e::INTERPOLATOR_GAIN:
+				pos = Gain(pos, var.lerparam);
+				break;
+			}
+
+			//should we end this frame?
+			bool ShouldEnd = gpGlobals->curtime >= var.EndTime || g_bForceLerpEnd;
+
+			//get our vars
+			for (int j = 0; j < var.ArgCount; j++)
+			{
+				output[j] = ShouldEnd ? var.target[j] : var.start[j] + ((var.target[j] - var.start[j]) * pos);
+			}
+
+			//set our convar value
+			var.var->SetValue(CFmtStr(format, output[0], output[1], output[2]));
+
+			//check the end time
+			if (ShouldEnd)
+			{
+				g_LerpSystemVars.Remove(i--);
+				continue;
+			}
+		}
+
+		//reset g_bCalledFromLerpSystem
+		g_bCalledFromLerpSystem = false;
+	}
+};
+static CFogLerpSystem g_sFogLerpSystem;
+
+
+
+
+//fog lerp system vars
+static void FogLerpSystemConvarChangeCallback(IConVar* var, const char*, float)
+{
+	//if disabled then force the lerp system to do 1 more update to finish the values
+	g_sLerpEnabled = ((ConVar*)var)->GetBool();
+	if (!g_sLerpEnabled)
+	{
+		g_bForceLerpEnd = true;
+		g_sFogLerpSystem.PreRender();
+		g_bForceLerpEnd = false;
+	}
+}
+ConVar fog_lerp_system_enable("fog_lerp_system_enable", "1", 0, nullptr, FogLerpSystemConvarChangeCallback);
+ConVar fog_lerp_system_lerp_time("fog_lerp_system_lerp_time", "1.0");
+ConVar fog_lerp_system_lerp_type("fog_lerp_system_lerp_type", "5");
+ConVar fog_lerp_system_lerp_parameter("fog_lerp_system_lerp_parameter", "0");
+
+//Change callback for the lerp vars
+static void FogChangedLerpSystemCallback(IConVar* var, const char* prevstring, float prevfloat)
+{
+	//dont do any of the following code if this is set to true
+	static bool g_Hack = false;
+	if (g_Hack)
+		return;
+
+	//check we are connected
+	const bool IsMapPropertiesPanelOpen();
+	const bool IsMapPropertiesFogTriggersPanelOpen();
+	if (!engine->IsConnected() || !g_sLerpEnabled || fog_lerp_system_lerp_time.GetFloat() <= 0.0f || (IsMapPropertiesPanelOpen() && !IsMapPropertiesFogTriggersPanelOpen()))
+	{
+		g_Hack = g_bForceLerpEnd = true;
+		g_sFogLerpSystem.PreRender();
+		g_Hack = g_bForceLerpEnd = false;
+		return;
+	}
+
+	//if we are calling it from the lerp system then dont do this
+	static bool CanChangeValue = true;
+	if (!g_bCalledFromLerpSystem && CanChangeValue && Q_stricmp(prevstring, ((ConVar*)var)->GetString()))
+	{
+		//static int debug = 0;
+		//ConMsg("UPDATING %d\n", debug++);
+
+		//make sure we dont recurse
+		CanChangeValue = false;
+
+		//check this convar already exists inside g_LerpSystemVars
+		for (int i = 0; i < g_LerpSystemVars.Count(); i++)
+		{
+			if (!Q_stricmp(g_LerpSystemVars[i].var->GetName(), var->GetName()))
+			{
+				g_LerpSystemVars.Remove(i);
+				break;
+			}
+		}
+
+		//add to the lerp values
+		FogLerpVar_t& Var = g_LerpSystemVars[g_LerpSystemVars.AddToTail()];
+		memset(&Var, 0, sizeof(FogLerpVar_t));
+
+		//set the vars
+		Var.var = (ConVar*)var;
+		Var.StartTime = gpGlobals->curtime;
+		Var.EndTime = Var.StartTime + fog_lerp_system_lerp_time.GetFloat();
+		Var.lerptype = (FogLerpVar_t::LerpType_e)fog_lerp_system_lerp_type.GetInt();
+		Var.lerparam = fog_lerp_system_lerp_parameter.GetFloat();
+		Var.ArgCount = Clamp(sscanf(Var.var->GetString(), "%f %f %f", &Var.target[0], &Var.target[1], &Var.target[2]), 0, 3);		//clamp between 0 and 3 because we can have max 3 vars (float[3])
+		sscanf(prevstring, "%f %f %f", &Var.start[0], &Var.start[1], &Var.start[2]);
+
+		//set the value to the old value
+		((ConVar*)var)->SetValue(prevstring);
+
+		//can call into this again
+		CanChangeValue = true;
+	}
+}
+
+
+
+
+
 //-----------------------------------------------------------------------------
 // Convars related to fog color
 //-----------------------------------------------------------------------------
 // set any of these to use the maps fog
 ConVar fog_override("fog_override", "0", FCVAR_CHEAT);
-ConVar fog_start("fog_start", "-1", FCVAR_CHEAT);
-ConVar fog_end("fog_end", "-1", FCVAR_CHEAT);
-ConVar fog_color("fog_color", "-1 -1 -1", FCVAR_CHEAT);
 ConVar fog_enable("fog_enable", "1", FCVAR_CHEAT);
-ConVar fog_startskybox("fog_startskybox", "-1", FCVAR_CHEAT);
-ConVar fog_endskybox("fog_endskybox", "-1", FCVAR_CHEAT);
-ConVar fog_maxdensityskybox("fog_maxdensityskybox", "-1", FCVAR_CHEAT);
-ConVar fog_colorskybox("fog_colorskybox", "-1 -1 -1", FCVAR_CHEAT);
 ConVar fog_enableskybox("fog_enableskybox", "1", FCVAR_CHEAT);
-ConVar fog_maxdensity("fog_maxdensity", "-1", FCVAR_CHEAT);
+ConVar fog_start("fog_start", "-1", FCVAR_CHEAT, nullptr, FogChangedLerpSystemCallback);
+ConVar fog_end("fog_end", "-1", FCVAR_CHEAT, nullptr, FogChangedLerpSystemCallback);
+ConVar fog_color("fog_color", "-1 -1 -1", FCVAR_CHEAT, nullptr, FogChangedLerpSystemCallback);
+ConVar fog_startskybox("fog_startskybox", "-1", FCVAR_CHEAT, nullptr, FogChangedLerpSystemCallback);
+ConVar fog_endskybox("fog_endskybox", "-1", FCVAR_CHEAT, nullptr, FogChangedLerpSystemCallback);
+ConVar fog_maxdensityskybox("fog_maxdensityskybox", "-1", FCVAR_CHEAT, nullptr, FogChangedLerpSystemCallback);
+ConVar fog_colorskybox("fog_colorskybox", "-1 -1 -1", FCVAR_CHEAT, nullptr, FogChangedLerpSystemCallback);
+ConVar fog_maxdensity("fog_maxdensity", "-1", FCVAR_CHEAT, nullptr, FogChangedLerpSystemCallback);
 
 //alone mod
 ConVar fog_blend("fog_blend", "-1", FCVAR_CHEAT);
-ConVar fog_blendangle("fog_blendangle", "-1", FCVAR_CHEAT);
-ConVar fog_blendcolor("fog_blendcolor", "-1 -1 -1", FCVAR_CHEAT);
+ConVar fog_blendangle("fog_blendangle", "-1", FCVAR_CHEAT, nullptr, FogChangedLerpSystemCallback);
+ConVar fog_blendcolor("fog_blendcolor", "-1 -1 -1", FCVAR_CHEAT, nullptr, FogChangedLerpSystemCallback);
+
+//ConVar fog_blendstart("fog_blendstart", "-1", FCVAR_CHEAT);
+//ConVar fog_blendend("fog_blendend", "-1", FCVAR_CHEAT);
+//ConVar fog_blenddensity("fog_blenddensity", "-1", FCVAR_CHEAT);
+
 ConVar fog_blendskybox("fog_blendskybox", "-1", FCVAR_CHEAT);
-ConVar fog_blendangleskybox("fog_blendangleskybox", "-1", FCVAR_CHEAT);
-ConVar fog_blendcolorskybox("fog_blendcolorskybox", "-1 -1 -1", FCVAR_CHEAT);
+ConVar fog_blendangleskybox("fog_blendangleskybox", "-1", FCVAR_CHEAT, nullptr, FogChangedLerpSystemCallback);
+ConVar fog_blendcolorskybox("fog_blendcolorskybox", "-1 -1 -1", FCVAR_CHEAT, nullptr, FogChangedLerpSystemCallback);
+
+//ConVar fog_blendstartskybox("fog_blendstartskybox", "-1", FCVAR_CHEAT);
+//ConVar fog_blendendskybox("fog_blendendskybox", "-1", FCVAR_CHEAT);
+//ConVar fog_blenddensityskybox("fog_blenddensityskybox", "-1", FCVAR_CHEAT);
 
 //-----------------------------------------------------------------------------
 // Water-related convars
@@ -779,6 +1024,136 @@ static void SetClearColorToFogColor()
 	pRenderContext->ClearColor4ub(ucFogColor[0], ucFogColor[1], ucFogColor[2], 255);
 }
 
+static ConVar r_horizonfog("r_horizonfog", "0");
+static ConVar r_horizonfog_enable("r_horizonfog_enable", "1");
+static ConVar r_horizonfog_no3dskyclip("r_horizonfog_no3dskyclip", "1");
+static ConVar r_horizonfog_top_r("r_horizonfog_top_r", "0.5");
+static ConVar r_horizonfog_top_g("r_horizonfog_top_g", "0.7");
+static ConVar r_horizonfog_top_b("r_horizonfog_top_b", "1.0");
+static ConVar r_horizonfog_mid_r("r_horizonfog_mid_r", "1.0");
+static ConVar r_horizonfog_mid_g("r_horizonfog_mid_g", "0.5");
+static ConVar r_horizonfog_mid_b("r_horizonfog_mid_b", "0.2");
+static ConVar r_horizonfog_bot_r("r_horizonfog_bot_r", "0.1");
+static ConVar r_horizonfog_bot_g("r_horizonfog_bot_g", "0.1");
+static ConVar r_horizonfog_bot_b("r_horizonfog_bot_b", "0.05");
+static ConVar r_horizonfog_pitch("r_horizonfog_pitch", "0");
+static ConVar r_horizonfog_yaw("r_horizonfog_yaw", "0");
+static ConVar r_horizonfog_offset_x("r_horizonfog_offset_x", "0");
+static ConVar r_horizonfog_offset_y("r_horizonfog_offset_y", "0");
+static ConVar r_horizonfog_offset_z("r_horizonfog_offset_z", "0");
+static ConVar r_horizonfog_height("r_horizonfog_height", "1.0");
+static ConVar r_horizonfog_width("r_horizonfog_width", "360");
+static ConVar r_horizonfog_scale("r_horizonfog_scale", "0.5");
+
+static void DrawHorizonFog3D(const Vector& origin, IMaterial* material)
+{
+	if (!r_horizonfog.GetBool() || !material)
+		return;
+
+	CMatRenderContextPtr pRenderContext(materials);
+	pRenderContext->Bind(material);
+
+	pRenderContext->OverrideDepthEnable(true, false);
+
+	pRenderContext->MatrixMode(MATERIAL_MODEL);
+	pRenderContext->PushMatrix();
+	pRenderContext->LoadIdentity();
+
+	pRenderContext->Translate(
+		origin.x + r_horizonfog_offset_x.GetFloat(),
+		origin.y + r_horizonfog_offset_y.GetFloat(),
+		origin.z + r_horizonfog_offset_z.GetFloat()
+	);
+
+	QAngle ang(r_horizonfog_pitch.GetFloat(), r_horizonfog_yaw.GetFloat(), 0);
+
+	pRenderContext->Rotate(ang.y, 0, 0, 1);
+	pRenderContext->Rotate(ang.x, 0, 1, 0);
+
+	float radius = 10000.0f * r_horizonfog_scale.GetFloat();
+	float height = r_horizonfog_height.GetFloat();
+
+	pRenderContext->Scale(radius, radius, radius);
+
+	const int slices = 64;
+	const int stacks = 16;
+
+	float width = r_horizonfog_width.GetFloat();
+	float widthRad = DEG2RAD(width);
+	float yawRad = DEG2RAD(r_horizonfog_yaw.GetFloat());
+
+	IMesh* pMesh = pRenderContext->GetDynamicMesh();
+	CMeshBuilder meshBuilder;
+
+	const float maxPhi = M_PI * 0.98f;
+
+	for (int i = 0; i < stacks; ++i)
+	{
+		meshBuilder.Begin(pMesh, MATERIAL_TRIANGLE_STRIP, (slices + 1) * 2);
+
+		float phi0 = ((float)i / stacks) * maxPhi;
+		float phi1 = ((float)(i + 1) / stacks) * maxPhi;
+
+		for (int j = 0; j <= slices; ++j)
+		{
+			float t = (float)j / slices;
+			float theta = yawRad + (t * widthRad) - (widthRad * 0.5f);
+
+			float x0 = sinf(phi0) * cosf(theta);
+			float y0 = sinf(phi0) * sinf(theta);
+			float z0 = cosf(phi0) * height;
+
+			float x1 = sinf(phi1) * cosf(theta);
+			float y1 = sinf(phi1) * sinf(theta);
+			float z1 = cosf(phi1) * height;
+
+			auto CalcColor = [](float z) -> Vector
+			{
+				if (z >= 0.0f)
+				{
+					float t = z;
+					return Vector(
+						r_horizonfog_mid_r.GetFloat() * (1 - t) + r_horizonfog_top_r.GetFloat() * t,
+						r_horizonfog_mid_g.GetFloat() * (1 - t) + r_horizonfog_top_g.GetFloat() * t,
+						r_horizonfog_mid_b.GetFloat() * (1 - t) + r_horizonfog_top_b.GetFloat() * t
+					);
+				}
+				else
+				{
+					float t = -z;
+					return Vector(
+						r_horizonfog_bot_r.GetFloat() * t + r_horizonfog_mid_r.GetFloat() * (1 - t),
+						r_horizonfog_bot_g.GetFloat() * t + r_horizonfog_mid_g.GetFloat() * (1 - t),
+						r_horizonfog_bot_b.GetFloat() * t + r_horizonfog_mid_b.GetFloat() * (1 - t)
+					);
+				}
+			};
+
+			Vector col0 = CalcColor(z0);
+			Vector col1 = CalcColor(z1);
+
+			meshBuilder.Position3f(x0, y0, z0);
+			meshBuilder.Normal3f(x0, y0, z0);
+			meshBuilder.TexCoord2f(0, t, (float)i / stacks);
+			meshBuilder.Color4f(col0.x, col0.y, col0.z, 1.0f);
+			meshBuilder.AdvanceVertex();
+
+			meshBuilder.Position3f(x1, y1, z1);
+			meshBuilder.Normal3f(x1, y1, z1);
+			meshBuilder.TexCoord2f(0, t, (float)(i + 1) / stacks);
+			meshBuilder.Color4f(col1.x, col1.y, col1.z, 1.0f);
+			meshBuilder.AdvanceVertex();
+		}
+
+		meshBuilder.End();
+		pMesh->Draw();
+	}
+
+	pRenderContext->OverrideDepthEnable(false, true);
+	pRenderContext->PopMatrix();
+}
+
+
 //-----------------------------------------------------------------------------
 // Precache of necessary materials
 //-----------------------------------------------------------------------------
@@ -1372,12 +1747,16 @@ void CViewRender::ViewDrawScene(bool bDrew3dSkybox, SkyboxVisibility_t nSkyboxVi
 #else
 	bool drawSkybox = r_skybox.GetBool();
 #endif
-	if (bDrew3dSkybox || (nSkyboxVisible == SKYBOX_NOT_VISIBLE))	
+	if (bDrew3dSkybox || (nSkyboxVisible == SKYBOX_NOT_VISIBLE))
 	{
 		drawSkybox = false;
 	}
 
 	ParticleMgr()->IncrementFrameCode();
+
+	//draw the horizon fog
+	if (r_horizonfog_enable.GetBool() && !r_horizonfog_no3dskyclip.GetBool() || !bDrew3dSkybox)
+		DrawHorizonFog3D(view.origin, m_HorizonFogMaterial);
 
 	DrawWorldAndEntities(drawSkybox, view, nClearFlags, pCustomVisibility);
 
@@ -1515,7 +1894,7 @@ static void GetFogColor(fogparams_t* pFogParams, float* pColor)
 				flSecondaryColor[2] = -1;
 			}
 		}
-	
+
 		//set our vars to the default if needed
 		if (flSecondaryColor[0] == -1 && flSecondaryColor[1] == -1 && flSecondaryColor[2] == -1)
 		{
@@ -1526,7 +1905,7 @@ static void GetFogColor(fogparams_t* pFogParams, float* pColor)
 	}
 
 	//dont do this if fog_override is enabled
-	if (!fog_override.GetBool())
+	//if (!fog_override.GetBool())
 		GetFogColorTransition(pFogParams, flPrimaryColor, flSecondaryColor);
 
 	//should we blend?
@@ -1537,14 +1916,14 @@ static void GetFogColor(fogparams_t* pFogParams, float* pColor)
 	if (blend)
 	{
 		Vector dir = pFogParams->dirPrimary;
-		
+
 		//set the blend angle
 		if (fog_override.GetBool() && fog_blendangle.GetFloat() != -1)
 		{
 			QAngle ang;
 			ang.Init(0, fog_blendangle.GetFloat(), 0);
-			AngleVectors(ang, &dir);	
-			VectorNormalize(dir);
+			AngleVectors(ang, &dir);
+			//VectorNormalize(dir);
 		}
 
 		//
@@ -1591,7 +1970,7 @@ static void GetFogColor(fogparams_t* pFogParams, float* pColor)
 		pColor[1] = flPrimaryColor[1];
 		pColor[2] = flPrimaryColor[2];
 	}
-	
+
 
 	VectorScale(pColor, 1.0f / 255.0f, pColor);
 }
@@ -1731,7 +2110,7 @@ static float GetFogMaxDensity(fogparams_t* pFogParams)
 		if (fog_maxdensity.GetFloat() != -1.0f)
 			return fog_maxdensity.GetFloat();
 	}
-	
+
 	return pFogParams->maxdensity;
 }
 
@@ -1820,7 +2199,7 @@ static void GetSkyboxFogColor(float* pColor)
 			QAngle ang;
 			ang.Init(0, fog_blendangleskybox.GetFloat(), 0);
 			AngleVectors(ang, &dir);
-			VectorNormalize(dir);
+			//VectorNormalize(dir);
 		}
 
 		//
@@ -2324,135 +2703,6 @@ if (amod_view_filter_video##i.GetBool()) { \
 DrawQuad(m_filterVideo##i, view.width, view.height); \
 }
 
-static ConVar r_horizonfog("r_horizonfog", "0");
-static ConVar r_horizonfog_enable("r_horizonfog_enable", "1");
-static ConVar r_horizonfog_no3dskyclip("r_horizonfog_no3dskyclip", "1");
-static ConVar r_horizonfog_top_r("r_horizonfog_top_r", "0.5");
-static ConVar r_horizonfog_top_g("r_horizonfog_top_g", "0.7");
-static ConVar r_horizonfog_top_b("r_horizonfog_top_b", "1.0");
-static ConVar r_horizonfog_mid_r("r_horizonfog_mid_r", "1.0");
-static ConVar r_horizonfog_mid_g("r_horizonfog_mid_g", "0.5");
-static ConVar r_horizonfog_mid_b("r_horizonfog_mid_b", "0.2");
-static ConVar r_horizonfog_bot_r("r_horizonfog_bot_r", "0.1");
-static ConVar r_horizonfog_bot_g("r_horizonfog_bot_g", "0.1");
-static ConVar r_horizonfog_bot_b("r_horizonfog_bot_b", "0.05");
-static ConVar r_horizonfog_pitch("r_horizonfog_pitch", "0");
-static ConVar r_horizonfog_yaw("r_horizonfog_yaw", "0");
-static ConVar r_horizonfog_offset_x("r_horizonfog_offset_x", "0");
-static ConVar r_horizonfog_offset_y("r_horizonfog_offset_y", "0");
-static ConVar r_horizonfog_offset_z("r_horizonfog_offset_z", "0");
-static ConVar r_horizonfog_height("r_horizonfog_height", "1.0");
-static ConVar r_horizonfog_width("r_horizonfog_width", "360");
-static ConVar r_horizonfog_scale("r_horizonfog_scale", "0.5");
-
-static void DrawHorizonFog3D(const Vector& origin, IMaterial* material)
-{
-	if (!r_horizonfog.GetBool() || !material)
-		return;
-
-	CMatRenderContextPtr pRenderContext(materials);
-	pRenderContext->Bind(material);
-
-	pRenderContext->OverrideDepthEnable(true, false);
-
-	pRenderContext->MatrixMode(MATERIAL_MODEL);
-	pRenderContext->PushMatrix();
-	pRenderContext->LoadIdentity();
-
-	pRenderContext->Translate(
-		origin.x + r_horizonfog_offset_x.GetFloat(),
-		origin.y + r_horizonfog_offset_y.GetFloat(),
-		origin.z + r_horizonfog_offset_z.GetFloat()
-	);
-
-	QAngle ang(r_horizonfog_pitch.GetFloat(), r_horizonfog_yaw.GetFloat(), 0);
-
-	pRenderContext->Rotate(ang.y, 0, 0, 1);
-	pRenderContext->Rotate(ang.x, 0, 1, 0);
-
-	float radius = 10000.0f * r_horizonfog_scale.GetFloat();
-	float height = r_horizonfog_height.GetFloat();
-
-	pRenderContext->Scale(radius, radius, radius);
-
-	const int slices = 64;
-	const int stacks = 16;
-
-	float width = r_horizonfog_width.GetFloat();
-	float widthRad = DEG2RAD(width);
-	float yawRad = DEG2RAD(r_horizonfog_yaw.GetFloat());
-
-	IMesh* pMesh = pRenderContext->GetDynamicMesh();
-	CMeshBuilder meshBuilder;
-
-	const float maxPhi = M_PI * 0.98f;
-
-	for (int i = 0; i < stacks; ++i)
-	{
-		meshBuilder.Begin(pMesh, MATERIAL_TRIANGLE_STRIP, (slices + 1) * 2);
-
-		float phi0 = ((float)i / stacks) * maxPhi;
-		float phi1 = ((float)(i + 1) / stacks) * maxPhi;
-
-		for (int j = 0; j <= slices; ++j)
-		{
-			float t = (float)j / slices;
-			float theta = yawRad + (t * widthRad) - (widthRad * 0.5f);
-
-			float x0 = sinf(phi0) * cosf(theta);
-			float y0 = sinf(phi0) * sinf(theta);
-			float z0 = cosf(phi0) * height;
-
-			float x1 = sinf(phi1) * cosf(theta);
-			float y1 = sinf(phi1) * sinf(theta);
-			float z1 = cosf(phi1) * height;
-
-			auto CalcColor = [](float z) -> Vector
-			{
-				if (z >= 0.0f)
-				{
-					float t = z;
-					return Vector(
-						r_horizonfog_mid_r.GetFloat() * (1 - t) + r_horizonfog_top_r.GetFloat() * t,
-						r_horizonfog_mid_g.GetFloat() * (1 - t) + r_horizonfog_top_g.GetFloat() * t,
-						r_horizonfog_mid_b.GetFloat() * (1 - t) + r_horizonfog_top_b.GetFloat() * t
-					);
-				}
-				else
-				{
-					float t = -z;
-					return Vector(
-						r_horizonfog_bot_r.GetFloat() * t + r_horizonfog_mid_r.GetFloat() * (1 - t),
-						r_horizonfog_bot_g.GetFloat() * t + r_horizonfog_mid_g.GetFloat() * (1 - t),
-						r_horizonfog_bot_b.GetFloat() * t + r_horizonfog_mid_b.GetFloat() * (1 - t)
-					);
-				}
-			};
-
-			Vector col0 = CalcColor(z0);
-			Vector col1 = CalcColor(z1);
-
-			meshBuilder.Position3f(x0, y0, z0);
-			meshBuilder.Normal3f(x0, y0, z0);
-			meshBuilder.TexCoord2f(0, t, (float)i / stacks);
-			meshBuilder.Color4f(col0.x, col0.y, col0.z, 1.0f);
-			meshBuilder.AdvanceVertex();
-
-			meshBuilder.Position3f(x1, y1, z1);
-			meshBuilder.Normal3f(x1, y1, z1);
-			meshBuilder.TexCoord2f(0, t, (float)(i + 1) / stacks);
-			meshBuilder.Color4f(col1.x, col1.y, col1.z, 1.0f);
-			meshBuilder.AdvanceVertex();
-		}
-
-		meshBuilder.End();
-		pMesh->Draw();
-	}
-
-	pRenderContext->OverrideDepthEnable(false, true);
-	pRenderContext->PopMatrix();
-}
-
 void CViewRender::RenderView(const CViewSetup& viewtmp, int nClearFlags, int whatToDraw)
 {
 	m_UnderWaterOverlayMaterial.Shutdown();					// underwater view will set
@@ -2572,10 +2822,6 @@ void CViewRender::RenderView(const CViewSetup& viewtmp, int nClearFlags, int wha
 				nClearFlags |= VIEW_CLEAR_COLOR;
 			}
 		}
-
-		//draw the horizon fog
-		if (r_horizonfog_enable.GetBool() && !r_horizonfog_no3dskyclip.GetBool())
-			DrawHorizonFog3D(view.origin, m_HorizonFogMaterial);
 
 		// Render world and all entities, particles, etc.
 		if (!g_pIntroData)
@@ -2722,7 +2968,7 @@ void CViewRender::RenderView(const CViewSetup& viewtmp, int nClearFlags, int wha
 			}
 			pRenderContext.SafeRelease();
 		}
-		
+
 		//get the color for the color picker if we need to
 		if (g_bShouldSetColorPicker)
 		{
@@ -5451,20 +5697,20 @@ void CSkyboxView::DrawInternal(view_id_t iSkyBoxViewID, bool bInvokePreAndPostRe
 
 	g_pClientShadowMgr->ComputeShadowTextures((*this), m_pWorldListInfo->m_LeafCount, m_pWorldListInfo->m_pLeafList);
 
-#if DRAW_USES_DYNAMIC_SKY
-	if (g_PModBase_DynamicSkybox_bUse)
-		ModBase_DrawSkyBox(view->GetZFar());
-#endif
-
 	//HACK HACK for the horizon fog
 	if (r_horizonfog.GetBool() && r_horizonfog_enable.GetBool() && r_horizonfog_no3dskyclip.GetBool())
 	{
 		//set our temporary flags
 		int temp = m_DrawFlags & ~(DF_DRAWSKYBOX);
 
+#if DRAW_USES_DYNAMIC_SKY
+		if (g_PModBase_DynamicSkybox_bUse)
+			ModBase_DrawSkyBox(view->GetZFar());
+#else
 		//draw ONLY the 2d skybox
 		m_DrawFlags = DF_DRAWSKYBOX;
 		DrawWorld(0.0f);
+#endif
 
 		//draw the horizon fog now
 		DrawHorizonFog3D(origin, ((CViewRender*)view)->m_HorizonFogMaterial);
@@ -5475,6 +5721,11 @@ void CSkyboxView::DrawInternal(view_id_t iSkyBoxViewID, bool bInvokePreAndPostRe
 	}
 	else
 	{
+#if DRAW_USES_DYNAMIC_SKY
+		if (g_PModBase_DynamicSkybox_bUse)
+			ModBase_DrawSkyBox(view->GetZFar());
+#endif
+
 		DrawWorld(0.0f);
 	}
 
@@ -5527,7 +5778,6 @@ bool CSkyboxView::Setup(const CViewSetup& view, int* pClearFlags, SkyboxVisibili
 		if (g_PModBase_DynamicSkybox_bUse)
 			ModBase_DrawSkyBox(view.zFar);
 #endif
-
 		return false;
 	}
 

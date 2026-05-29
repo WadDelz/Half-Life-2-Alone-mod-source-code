@@ -277,7 +277,6 @@ void CColorPicker::OnCommand(const char* command)
 		if (vgui::input()->GetAppModalSurface() == GetVPanel())
 			return;
 
-		m_hPreviousModal = vgui::input()->GetAppModalSurface();
 		vgui::input()->SetAppModalSurface(GetVPanel());
 		return;
 	}

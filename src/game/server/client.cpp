@@ -1152,12 +1152,34 @@ void CC_Player_NoClip(void)
 static ConCommand noclip("noclip", CC_Player_NoClip, "Toggle. Player becomes non-solid and flies.", FCVAR_CHEAT);
 
 
+void CC_Player_NoClipTrue(const CCommand& args)
+{
+	CBasePlayer* pPlayer = ToBasePlayer(UTIL_GetCommandClient());
+	if (!pPlayer)
+		return;
+
+	bool active = atoi(args.Arg(0)) == 0;
+	if (active)
+	{
+		pPlayer->SetParent(NULL);
+		pPlayer->SetMoveType(MOVETYPE_NOCLIP);
+		pPlayer->AddEFlags(EFL_NOCLIP_ACTIVE);
+	}
+	else
+	{
+		pPlayer->SetMoveType(MOVETYPE_WALK);
+		pPlayer->RemoveEFlags(EFL_NOCLIP_ACTIVE);
+	}
+}
+static ConCommand noclip_set("noclip_set", CC_Player_NoClipTrue);
+
+
 //------------------------------------------------------------------------------
 // Sets client to godmode
 //------------------------------------------------------------------------------
 void CC_God_f(void)
 {
-	if (!sv_cheats->GetBool())
+	if (!sv_cheats->GetBool()) 
 		return;
 
 	CBasePlayer* pPlayer = ToBasePlayer(UTIL_GetCommandClient());

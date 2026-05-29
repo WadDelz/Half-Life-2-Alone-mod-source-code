@@ -3,7 +3,8 @@
 #define __ALONEMODTIMEINFO_H
 
 #ifdef CLIENT_DLL
-#define FOG_CUBE_TRIGGER_TEST 0		//1
+#define FOG_CUBE_TRIGGER_TEST 1
+#define FOG_CUBE_TRIGGER_TEST_VERSION_1 0
 #else
 #define FOG_CUBE_TRIGGER_TEST 0		//always 0. This is not needed for the server
 #endif
@@ -40,11 +41,13 @@ struct MapTimeInfo_t
 		//fog array
 		CUtlVector<FogInfo_t> foginfo;
 
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 		//lerp stuff
 		bool inlerp;
 		float lerptime;
 		float lerpstarttime;
 		float lerpendtime;
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 
 		//is this active
 		bool active = false;
@@ -110,6 +113,9 @@ struct MapTimeInfo_t
 	//allow daytime and night time
 	bool AllowDaytime = true;
 	bool AllowNightTime = true;
+
+	//should the times flip? For example if this was true and the current time was day, It would make the time be night and vice versa.
+	bool FlipTimes = false;
 };
 
 //map times info base

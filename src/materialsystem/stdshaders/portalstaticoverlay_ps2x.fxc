@@ -70,5 +70,6 @@ float4 main( PS_INPUT i ) : COLOR
 
 
 	float fogFactor = CalcPixelFogFactor( PIXELFOGTYPE, g_FogParams, g_EyePos_SpecExponent.z, i.worldPos_projPosZ.z, i.worldPos_projPosZ.w );
-	return FinalOutput( float4(1.0,0.0,0.0,1.0), fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR );
+	return float4(1.0, 0.5, 0.2, 1.0);
+	//return FinalOutput( float4(1.0,0.0,0.0,1.0), fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR );
 }

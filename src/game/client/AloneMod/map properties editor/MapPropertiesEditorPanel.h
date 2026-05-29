@@ -8,7 +8,7 @@
 #include "MapPropertiesEditorPanelHorizonFogPage.h"
 #include <vgui_controls/PropertyDialog.h>
 
-#define COMMAND_APPLY_PAGE_SETTINGS "ApplySettings"
+#define COMMAND_APPLY_PAGE_SETTINGS "ApplyPageSettings"
 
 //map properties panel
 class CMapPropertiesPanel : public PropertyDialog
@@ -22,6 +22,10 @@ public:
 	void OnThink();
 	void OnClose();
 	void OnCommand(const char* pszCommand);
+
+	//update our pages
+	void UpdateNonTriggerPages() { m_FogPage->Update(); m_SkyboxFilterPage->Update(); m_HorizonPage->Update(); }
+	void UpdateTriggersPage() { m_FogTriggersPage->Update(true); }
 
 	//scheme
 	void ApplySchemeSettings(IScheme* scheme);
@@ -54,6 +58,9 @@ private:
 	CMapPropertiesPanelHorizonFogPage* m_HorizonPage;
 
 private:
+	//were all friends here
+	friend const bool IsMapPropertiesFogTriggersPanelOpen();
+
 	//have we closed?
 	bool m_bClosed;
 

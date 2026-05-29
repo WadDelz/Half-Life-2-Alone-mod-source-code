@@ -2411,7 +2411,7 @@ void CSongPanel::OnCommand(const char* pcCommand)
 		//check for empty playlist
 		if (g_QueuedSongs.Count() <= 0)
 		{
-			QueryBox* error = new QueryBox("#Amod_Panel_Error", "Amod_SongPanel_Playlist_Save_IsEmpty", this);
+			QueryBox* error = new QueryBox("#Amod_Panel_Error", "#Amod_SongPanel_Playlist_Play_IsEmpty", this);
 			error->DoModal(this);
 			error->Activate();
 			return;

@@ -17,11 +17,14 @@
 
 #define DAY_DEFAULT_SKY_NAME "sky_day01_01"
 #define DAY_DEFAULT_FILTER_NAME "scripts/colorcorrection/cc_daytime.raw"
-#define DAY_DEFAULT_FILTER_INTENSITY "0.325"
+#define DAY_DEFAULT_FILTER_INTENSITY "0.3"
 #define DAY_DEFAULT_CLOUD_COLOR "255 255 255 120"
 #define DAY_DEFAULT_BLOOM_ENABLED true
 #define DAY_DEFAULT_BLOOM_SCALE 1
 #define DAY_DEFAULT_BLOOM_SCALAR 0.4f
+
+//load mod convar
+ConVar amod_timeinfo_load_mod("amod_timeinfo_load_mod", "", FCVAR_REPLICATED | FCVAR_DEVELOPMENTONLY, nullptr);
 
 #if FOG_CUBE_TRIGGER_TEST
 #include "AloneMod/map properties editor/MapPropertiesEditorPanel.h"
@@ -86,7 +89,11 @@ void InitalizeDayNightFogTriggersInfo(KeyValues* triggers, CUtlVector<MapTimeInf
 		//set the data
 		UTIL_StringToVector(cube.mins.Base(), trigger->GetString("mins"));
 		UTIL_StringToVector(cube.maxs.Base(), trigger->GetString("maxs"));
+
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 		cube.lerptime = trigger->GetFloat("LerpTime");
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
+
 		Q_strncpy(cube.name, trigger->GetName(), sizeof(cube.name));
 
 		//read all the fog variables
@@ -142,6 +149,7 @@ void AddDefaultFogValuesToTimeinfo(MapTimeInfo_t& info)
 		{"fog_blendangleskybox", "-1"},
 		{"fog_blendcolor", "-1 -1 -1"},
 		{"fog_blendcolorskybox", "-1 -1 -1"},
+		{"r_farz", "-1"},
 	};
 
 	//add the defaults
@@ -166,6 +174,7 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 {
 	info.AllowDaytime = map->GetBool("AllowDaytime", true);
 	info.AllowNightTime = map->GetBool("AllowNightTime", true);
+	info.FlipTimes = map->GetBool("FlipTimes", false);
 
 	//ALWAYS add the default fog values
 	AddDefaultFogValuesToTimeinfo(info);
@@ -312,6 +321,87 @@ void InitalizeDayNightInfoFileInternally(KeyValues* map, MapTimeInfo_t& info)
 //--------------------------------------------------------------------------------------------
 // Purpose: Loads a map info data file
 //--------------------------------------------------------------------------------------------
+void InitalizeDayNightInfoFileFromBase(const char* file)
+{
+	KeyValuesAD keyvalues(new KeyValues(file));
+	keyvalues->UsesEscapeSequences(true);
+	if (!keyvalues->LoadFromFile(filesystem, file))
+		return;
+
+	//ptr to base
+	MapTimeInfoBase_t* base = nullptr;
+
+	//look for the base first
+	const char* basename = CFmtStr("resource/time_info/%s/%s", amod_timeinfo_load_mod.GetString(), V_GetFileName(file));
+	for (int i = 0; i < DayNightInfo.Count(); i++)
+	{
+		if (!Q_stricmp(DayNightInfo[i].filename, basename))
+		{
+			base = &DayNightInfo[i];
+			break;
+		}
+	}
+
+	//if we didnt find it in the loop then add it
+	if (!base)
+	{
+		base = &DayNightInfo[DayNightInfo.AddToTail()];
+		Q_strncpy(base->filename, basename, sizeof(base->filename));
+	}
+
+	//go through each subkey
+	FOR_EACH_TRUE_SUBKEY(keyvalues, map)
+	{
+		//check the item already exists
+		bool found = false;
+		GetMapTimeInfo(map->GetName(), &found);
+		if (found)
+		{
+			//dont add the item if it already exists
+			continue;
+		}
+
+		//add the data
+		MapTimeInfo_t& info = base->base[base->base.AddToTail()];
+		Q_strncpy(info.mapname, map->GetName(), sizeof(info.mapname));
+
+		InitalizeDayNightInfoFileInternally(map, info);
+	}
+}
+
+//--------------------------------------------------------------------------------------------
+// Purpose: Initalizes all the day/night info structs BUT from the base time info so no time info gets missed
+//--------------------------------------------------------------------------------------------
+void InitalizeDayNightInfoFromBase()
+{
+	//mod folder
+	static const char* modfolder = "resource/time_info";
+
+	//go through all files in the amod_timeinfo_load_directory.GetString()/* directory
+	FileFindHandle_t handle;
+	const char* firstfile = filesystem->FindFirst(CFmtStr("%s/*.txt", modfolder), &handle);
+	while (firstfile)
+	{
+		//dont read the . filenames
+		if (!Q_stricmp(firstfile, ".") || !Q_stricmp(firstfile, ".."))
+		{
+			firstfile = filesystem->FindNext(handle);
+			continue;
+		}
+
+		//load the file
+		if (!filesystem->FindIsDirectory(handle) && strchr(firstfile, '.'))
+			InitalizeDayNightInfoFileFromBase(CFmtStr("%s/%s", modfolder, firstfile));
+
+		firstfile = filesystem->FindNext(handle);
+	}
+
+	filesystem->FindClose(handle);
+}
+
+//--------------------------------------------------------------------------------------------
+// Purpose: Loads a map info data file
+//--------------------------------------------------------------------------------------------
 void InitalizeDayNightInfoFile(const char* file)
 {
 	KeyValuesAD keyvalues(new KeyValues(file));
@@ -342,8 +432,6 @@ void InitalizeDayNightInfoFile(const char* file)
 		InitalizeDayNightInfoFileInternally(map, info);
 	}
 }
-
-ConVar amod_timeinfo_load_mod("amod_timeinfo_load_mod", "", FCVAR_REPLICATED);
 
 //--------------------------------------------------------------------------------------------
 // Purpose: Initalizes all the day/night info structs
@@ -408,6 +496,10 @@ void InitalizeDayNightInfo(bool reload)
 	}
 
 	filesystem->FindClose(handle);
+
+	//now load every base resource/time_info/* file so we dont miss out on any (ONLY if amod_timeinfo_load_mod isnt nothing)
+	if (*amod_timeinfo_load_mod.GetString())
+		InitalizeDayNightInfoFromBase();
 
 #ifdef CLIENT_DLL
 	//call open_map_time_properties_editor 1 to reset the map properties editor
@@ -561,6 +653,7 @@ void WriteTimeInfoToKeyvalues(MapTimeInfo_t& info, KeyValues* out)
 	//write our force mode
 	out->SetInt("AllowDayTime", info.AllowDaytime);
 	out->SetInt("AllowNightTime", info.AllowNightTime);
+	out->SetBool("FlipTimes", info.FlipTimes);
 
 	//get day/night keys
 	KeyValues* day = new KeyValues("day");
@@ -685,7 +778,10 @@ void WriteTimeInfoToKeyvalues(MapTimeInfo_t& info, KeyValues* out)
 				KeyValues* triggerkv = new KeyValues(trigger.name);
 				triggerkv->SetString("mins", CFmtStr("%f %f %f", trigger.mins.x, trigger.mins.y, trigger.mins.z));
 				triggerkv->SetString("maxs", CFmtStr("%f %f %f", trigger.maxs.x, trigger.maxs.y, trigger.maxs.z));
+
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 				triggerkv->SetFloat("lerptime", trigger.lerptime);
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 
 				//get all the vars
 				KeyValues* variables = new KeyValues("Variables");
@@ -772,6 +868,7 @@ MapTimeInfo_t& GetDefaultMapTimeInfo()
 	def.mapname[0] = '\0';
 	def.AllowDaytime = true;
 	def.AllowNightTime = true;
+	def.FlipTimes = false;
 
 	//reset set skyboxs/data INCASE ive ever used amod_timeinfo_reset to reset the symbol table
 	def.DayInfo.Skybox = gs_DayNightInfoSymbolsTable.AddString(DAY_DEFAULT_SKY_NAME);
@@ -807,9 +904,20 @@ MapTimeInfo_t& GetMapTimeInfo(const char* mapname, bool* found)
 		for (int j = 0; j < DayNightInfo[i].base.Count(); j++)
 		{
 			if (!Q_stricmp(DayNightInfo[i].base[j].mapname, mapname))
+			{
+				//set found
+				if (found)
+					*found = true;
+
+				//return the time info
 				return DayNightInfo[i].base[j];
+			}
 		}
 	}
+
+	//set found
+	if (found)
+		*found = false;
 
 	//default
 	return GetDefaultMapTimeInfo();
@@ -899,7 +1007,10 @@ void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool fromnight, bo
 			MapTimeInfo_t::FogCubeTrigger_t& info = to.NightInfo.FogCubeTriggers[to.NightInfo.FogCubeTriggers.AddToTail()];
 
 			//copy
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 			info.lerptime = fromtriggers[i].lerptime;
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
+
 			info.mins = fromtriggers[i].mins;
 			info.maxs = fromtriggers[i].maxs;
 			Q_strncpy(info.name, fromtriggers[i].name, sizeof(info.name));
@@ -980,7 +1091,10 @@ void CopyTimeInfoData(MapTimeInfo_t& from, MapTimeInfo_t& to, bool fromnight, bo
 			MapTimeInfo_t::FogCubeTrigger_t& info = to.DayInfo.FogCubeTriggers[to.DayInfo.FogCubeTriggers.AddToTail()];
 
 			//copy
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 			info.lerptime = fromtriggers[i].lerptime;
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
+
 			info.mins = fromtriggers[i].mins;
 			info.maxs = fromtriggers[i].maxs;
 			Q_strncpy(info.name, fromtriggers[i].name, sizeof(info.name));
@@ -1116,6 +1230,9 @@ extern ConVar fog_blendcolor;
 extern ConVar fog_blendskybox;
 extern ConVar fog_blendangleskybox;
 extern ConVar fog_blendcolorskybox;
+extern ConVar fog_lerp_system_lerp_time;
+extern ConVar fog_lerp_system_lerp_type;
+extern ConVar fog_lerp_system_lerp_parameter;
 #endif
 
 #ifdef CLIENT_DLL
@@ -1125,7 +1242,7 @@ extern ConVar fog_blendcolorskybox;
 #include "debugoverlay_shared.h"
 
 //debug convar 
-static ConVar amod_fog_cubeinfo_debug("amod_fog_cubeinfo_debug", "1");
+ConVar amod_fog_cubeinfo_debug("amod_fog_cubeinfo_debug", "0");
 
 //this it the cube trigger that will use the maps fog.
 static MapTimeInfo_t::FogCubeTrigger_t s_MapCubeTrigger;
@@ -1137,7 +1254,10 @@ void ResetCubeTriggerData()
 {
 	//set the s_MapCubeTrigger
 	memset(&s_MapCubeTrigger, 0, sizeof(s_MapCubeTrigger));
+	
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 	s_MapCubeTrigger.lerptime = 1.0f;
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 
 	//de-activate every active trigger
 	CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& CubeTriggers = IsDaytimeEnabled() ? g_CurrentDayNightInfo->DayInfo.FogCubeTriggers : g_CurrentDayNightInfo->NightInfo.FogCubeTriggers;
@@ -1153,6 +1273,9 @@ void ResetCubeTriggerData()
 //update time for the cube trigger update func
 static float s_NextUpdateTime = 0.0f;
 #endif
+
+//update the vars this frame?
+bool s_bUpdateTriggerValuesThisFrame = false;
 
 
 //time info class
@@ -1212,6 +1335,7 @@ public:
 	//collects the fog cubes
 	void CollectFogCubes(Vector pos, CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& CubeTriggers, CUtlVector<MapTimeInfo_t::FogCubeTrigger_t*>& CubeTriggersOutsideThis, MapTimeInfo_t::FogCubeTrigger_t** OldActive, MapTimeInfo_t::FogCubeTrigger_t** CurrentActive)
 	{
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 		//get the old active trigger
 		for (int i = 0; i < CubeTriggers.Count(); i++)
 		{
@@ -1223,7 +1347,7 @@ public:
 			}
 		}
 
-		//did we find a cube or not cunt (sorry for the language my bf6 game keeps fucking me over by disconnecting cause im alt tabbing to this. fix your game ea D:)
+		//did we find a cube or not
 		bool bDid = false;
 
 		//all the triggers outside the cube we are inside.
@@ -1290,17 +1414,102 @@ public:
 		{
 			*CurrentActive = &s_MapCubeTrigger;
 		}
+#else 
+		//get the old active trigger
+		for (int i = 0; i < CubeTriggers.Count(); i++)
+		{
+			if (CubeTriggers[i].active)
+			{
+				*CurrentActive = &CubeTriggers[i];
+				*OldActive = *CurrentActive;
+				break;
+			}
+		}
+
+		//did we add an item?
+		bool bDid = false;
+
+		//best (most inner) trigger
+		MapTimeInfo_t::FogCubeTrigger_t* best = NULL;
+
+		//go through all cube triggers
+		for (int i = 0; i < CubeTriggers.Count(); i++)
+		{
+			//get the cube trigger
+			MapTimeInfo_t::FogCubeTrigger_t& trigger = CubeTriggers[i];
+
+			//are we in the trigger or not?
+			bool InBounds = (pos.x >= trigger.mins.x && pos.y >= trigger.mins.y && pos.z >= trigger.mins.z) &&
+				(pos.x <= trigger.maxs.x && pos.y <= trigger.maxs.y && pos.z <= trigger.maxs.z);
+
+			if (!InBounds)
+				continue;
+
+			//we are inside at least one trigger
+			bDid = true;
+
+			//assume this is the most inner trigger
+			bool isMostInner = true;
+
+			//compare against all other triggers
+			for (int j = 0; j < CubeTriggers.Count(); j++)
+			{
+				if (i == j)
+					continue;
+
+				MapTimeInfo_t::FogCubeTrigger_t& other = CubeTriggers[j];
+
+				//are we inside the other trigger?
+				bool InBoundsOther = (pos.x >= other.mins.x && pos.y >= other.mins.y && pos.z >= other.mins.z) &&
+					(pos.x <= other.maxs.x && pos.y <= other.maxs.y && pos.z <= other.maxs.z);
+
+				if (!InBoundsOther)
+					continue;
+
+				//check if THIS trigger contains the other trigger
+				bool ContainsOther =
+					(other.mins.x >= trigger.mins.x && other.mins.y >= trigger.mins.y && other.mins.z >= trigger.mins.z) &&
+					(other.maxs.x <= trigger.maxs.x && other.maxs.y <= trigger.maxs.y && other.maxs.z <= trigger.maxs.z);
+
+				//if we contain another trigger, we are NOT the most inner
+				if (ContainsOther)
+				{
+					isMostInner = false;
+					break;
+				}
+			}
+
+			//add to list regardless (keeps your original behavior)
+			CubeTriggersOutsideThis.AddToTail(&CubeTriggers[i]);
+
+			//if this is the most inner, store it
+			if (isMostInner)
+				best = &CubeTriggers[i];
+		}
+
+		//set the active trigger
+		if (bDid && best)
+		{
+			*CurrentActive = best;
+		}
+		else
+		{
+			*CurrentActive = &s_MapCubeTrigger;
+		}
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 	}
 
 	//updates the fog triggers
-	void UpdateFogTriggers(CBasePlayer* pPlayer, CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& CubeTriggers, bool forcend = false)
+	void UpdateFogTriggers(CBasePlayer* pPlayer, CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& CubeTriggers, bool forcend = false, bool fromeditor = false)
 	{
 		//get the cube triggers count
 		if (CubeTriggers.Count() <= 0)
 			return;					//dont bother with 0 triggers
-	
+
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 		//current time
 		float curtime = gpGlobals->curtime;
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 
 		//get the players pos
 		Vector pos = pPlayer->WorldSpaceCenter();
@@ -1313,33 +1522,97 @@ public:
 		CUtlVector<MapTimeInfo_t::FogCubeTrigger_t*> CubeTriggersOutsideThis;
 		CollectFogCubes(pos, CubeTriggers, CubeTriggersOutsideThis, &OldActive, &CurrentActive);
 
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 		//static array of starting values
 		static CUtlVector<MapTimeInfo_t::FogCubeTrigger_t::Value_t> s_FogStartingValues;
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 
 		//check the current trigger
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 		if (CurrentActive != OldActive)
+#else
+		if (CurrentActive != OldActive || forcend || fromeditor)
+#endif
 		{
 			//check and set OldActive
 			if (OldActive) OldActive->active = false;
 
 			//set CurrentActive
 			CurrentActive->active = true;
+
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 			CurrentActive->inlerp = true;
 			CurrentActive->lerpstarttime = curtime;
 			CurrentActive->lerpendtime = curtime + CurrentActive->lerptime;
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 
 			//get the fog array. If CurrentActive is s_MapCubeTrigger then use the maps current fog
 			CUtlVector<MapTimeInfo_t::FogInfo_t> foginfo;
+			MapTimeInfo_t::BaseTimeInfo_t* baseinfo = IsDaytimeEnabled() ? (MapTimeInfo_t::BaseTimeInfo_t*)&g_CurrentDayNightInfo->DayInfo : (MapTimeInfo_t::BaseTimeInfo_t*)&g_CurrentDayNightInfo->NightInfo;
 
-			//always add to the base array above
-			CUtlVector<MapTimeInfo_t::FogInfo_t>& BaseOutsideFog = IsDaytimeEnabled() ? g_CurrentDayNightInfo->DayInfo.FogInfo : g_CurrentDayNightInfo->NightInfo.FogInfo;
-			for (int j = 0; j < BaseOutsideFog.Count(); j++)
+#if !FOG_CUBE_TRIGGER_TEST_VERSION_1
+			//HACKA-REE-DOO - Always add the default value for these vars. Add to this list if needed
+			static ConVar* s_HackAddDefaultFromVars[] = {
+				cvar->FindVar("amod_epic_filter_lerp_time"),
+			};
+
+			for (int j = 0; j < SIZE_OF_ARRAY(s_HackAddDefaultFromVars); j++)
 			{
-				//wow so easy!!
-				AddOrUpdateFogInfoInArray(foginfo, BaseOutsideFog[j].convar, BaseOutsideFog[j].value);
+				//check for the var
+				if (!s_HackAddDefaultFromVars[j])
+					continue;
+
+				AddOrUpdateFogInfoInArray(foginfo, s_HackAddDefaultFromVars[j]->GetName(), s_HackAddDefaultFromVars[j]->GetDefault());
 			}
 
-			if (CurrentActive != &s_MapCubeTrigger)
+			//always add these
+			if (CurrentActive != OldActive)
+			{
+				AddOrUpdateFogInfoInArray(foginfo, gs_DayNightInfoSymbolsTable.AddString("fog_lerp_system_lerp_time"), gs_DayNightInfoSymbolsTable.AddString(CFmtStr("%f", fog_lerp_system_lerp_time.GetFloat())));
+				AddOrUpdateFogInfoInArray(foginfo, gs_DayNightInfoSymbolsTable.AddString("fog_lerp_system_lerp_type"), gs_DayNightInfoSymbolsTable.AddString(CFmtStr("%f", fog_lerp_system_lerp_type.GetFloat())));
+				AddOrUpdateFogInfoInArray(foginfo, gs_DayNightInfoSymbolsTable.AddString("fog_lerp_system_lerp_parameter"), gs_DayNightInfoSymbolsTable.AddString(CFmtStr("%f", fog_lerp_system_lerp_parameter.GetFloat())));
+			}
+
+			//add the defaults
+			if (!fromeditor)
+			{
+				//add these values
+				AddOrUpdateFogInfoInArray(foginfo, gs_DayNightInfoSymbolsTable.AddString("amod_trigger_filterintensity"), gs_DayNightInfoSymbolsTable.AddString(""));
+				AddOrUpdateFogInfoInArray(foginfo, gs_DayNightInfoSymbolsTable.AddString("amod_trigger_filtername"), gs_DayNightInfoSymbolsTable.AddString(""));
+				AddOrUpdateFogInfoInArray(foginfo, gs_DayNightInfoSymbolsTable.AddString("mat_force_bloom"), gs_DayNightInfoSymbolsTable.AddString(CFmtStr("%d", baseinfo->BloomEnabled)));
+				AddOrUpdateFogInfoInArray(foginfo, gs_DayNightInfoSymbolsTable.AddString("mat_bloomscale"), gs_DayNightInfoSymbolsTable.AddString(CFmtStr("%d", baseinfo->BloomScale)));
+				AddOrUpdateFogInfoInArray(foginfo, gs_DayNightInfoSymbolsTable.AddString("mat_bloom_scalefactor_scalar"), gs_DayNightInfoSymbolsTable.AddString(CFmtStr("%.3f", baseinfo->BloomScalarFactor)));
+				AddOrUpdateFogInfoInArray(foginfo, gs_DayNightInfoSymbolsTable.AddString("sv_skyname"), baseinfo->Skybox);
+
+				//always add to the base array above
+				CUtlVector<MapTimeInfo_t::FogInfo_t>& BaseOutsideFog = baseinfo->FogInfo;
+				for (int j = 0; j < BaseOutsideFog.Count(); j++)
+				{
+					//wow so easy!!
+					AddOrUpdateFogInfoInArray(foginfo, BaseOutsideFog[j].convar, BaseOutsideFog[j].value);
+				}
+
+				//always add the base horizon fog info
+				for (int j = 0; j < baseinfo->HorizonInfo.Count(); j++)
+				{
+					//wow so easy x2!!
+					AddOrUpdateFogInfoInArray(foginfo, baseinfo->HorizonInfo[j].convar, baseinfo->HorizonInfo[j].value);
+				}
+			}
+			else
+			{
+				//HACK: update the time properties editor. This is because the filter name + skybox name + fog + other stuff doesnt get reset if we exit the zone
+				if (g_MapPropertiesPanel && CurrentActive != OldActive)
+				{
+					void HACKShouldUpdateSkyboxAndFilter();
+					HACKShouldUpdateSkyboxAndFilter();
+
+					g_MapPropertiesPanel->UpdateNonTriggerPages();
+				}
+			}
+#endif
+
+			if (CurrentActive != &s_MapCubeTrigger && (!fromeditor || s_bUpdateTriggerValuesThisFrame || (fromeditor && CurrentActive != OldActive)))
 			{
 				//add all the fog infos from the CubeTriggersOutsideThis fog info arrays
 				for (int i = 0; i < CubeTriggersOutsideThis.Count(); i++)
@@ -1351,14 +1624,19 @@ public:
 						AddOrUpdateFogInfoInArray(foginfo, OutsideThisFog[j].convar, OutsideThisFog[j].value);
 					}
 				}
+
+				//reset s_bUpdateTriggerValuesThisFrame
+				s_bUpdateTriggerValuesThisFrame = false;
 			}
 
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 			//set the s_MapCubeTrigger's lerptime to be the current time + the old triggers lerp time
 			else if (OldActive && CurrentActive == &s_MapCubeTrigger)
 				CurrentActive->lerpendtime = curtime + OldActive->lerptime;
 
 			//clear then reset the fog info
 			s_FogStartingValues.RemoveAll();
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 
 			for (int i = 0; i < foginfo.Count(); i++)
 			{
@@ -1371,14 +1649,26 @@ public:
 					break;
 				}
 
+
 				//set the values
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 				MapTimeInfo_t::FogCubeTrigger_t::Value_t& value = s_FogStartingValues[s_FogStartingValues.AddToTail(MapTimeInfo_t::FogCubeTrigger_t::Value_t{ 0, 0, 0 })];
 				sscanf(var->GetString(), "%f %f %f", &value.a, &value.b, &value.c);
+#else
+				var->SetValue(CFmtStr("%s", gs_DayNightInfoSymbolsTable.String(foginfo[i].value)));
+
+				//check for sv_skyname and it being empty
+				if (!Q_stricmp(var->GetName(), "sv_skyname") && !*var->GetString())
+				{
+					var->SetValue(gs_DayNightInfoSymbolsTable.String(baseinfo->Skybox));
+				}
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 			}
 		}
 
+#if FOG_CUBE_TRIGGER_TEST_VERSION_1
 		//if we just started the level. Set currentactive->LerpEndTime to the start time
-		if (g_bJustStartedLevel || forcend)
+		if (g_bJustStartedLevel || forcend || fromeditor)
 		{
 			CurrentActive->lerpendtime = curtime;
 			g_bJustStartedLevel = false;
@@ -1460,21 +1750,58 @@ public:
 				var->SetValue(setvalue);
 			}
 		}
+#endif //FOG_CUBE_TRIGGER_TEST_VERSION_1
 
 		//draw the debug overlays
-		if (!amod_fog_cubeinfo_debug.GetBool())
-			return;
-
-		for (int i = 0; i < CubeTriggers.Count(); i++)
+		if (amod_fog_cubeinfo_debug.GetBool())
 		{
-			//draw debug overlays
-			Color color;
-			if (CubeTriggersOutsideThis.Find(&CubeTriggers[i]) != -1)
-				color = Color(0, 255, 100, 1);
-			else
-				color = Color(255, 0, 0, 1);
+			//cube colors
+			static Color s_CubeColors[] = {
+				Color(150, 250, 0, 1),		//lime
+				Color(0, 240, 255, 1),		//cyan
+				Color(0, 255, 140, 1),		//aqua green
+				Color(0, 50, 255, 1),		//dark blue
+				Color(255, 0, 255, 1),		//magenta
+				Color(240, 255, 0, 1),		//yellow
+				Color(255, 100, 0, 1),		//orange
+				Color(0, 255, 0, 1),		//green
+			};
+			static int s_CubeColorsCount = SIZE_OF_ARRAY(s_CubeColors);
 
-			NDebugOverlay::Box(vec3_origin, CubeTriggers[i].mins, CubeTriggers[i].maxs, color.r(), color.g(), color.b(), color.a(), 0.05f);
+			//go through all the CubeTriggersOutsideThis and draw a bbox
+			for (int i = 0; i < CubeTriggersOutsideThis.Count(); i++)
+			{
+				Color color;
+
+				//if i is the last trigger then make it the last s_CubeColors color
+				if (i == CubeTriggersOutsideThis.Count() - 1)
+					color = s_CubeColors[s_CubeColorsCount - 1];
+				else
+					color = s_CubeColors[(s_CubeColorsCount - 2) - (i % (s_CubeColorsCount - 1))];
+
+				//show the bbox
+				NDebugOverlay::Box(vec3_origin, CubeTriggersOutsideThis[i]->mins, CubeTriggersOutsideThis[i]->maxs, color.r(), color.g(), color.b(), color.a(), 0.05f);
+
+				//show the text
+				Vector origin = (CubeTriggersOutsideThis[i]->mins + CubeTriggersOutsideThis[i]->maxs) * 0.5f;
+				NDebugOverlay::Text(origin, CFmtStr("Trigger: %s", CubeTriggersOutsideThis[i]->name), false, 0.05f);
+				NDebugOverlay::Text(Vector(origin.x, origin.y, origin.z - 10), CFmtStr("Inside Level: %d", (i * -1) + (CubeTriggersOutsideThis.Count() - 1)), false, 0.05f);
+			}
+
+			//draw all the cubes we are NOT inside
+			for (int i = 0; i < CubeTriggers.Count(); i++)
+			{
+				if (CubeTriggersOutsideThis.Find(&CubeTriggers[i]) == CubeTriggersOutsideThis.InvalidIndex() && CubeTriggers[i].mins != CubeTriggers[i].maxs)
+				{
+					//show the bbox
+					NDebugOverlay::Box(vec3_origin, CubeTriggers[i].mins, CubeTriggers[i].maxs, 255, 0, 0, 1, 0.05f);
+
+					//show the text
+					Vector origin = (CubeTriggers[i].mins + CubeTriggers[i].maxs) * 0.5f;
+					NDebugOverlay::Text(origin, CFmtStr("Trigger: %s", CubeTriggers[i].name), false, 0.05f);
+					NDebugOverlay::Text(Vector(origin.x, origin.y, origin.z - 10), "Inside: 0", false, 0.05f);
+				}
+			}
 		}
 	}
 
@@ -1501,7 +1828,7 @@ public:
 		UpdateFogTriggers(pPlayer, CubeTriggers);
 
 		//set s_NextUpdateTime
-		s_NextUpdateTime = gpGlobals->curtime + 0.02f;
+		s_NextUpdateTime = gpGlobals->curtime + 0.03f;	//30 times a second
 	}
 #endif //FOG_CUBE_TRIGGER_TEST
 
@@ -1512,7 +1839,7 @@ public:
 //------------------------------------------------------------------------------------------------------------------------------------
 // Purpose: For updating the cube triggers for the 
 //------------------------------------------------------------------------------------------------------------------------------------
-void UpdateFogTriggers(CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& CubeTriggers, bool forcend)
+void UpdateFogTriggers(CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& CubeTriggers, bool fromeditor)
 {
 	//get the player
 	CBasePlayer* pPlayer = CBasePlayer::GetLocalPlayer();
@@ -1520,7 +1847,7 @@ void UpdateFogTriggers(CUtlVector<MapTimeInfo_t::FogCubeTrigger_t>& CubeTriggers
 		return;
 
 	//update
-	g_TimeInfoInitalizer.UpdateFogTriggers(pPlayer, CubeTriggers, forcend);
+	g_TimeInfoInitalizer.UpdateFogTriggers(pPlayer, CubeTriggers, false, fromeditor);
 }
 #endif //FOG_CUBE_TRIGGER_TEST
 

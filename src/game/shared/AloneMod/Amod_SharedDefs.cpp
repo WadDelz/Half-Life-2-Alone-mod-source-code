@@ -155,6 +155,10 @@ bool IsDaytimeEnabled()
 	else if (!info.AllowNightTime)
 		return true;
 
+	//should we flip the time. If so then return the opposite of amod_day
+	if (info.FlipTimes)
+		return !amod_day->GetBool();
+
 	//just return the value of amod_day
 	return amod_day->GetBool();
 }
